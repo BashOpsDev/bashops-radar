@@ -6,14 +6,38 @@
 </head>
 <body>
     <main>
-        <section class="hero">
-            <h1>BashOps Radar</h1>
-            <p>Find startup repositories with strong Proof-of-Work opportunities.</p>
+        <nav class="nav">
+            <div class="brand">
+                <div class="logo">BR</div>
+                <span>BashOps Radar</span>
+            </div>
+            <a class="nav-cta" href="#analyze">Analyze Repo</a>
+        </nav>
 
-            <form method="post" action="/analyze">
+        <section class="hero">
+            <div class="badge">Proof-of-Work Intelligence for Engineers</div>
+            <h1>Find startups worth contributing to before wasting hours.</h1>
+            <p>
+                Paste a GitHub repo and BashOps Radar scores the opportunity,
+                ranks issues, and shows the best Proof-of-Work angle.
+            </p>
+
+            <form id="analyze" method="post" action="/analyze">
                 <input name="repo_url" placeholder="Paste GitHub repo URL..." required>
                 <button type="submit">Analyze Repo</button>
             </form>
+        </section>
+
+        <section class="reasons">
+            <h2>Why freelancers and engineers use this</h2>
+            <div class="reason-grid">
+                <div>Find funded startup targets faster</div>
+                <div>Stop wasting time on dead repos</div>
+                <div>Pick issues with higher merge probability</div>
+                <div>Generate better outreach angles</div>
+                <div>Turn GitHub work into paid sprint opportunities</div>
+                <div>Build proof before asking for work</div>
+            </div>
         </section>
 
         {% if error %}
@@ -24,6 +48,7 @@
         <section class="card">
             <div class="top">
                 <div>
+                    <div class="repo-label">Opportunity Report</div>
                     <h2>{{ result.repo }}</h2>
                     <p>{{ result.description }}</p>
                 </div>
@@ -51,6 +76,13 @@
 
             <h3>Proof-of-Work Angle</h3>
             <p class="angle">{{ result.angle }}</p>
+
+            <h3>Why this matters</h3>
+            <p class="angle">
+                This gives freelancers a sharper way to approach founders:
+                not “hire me”, but “I found a real issue, I know the angle,
+                and I can submit a useful PR first.”
+            </p>
 
             <h3>Top Issues</h3>
             {% for score, issue_type, issue in result.issues %}
