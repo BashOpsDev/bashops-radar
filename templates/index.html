@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BashOps Radar</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main>
+        <section class="hero">
+            <h1>BashOps Radar</h1>
+            <p>Find startup repositories with strong Proof-of-Work opportunities.</p>
+
+            <form method="post" action="/analyze">
+                <input name="repo_url" placeholder="Paste GitHub repo URL..." required>
+                <button type="submit">Analyze Repo</button>
+            </form>
+        </section>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <section class="card">
+            <div class="top">
+                <div>
+                    <h2>{{ result.repo }}</h2>
+                    <p>{{ result.description }}</p>
+                </div>
+                <div class="score">
+                    {{ result.score }}/100
+                    <span>{{ result.decision }}</span>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div><strong>Stars</strong><span>{{ result.stars }}</span></div>
+                <div><strong>Forks</strong><span>{{ result.forks }}</span></div>
+                <div><strong>Open Issues</strong><span>{{ result.open_issues }}</span></div>
+                <div><strong>Website</strong><span>{{ result.website }}</span></div>
+            </div>
+
+            <h3>Best First Target</h3>
+            {% if result.best_issue %}
+            <div class="issue best">
+                <strong>#{{ result.best_issue.number }} — {{ result.best_issue.title }}</strong>
+                <p>{{ result.best_issue.type }} · Score {{ result.best_issue.score }}/100</p>
+                <a href="{{ result.best_issue.url }}" target="_blank">Open Issue</a>
+            </div>
+            {% endif %}
+
+            <h3>Proof-of-Work Angle</h3>
+            <p class="angle">{{ result.angle }}</p>
+
+            <h3>Top Issues</h3>
+            {% for score, issue_type, issue in result.issues %}
+            <div class="issue">
+                <strong>#{{ issue.number }} — {{ issue.title }}</strong>
+                <p>{{ issue_type }} · Score {{ score }}/100</p>
+                <a href="{{ issue.html_url }}" target="_blank">Open Issue</a>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
