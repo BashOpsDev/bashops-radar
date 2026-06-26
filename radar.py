@@ -19,9 +19,16 @@ def parse_github_url(url: str):
 
 
 def github_get(endpoint: str):
-    response = requests.get(f"https://api.github.com{endpoint}", timeout=20)
+    try:
+        response = requests.get(f"https://api.github.com{endpoint}", timeout=30)
+    except requests.exceptions.Timeout:
+        raise Exception("GitHub API timed out. Check your internet connection and try again.")
+    except requests.exceptions.ConnectionError:
+        raise Exception("Could not connect to GitHub API. Check your internet connection and try again.")
+
     if response.status_code != 200:
         raise Exception(f"GitHub API error: {response.status_code} - {response.text}")
+
     return response.json()
 
 
@@ -358,6 +365,96 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
     filename.write_text(content, encoding="utf-8")
     console.print(f"\n[bold green]Pipeline report exported:[/bold green] {filename}")
 
+def estimate_difficulty(issue_type: str, issue_score: int) -> str:
+    if issue_type in ["Docs", "Good First Issue"]:
+        return "Low"
+    if issue_type in ["Bug Fix", "Testing/CI"] and issue_score >= 80:
+        return "Medium"
+    return "Medium/High"
+
+
+def estimate_time(issue_type: str) -> str:
+    if issue_type == "Docs":
+        return "30–60 minutes"
+    if issue_type == "Good First Issue":
+        return "1–2 hours"
+    if issue_type == "Testing/CI":
+        return "2–4 hours"
+    if issue_type == "Bug Fix":
+        return "3–6 hours"
+    return "4–8 hours"
+
+
+def merge_probability(issue_score: int, repo_score: int) -> str:
+    average = (issue_score + repo_score) / 2
+
+    if average >= 85:
+        return "High"
+    if average >= 70:
+        return "Medium"
+    return "Low"
+
+
+def enrich_repo(repo_url: str):
+    owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
+
+    console.print("\n[bold green]BashOps Radar Founder Intelligence V0.8[/bold green]")
+    console.print(f"[bold]Repo:[/bold] {owner}/{repo_name}")
+    console.print(f"[bold]Website:[/bold] {repo.get('homepage') or 'Not found'}")
+    console.print(f"[bold]GitHub:[/bold] {repo.get('html_url')}")
+    console.print(f"[bold]Owner / Org:[/bold] {owner}")
+    console.print(f"[bold]Description:[/bold] {repo.get('description')}")
+    console.print(f"[bold]Stars:[/bold] {repo.get('stargazers_count')}")
+    console.print(f"[bold]Open Issues:[/bold] {repo.get('open_issues_count')}")
+    console.print(f"[bold]Last Push:[/bold] {repo.get('pushed_at')}")
+    console.print(f"[bold]Opportunity Score:[/bold] {repo_score}/100")
+    console.print(f"[bold]Decision:[/bold] {decision(repo_score)}")
+
+    console.print("\n[bold yellow]Founder / Company Intelligence:[/bold yellow]")
+    console.print("- Founder/contact lookup: Manual verification required")
+    console.print("- Hiring signal: Check website careers page, README, GitHub org, and LinkedIn")
+    console.print("- Funding signal: Check YC, Crunchbase, Wellfound, company blog, or launch posts")
+    console.print("- Best outreach path: GitHub interaction first, then founder email/LinkedIn after useful PR")
+
+    console.print("\n[bold cyan]Business Opportunity Notes:[/bold cyan]")
+    console.print("This target is useful if the repo is active, founder/maintainer responds, and issues match backend/API reliability work.")
+
+
+def plan_opportunity(repo_url: str):
+    owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
+
+    console.print("\n[bold green]BashOps Radar Opportunity Planner V0.9[/bold green]")
+    console.print(f"[bold]Repo:[/bold] {owner}/{repo_name}")
+    console.print(f"[bold]Opportunity Score:[/bold] {repo_score}/100")
+    console.print(f"[bold]Decision:[/bold] {decision(repo_score)}")
+
+    if not issue_rankings:
+        console.print("[yellow]No open issues found to plan around.[/yellow]")
+        return
+
+    best_score, best_type, best_issue = issue_rankings[0]
+
+    console.print("\n[bold cyan]Best Issue:[/bold cyan]")
+    console.print(f"Issue #{best_issue.get('number')}: {best_issue.get('title')}")
+    console.print(f"URL: {best_issue.get('html_url')}")
+    console.print(f"Type: {best_type}")
+    console.print(f"Issue Score: {best_score}/100")
+
+    console.print("\n[bold yellow]Execution Plan:[/bold yellow]")
+    console.print(f"Difficulty: {estimate_difficulty(best_type, best_score)}")
+    console.print(f"Estimated Time: {estimate_time(best_type)}")
+    console.print(f"Merge Probability: {merge_probability(best_score, repo_score)}")
+    console.print(f"Suggested Angle: {recommend_angle(languages)}")
+
+    console.print("\n[bold cyan]PR Strategy:[/bold cyan]")
+    console.print("1. Reproduce or inspect the issue.")
+    console.print("2. Make the smallest useful fix.")
+    console.print("3. Add or update tests if practical.")
+    console.print("4. Keep the PR focused and easy to review.")
+    console.print("5. After review/merge, pitch a small paid sprint only if trust is built.")
+
+    console.print("\n[bold green]Sprint Opportunity:[/bold green]")
+    console.print("Offer: 48-hour backend/API reliability sprint fixing 1–3 scoped issues with tests and summary.")
 
 def analyze_repo(repo_url: str, save=False):
     owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
@@ -433,6 +530,12 @@ Analyze and save target:
 List saved targets:
   python radar.py list
 
+Founder intelligence:
+  python radar.py enrich https://github.com/sourcebot-dev/sourcebot
+
+Opportunity planner:
+  python radar.py plan https://github.com/sourcebot-dev/sourcebot
+
 Rank saved pipeline:
   python radar.py pipeline
 """)
@@ -453,6 +556,10 @@ if __name__ == "__main__":
         analyze_repo(sys.argv[2], save=True)
     elif command == "list":
         list_targets()
+    elif command == "enrich" and len(sys.argv) >= 3:
+         enrich_repo(sys.argv[2])
+    elif command == "plan" and len(sys.argv) >= 3:
+         plan_opportunity(sys.argv[2])
     else:
         # backward compatibility
         if "github.com" in command:
