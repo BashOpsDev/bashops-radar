@@ -271,6 +271,93 @@ def list_targets():
 
     console.print(table)
 
+def target_priority(score: int) -> str:
+    if score >= 90:
+        return "HOT"
+    if score >= 75:
+        return "WARM"
+    return "WATCH"
+
+
+def rank_targets():
+    if not TARGETS_FILE.exists():
+        console.print("[yellow]No targets saved yet.[/yellow]")
+        return []
+
+    with TARGETS_FILE.open("r", encoding="utf-8") as f:
+        targets = list(csv.DictReader(f))
+
+    for target in targets:
+        try:
+            target["score_int"] = int(target.get("score", 0))
+        except ValueError:
+            target["score_int"] = 0
+
+        target["priority"] = target_priority(target["score_int"])
+
+    return sorted(targets, key=lambda row: row["score_int"], reverse=True)
+
+
+def pipeline_report():
+    ranked = rank_targets()
+    if not ranked:
+        return
+
+    table = Table(title="BashOps Radar Pipeline Ranking")
+    table.add_column("Priority")
+    table.add_column("Repo")
+    table.add_column("Score")
+    table.add_column("Best Issue")
+    table.add_column("Status")
+    table.add_column("Next Action")
+    table.add_column("URL")
+
+    for target in ranked:
+        table.add_row(
+            target["priority"],
+            target["repo"],
+            str(target["score_int"]),
+            target["best_issue"],
+            target["status"],
+            target["next_action"],
+            target["url"],
+        )
+
+    console.print(table)
+
+    reports_dir = Path("reports")
+    reports_dir.mkdir(exist_ok=True)
+    filename = reports_dir / "pipeline_report.md"
+
+    rows = []
+    for index, target in enumerate(ranked, start=1):
+        rows.append(
+            f"""## {index}. {target["repo"]} — {target["priority"]}
+
+- Score: {target["score_int"]}/100
+- Best issue: {target["best_issue"]}
+- Status: {target["status"]}
+- Next action: {target["next_action"]}
+- URL: {target["url"]}
+"""
+        )
+
+    content = f"""# BashOps Radar Pipeline Report
+
+Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+## Decision Rule
+
+- HOT: work on this next
+- WARM: inspect manually
+- WATCH: keep in backlog
+
+{"".join(rows)}
+"""
+
+    filename.write_text(content, encoding="utf-8")
+    console.print(f"\n[bold green]Pipeline report exported:[/bold green] {filename}")
+
 
 def analyze_repo(repo_url: str, save=False):
     owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
@@ -345,6 +432,9 @@ Analyze and save target:
 
 List saved targets:
   python radar.py list
+
+Rank saved pipeline:
+  python radar.py pipeline
 """)
 
 
@@ -355,8 +445,10 @@ if __name__ == "__main__":
 
     command = sys.argv[1]
 
-    if command == "analyze" and len(sys.argv) >= 3:
+    if command == "analyze" and len(sys.argv) > 2:
         analyze_repo(sys.argv[2], save=False)
+    elif command == "pipeline":
+         pipeline_report()
     elif command == "add" and len(sys.argv) >= 3:
         analyze_repo(sys.argv[2], save=True)
     elif command == "list":
