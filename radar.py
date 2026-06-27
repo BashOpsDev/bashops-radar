@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import requests
 from rich.console import Console
 from rich.table import Table
+from config import APP_NAME, APP_VERSION, PUBLIC_MODE
 
 console = Console()
 TARGETS_FILE = Path("targets.csv")
@@ -234,21 +235,37 @@ I can take one scoped issue, submit a clean PR, and if useful, we can discuss a 
 def save_target(owner, repo_name, repo_score, issue_rankings):
     best_issue = issue_rankings[0][2] if issue_rankings else None
     file_exists = TARGETS_FILE.exists()
+    
 
-    with TARGETS_FILE.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+def print_header():
+    console.print(f"\n[bold green]{APP_NAME} v{APP_VERSION}[/bold green]")
+    console.print("[cyan]AI Opportunity Intelligence for Developers[/cyan]\n")
 
-        if not file_exists:
-            writer.writerow(["repo", "score", "best_issue", "status", "next_action", "url"])
 
-        writer.writerow([
-            f"{owner}/{repo_name}",
-            repo_score,
-            f"#{best_issue.get('number')}" if best_issue else "",
-            "backlog",
-            "inspect manually",
-            best_issue.get("html_url") if best_issue else repo.get("html_url"),
-        ])
+def today_briefing():
+    print_header()
+
+    target = best_pitch_target()
+    if not target:
+        return
+
+    repo = target.get("repo", "Unknown")
+    score = target.get("score_int", target.get("score", "0"))
+    best_issue = target.get("best_issue", "N/A")
+    status = target.get("status", "N/A")
+    next_action = target.get("next_action", "N/A")
+    url = target.get("url", "N/A")
+
+    console.print("[bold yellow]Today's Best Opportunity[/bold yellow]")
+    console.print(f"[bold]Company / Repo:[/bold] {repo}")
+    console.print(f"[bold]Score:[/bold] {score}/100")
+    console.print(f"[bold]Best Issue:[/bold] {best_issue}")
+    console.print(f"[bold]Status:[/bold] {status}")
+    console.print(f"[bold]Next Action:[/bold] {next_action}")
+    console.print(f"[bold]URL:[/bold] {url}")
+
+    console.print("\n[bold green]Recommended Focus:[/bold green]")
+    console.print("Work on the highest active opportunity. Keep scope small, submit one clean PR, then pitch only after trust is built.")
 
 
 def list_targets():
@@ -588,6 +605,12 @@ Analyze and save target:
 List saved targets:
   python radar.py list
 
+Today's briefing:
+  python radar.py today
+
+Contract engine:
+  python radar.py pitch
+
 Contract engine:
   python radar.py pitch
 
@@ -623,6 +646,10 @@ if __name__ == "__main__":
          plan_opportunity(sys.argv[2])
     elif command == "pitch":
          pitch_engine()
+    elif command == "today":
+        today_briefing()
+    elif command == "pitch":
+        pitch_engine()
     else:
         # backward compatibility
         if "github.com" in command:

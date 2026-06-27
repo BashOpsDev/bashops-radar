@@ -1,6 +1,6 @@
 # BashOps Radar Pipeline Report
 
-Generated: 2026-06-26 18:22
+Generated: 2026-06-27 09:30
 
 ## Decision Rule
 
@@ -12,8 +12,8 @@ Generated: 2026-06-26 18:22
 
 - Score: 100/100
 - Best issue: #1354
-- Status: backlog
-- Next action: inspect manually
+- Status: closed
+- Next action: do not pitch
 - URL: https://github.com/stagewise-io/stagewise/issues/1354
 ## 2. NangoHQ/nango — WARM
 
