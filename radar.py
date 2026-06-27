@@ -456,6 +456,51 @@ def plan_opportunity(repo_url: str):
     console.print("\n[bold green]Sprint Opportunity:[/bold green]")
     console.print("Offer: 48-hour backend/API reliability sprint fixing 1–3 scoped issues with tests and summary.")
 
+def best_pitch_target():
+    ranked = rank_targets()
+    if not ranked:
+        return None
+    return ranked[0]
+
+
+def pitch_engine():
+    target = best_pitch_target()
+    if not target:
+        return
+
+    repo = target.get("repo", "Unknown")
+    best_issue = target.get("best_issue", "N/A")
+    score = target.get("score_int", target.get("score", "0"))
+    url = target.get("url", "")
+
+    console.print("\n[bold green]BashOps Radar Contract Engine V1.0[/bold green]")
+    console.print(f"[bold]Best Target:[/bold] {repo}")
+    console.print(f"[bold]Score:[/bold] {score}/100")
+    console.print(f"[bold]Best Issue:[/bold] {best_issue}")
+    console.print(f"[bold]Issue URL:[/bold] {url}")
+
+    console.print("\n[bold yellow]Recommended Offer:[/bold yellow]")
+    console.print("48-hour backend/API reliability sprint fixing 1–3 scoped issues with tests and a clear technical summary.")
+
+    console.print("\n[bold cyan]Founder Message:[/bold cyan]")
+    console.print(
+        f"Hi, I reviewed {repo} and noticed {best_issue} plus a few related backend/API reliability areas.\n\n"
+        f"I specialize in Python/FastAPI, API reliability, async workflows, and production-focused fixes.\n\n"
+        f"I can take 1–3 scoped issues in a short 48-hour sprint, submit clean PRs with tests where practical, "
+        f"and provide a concise technical summary.\n\n"
+        f"If useful, I’d be happy to start with a small fixed sprint."
+    )
+
+    console.print("\n[bold cyan]Follow-up Message:[/bold cyan]")
+    console.print(
+        f"Hi, just following up on my note about helping with {repo}.\n\n"
+        f"I noticed there are still scoped engineering issues that match my backend/API reliability work. "
+        f"Happy to take a small sprint and keep it focused on practical fixes."
+    )
+
+    console.print("\n[bold green]Next Action:[/bold green]")
+    console.print("Use this only after trust is built: maintainer reply, review, approval, or merged PR.")
+
 def analyze_repo(repo_url: str, save=False):
     owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
 
@@ -530,6 +575,9 @@ Analyze and save target:
 List saved targets:
   python radar.py list
 
+Contract engine:
+  python radar.py pitch
+
 Founder intelligence:
   python radar.py enrich https://github.com/sourcebot-dev/sourcebot
 
@@ -560,6 +608,8 @@ if __name__ == "__main__":
          enrich_repo(sys.argv[2])
     elif command == "plan" and len(sys.argv) >= 3:
          plan_opportunity(sys.argv[2])
+    elif command == "pitch":
+         pitch_engine()
     else:
         # backward compatibility
         if "github.com" in command:
