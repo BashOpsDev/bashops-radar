@@ -460,7 +460,20 @@ def best_pitch_target():
     ranked = rank_targets()
     if not ranked:
         return None
-    return ranked[0]
+
+    inactive_statuses = {"closed", "merged", "won", "lost", "do not pitch"}
+
+    active_targets = [
+        target for target in ranked
+        if target.get("status", "").strip().lower() not in inactive_statuses
+        and target.get("next_action", "").strip().lower() != "do not pitch"
+    ]
+
+    if not active_targets:
+        console.print("[yellow]No active pitch targets found.[/yellow]")
+        return None
+
+    return active_targets[0]
 
 
 def pitch_engine():
