@@ -36,6 +36,10 @@ def analyze(request: Request, repo_url: str = Form(...)):
                 "type": issue_type,
             }
 
+        recommended_action = "Analyze another repository"
+        if best_issue:
+            recommended_action = f"Start with #{best_issue['number']} - {best_issue['title']}"
+
         result = {
             "repo": f"{owner}/{repo_name}",
             "website": repo.get("homepage") or "Not found",
@@ -54,11 +58,11 @@ def analyze(request: Request, repo_url: str = Form(...)):
             "decision": decision(repo_score),
             "angle": recommend_angle(languages),
             "best_issue": best_issue,
+            "recommended_action": recommended_action,
+            "recommended_outcome": "Submit one focused PR, build trust, then pitch a 48-hour sprint.",
             "issues": issue_rankings[:8],
             "languages": languages,
         }
-"recommended_action": f"Start with {best_issue['number']} — {best_issue['title']}" if best_issue else "Analyze another repository",
-"recommended_outcome": "Submit one focused PR, build trust, then pitch a 48-hour sprint.",
 
         return templates.TemplateResponse(
             request=request,
