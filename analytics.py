@@ -45,7 +45,7 @@ def repo_links(repo_url: str, best_issue_url: str = ""):
     }
 
 
-def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS):
+def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS, language="Unknown"):
     file_exists = ANALYTICS_FILE.exists()
 
     ip = request.client.host if request.client else "unknown"
