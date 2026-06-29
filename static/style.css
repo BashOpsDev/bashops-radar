@@ -955,3 +955,77 @@ button:hover,
         grid-template-columns: 1fr;
     }
 }
+.quick-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.link-btn,
+.copy-btn {
+  border: none;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #111827;
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.link-btn:hover,
+.copy-btn:hover {
+  background: #2563eb;
+}
+
+.pitch-box {
+  margin-top: 14px;
+}
+
+.pitch-box textarea {
+  width: 100%;
+  min-height: 110px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  padding: 12px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.copy-btn {
+  margin-top: 8px;
+  background: #16a34a;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.language {
+  background: #e0f2fe;
+}
+
+.difficulty {
+  background: #fef3c7;
+}
+
+.probability {
+  background: #dcfce7;
+}
+
+.time {
+  background: #ede9fe;
+}
