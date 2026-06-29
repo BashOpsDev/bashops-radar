@@ -113,6 +113,22 @@ def analytics_summary():
     top_issues = issue_counts.most_common(10)
     daily_activity = list(daily_counts.items())[-7:]
 
+best_opportunities = []
+
+seen = set()
+for row in sorted(rows, key=lambda x: x.get("score", "0"), reverse=True):
+    repo = row.get("repo", "")
+    if repo and repo not in seen:
+        seen.add(repo)
+        best_opportunities.append({
+            "repo": repo,
+            "score": row.get("score", "0"),
+            "best_issue": row.get("best_issue", ""),
+            "time": row.get("pretty_time", ""),
+        })
+
+best_opportunities = best_opportunities[:5]
+
     return {
         "rows": rows,
         "total_analyses": total_analyses,
