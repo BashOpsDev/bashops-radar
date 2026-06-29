@@ -486,3 +486,94 @@ button:hover,
         gap: 16px;
     }
 }
+/* Final responsive report fix */
+
+.card {
+    width: 100%;
+    overflow: hidden;
+}
+
+.card .top {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+}
+
+.score-panel {
+    width: 100%;
+    max-width: 420px;
+}
+
+.card .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+
+.report-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+}
+
+.issue-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 14px;
+    align-items: center;
+}
+
+.issue-row strong,
+.issue strong,
+.card h2,
+.card p,
+.grid div {
+    word-break: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Tablet and mobile */
+@media (max-width: 900px) {
+    .card .grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .score-panel {
+        max-width: 100%;
+    }
+
+    .issue-row {
+        grid-template-columns: 1fr;
+    }
+
+    .issue-row span,
+    .issue-row a {
+        width: fit-content;
+    }
+}
+
+/* Small phones */
+@media (max-width: 520px) {
+    .card .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card,
+    .workflow,
+    .demo,
+    .features,
+    .roadmap,
+    .pricing,
+    .social-proof,
+    footer {
+        padding: 18px;
+    }
+
+    .card h2 {
+        font-size: 26px;
+    }
+
+    .score-number {
+        font-size: 44px;
+    }
+}
