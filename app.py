@@ -78,23 +78,19 @@ def home(request: Request):
 
 @app.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_dashboard(request: Request):
-    rows = read_analytics()
-    total_analyses = len(rows)
-
-    repo_counts = {}
-    for row in rows:
-        repo = row.get("repo", "unknown")
-        repo_counts[repo] = repo_counts.get(repo, 0) + 1
-
-    top_repos = sorted(repo_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    summary = analytics_summary()
 
     return templates.TemplateResponse(
         request=request,
         name="analytics.html",
         context={
-            "total_analyses": total_analyses,
-            "top_repos": top_repos,
-            "rows": rows[-20:],
+            "total_analyses": summary["total_analyses"],
+            "unique_repos": summary["unique_repos"],
+            "average_score": summary["average_score"],
+            "highest_score": summary["highest_score"],
+            "top_repos": summary["top_repos"],
+            "top_issues": summary["top_issues"],
+            "rows": summary["rows"][-20:],
         },
     )
 
