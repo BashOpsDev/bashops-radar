@@ -6,6 +6,28 @@ from collections import Counter, defaultdict
 ANALYTICS_FILE = Path("analytics.csv")
 DEFAULT_STATUS = "New Target"
 
+PIPELINE_STATUSES = [
+    "New Target",
+    "Researching",
+    "Working",
+    "PR Submitted",
+    "PR Merged",
+    "Founder Contacted",
+    "Paid Sprint",
+    "Retainer",
+]
+
+STATUS_PROGRESS = {
+    "New Target": 12,
+    "Researching": 25,
+    "Working": 50,
+    "PR Submitted": 70,
+    "PR Merged": 85,
+    "Founder Contacted": 95,
+    "Paid Sprint": 100,
+    "Retainer": 100,
+}
+
 
 def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS):
     file_exists = ANALYTICS_FILE.exists()
@@ -49,7 +71,55 @@ def read_analytics():
         if not row.get("status"):
             row["status"] = DEFAULT_STATUS
 
+        row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
+        row["pretty_time"] = format_time(row.get("timestamp", ""))
+
     return rows
+
+
+def write_analytics(rows):
+    with ANALYTICS_FILE.open("w", newline="", encoding="utf-8") as f:
+        fieldnames = [
+            "timestamp",
+            "repo",
+            "score",
+            "best_issue",
+            "ip",
+            "user_agent",
+            "status",
+        ]
+
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for row in rows:
+            writer.writerow({
+                "timestamp": row.get("timestamp", ""),
+                "repo": row.get("repo", ""),
+                "score": row.get("score", ""),
+                "best_issue": row.get("best_issue", ""),
+                "ip": row.get("ip", ""),
+                "user_agent": row.get("user_agent", ""),
+                "status": row.get("status", DEFAULT_STATUS),
+            })
+
+
+def update_pipeline_status(repo, status):
+    if status not in PIPELINE_STATUSES:
+        return False
+
+    rows = read_analytics()
+    updated = False
+
+    for row in rows:
+        if row.get("repo") == repo:
+            row["status"] = status
+            updated = True
+
+    if updated:
+        write_analytics(rows)
+
+    return updated
 
 
 def format_time(value):
@@ -103,32 +173,19 @@ def analytics_summary():
         except Exception:
             repo_scores[repo] = 0
 
-        row["pretty_time"] = format_time(row.get("timestamp", ""))
-
         try:
             dt = datetime.fromisoformat(row.get("timestamp", ""))
-            day = dt.strftime("%d %b")
-            daily_counts[day] += 1
+            daily_counts[dt.strftime("%d %b")] += 1
         except Exception:
             pass
 
     top_repos = [
-        {
-            "repo": repo,
-            "count": count,
-            "score": repo_scores.get(repo, 0),
-        }
+        {"repo": repo, "count": count, "score": repo_scores.get(repo, 0)}
         for repo, count in repo_counts.most_common(10)
     ]
 
-    top_issues = issue_counts.most_common(10)
-
     daily_activity = [
-        {
-            "day": day,
-            "count": count,
-            "bar": "█" * min(count, 20),
-        }
+        {"day": day, "count": count, "bar": "█" * min(count, 20)}
         for day, count in list(daily_counts.items())[-7:]
     ]
 
@@ -150,28 +207,13 @@ def analytics_summary():
                 "score": row.get("score", "0"),
                 "best_issue": row.get("best_issue", ""),
                 "status": row.get("status", DEFAULT_STATUS),
+                "progress": STATUS_PROGRESS.get(row.get("status", DEFAULT_STATUS), 12),
                 "time": row.get("pretty_time", ""),
             })
 
-    best_opportunities = best_opportunities[:5]
-
-    pipeline_statuses = [
-        "New Target",
-        "Researching",
-        "Working",
-        "PR Submitted",
-        "PR Merged",
-        "Founder Contacted",
-        "Paid Sprint",
-        "Retainer",
-    ]
-
     pipeline_stats = [
-        {
-            "status": status,
-            "count": status_counts.get(status, 0),
-        }
-        for status in pipeline_statuses
+        {"status": status, "count": status_counts.get(status, 0)}
+        for status in PIPELINE_STATUSES
     ]
 
     return {
@@ -183,8 +225,24 @@ def analytics_summary():
         "average_score": average_score,
         "highest_score": highest_score,
         "top_repos": top_repos,
-        "top_issues": top_issues,
+        "top_issues": issue_counts.most_common(10),
         "daily_activity": daily_activity,
-        "best_opportunities": best_opportunities,
+        "best_opportunities": best_opportunities[:5],
         "pipeline_stats": pipeline_stats,
+        "pipeline_statuses": PIPELINE_STATUSES,
     }
+
+
+def generate_pitch(repo, best_issue):
+    issue_text = f"issue {best_issue}" if best_issue else "a high-value issue"
+
+    return f"""Hi,
+
+I reviewed {repo} and noticed {issue_text}, which looks like a strong proof-of-work opportunity.
+
+I can investigate it, submit a focused PR, and include a clear technical summary with tests where practical.
+
+If the first contribution is useful, I would be happy to help with a focused 48-hour backend/API reliability sprint.
+
+Best,
+Bashir"""
