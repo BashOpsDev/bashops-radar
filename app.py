@@ -32,7 +32,10 @@ if GEMINI_API_KEY and genai:
 
 def generate_ai_summary(repo_full_name, repo, best_issue, repo_score, angle):
     if not GEMINI_API_KEY or not genai:
-        return "AI summary is not enabled yet. Add GEMINI_API_KEY to enable Gemini analysis."
+        return {
+            "text": "AI summary is not enabled yet. Add GEMINI_API_KEY to enable Gemini analysis.",
+            "status": "unavailable",
+        }
 
     issue_text = "No best issue found."
     if best_issue:
@@ -64,7 +67,6 @@ Write a concise analysis with:
 Keep it practical, direct, and under 180 words.
 """
 
-    def generate_ai_summary(prompt):
     try:
         model = genai.GenerativeModel("gemini-2.5-flash-lite")
         response = model.generate_content(prompt)
@@ -152,6 +154,8 @@ def analyze(request: Request, repo_url: str = Form(...)):
 
         result = {
             "repo": f"{owner}/{repo_name}",
+            "repo_url": repo_url,
+            "language": language_badge,
             "website": repo.get("homepage") or "Not found",
             "github": repo.get("html_url"),
             "description": repo.get("description"),
