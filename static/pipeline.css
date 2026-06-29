@@ -391,3 +391,21 @@ h2 {
         width: 100%;
     }
 }
+
+.pipeline-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 28px;
+    align-items: flex-start;
+}
+
+.repo-subtext {
+    color: var(--muted);
+    margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+    .pipeline-card-header {
+        flex-direction: column;
+    }
+}
