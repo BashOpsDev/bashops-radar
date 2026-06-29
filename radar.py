@@ -445,6 +445,7 @@ def enrich_repo(repo_url: str):
     console.print(f"[bold]Open Issues:[/bold] {repo.get('open_issues_count')}")
     console.print(f"[bold]Last Push:[/bold] {repo.get('pushed_at')}")
     console.print(f"[bold]Opportunity Score:[/bold] {repo_score}/100")
+    console.print(f"[bold]Language:[/bold] {language_badge}")
     console.print(f"[bold]Decision:[/bold] {decision(repo_score)}")
 
     console.print("\n[bold yellow]Founder / Company Intelligence:[/bold yellow]")
