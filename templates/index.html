@@ -124,6 +124,17 @@
 
             <div class="report-grid">
                 <div>
+<div class="next-action-card">
+    <span class="section-label">Recommended Next Action</span>
+    <h3>{{ result.recommended_action }}</h3>
+    <p>{{ result.recommended_outcome }}</p>
+
+    <div class="action-pills">
+        <span>{{ result.merge_probability }} merge probability</span>
+        <span>{{ result.estimated_time }}</span>
+        <span>{{ result.difficulty }} difficulty</span>
+    </div>
+</div>
                     <h3>Best First Target</h3>
                     {% if result.best_issue %}
                     <div class="issue best">
