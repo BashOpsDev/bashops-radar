@@ -146,6 +146,12 @@ def analyze(request: Request, repo_url: str = Form(...)):
             name="index.html",
             context={"result": result, "error": None},
         )
+track_analysis(
+            repo=result["repo"],
+            score=result["score"],
+            best_issue=f"#{best_issue['number']}" if best_issue else "",
+            request=request,
+        )
 
     except Exception as e:
         return templates.TemplateResponse(
