@@ -206,6 +206,9 @@ def analyze(request: Request, repo_url: str = Form(...)):
             best_issue=f"#{best_issue['number']}" if best_issue else "",
             request=request,
             language=result.get("language", "Unknown"),
+            stars=result.get("stars", ""),
+            forks=result.get("forks", ""),
+            open_issues=result.get("open_issues", ""),
         )
 
         return templates.TemplateResponse(
