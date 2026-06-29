@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from analytics import read_analytics, track_analysis
+from analytics import analytics_summary, track_analysis
 from radar import get_analysis, decision, recommend_angle
 
 try:
