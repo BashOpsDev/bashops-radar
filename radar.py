@@ -433,7 +433,7 @@ def merge_probability(issue_score: int, repo_score: int) -> str:
 
 
 def enrich_repo(repo_url: str):
-    owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
+    owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
     console.print("\n[bold green]BashOps Radar Founder Intelligence V0.8[/bold green]")
     console.print(f"[bold]Repo:[/bold] {owner}/{repo_name}")
@@ -458,7 +458,7 @@ def enrich_repo(repo_url: str):
 
 
 def plan_opportunity(repo_url: str):
-    owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
+    owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
     console.print("\n[bold green]BashOps Radar Opportunity Planner V0.9[/bold green]")
     console.print(f"[bold]Repo:[/bold] {owner}/{repo_name}")
@@ -552,7 +552,7 @@ def pitch_engine():
     console.print("Use this only after trust is built: maintainer reply, review, approval, or merged PR.")
 
 def analyze_repo(repo_url: str, save=False):
-    owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
+    owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
     console.print("\n[bold green]BashOps Radar Report V0.6[/bold green]")
     console.print(f"[bold]Repo:[/bold] {owner}/{repo_name}")
