@@ -1029,3 +1029,44 @@ button:hover,
 .time {
   background: #ede9fe;
 }
+.pitch-panel {
+    margin-top: 28px;
+    padding: 18px;
+    border: 1px solid rgba(255, 153, 0, 0.35);
+    border-radius: 16px;
+    background: rgba(255, 153, 0, 0.04);
+}
+
+.mini-pitch {
+    display: block;
+}
+
+.pitch-textarea {
+    width: 100%;
+    min-height: 180px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 153, 0, 0.4);
+    background: #020617;
+    color: #f8fafc;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.copy-btn {
+    display: inline-block;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 10px;
+    background: #00b86b;
+    color: #020617;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.copy-btn:hover {
+    background: #22c55e;
+}
