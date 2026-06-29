@@ -284,11 +284,11 @@ def pricing(request: Request):
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login(request: Request):
+def login(request: Request, joined: bool = False):
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={},
+        context={"joined": joined},
     )
 @app.post("/update-status")
 def update_status(repo: str = Form(...), status: str = Form(...)):
