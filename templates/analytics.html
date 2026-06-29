@@ -19,6 +19,14 @@
                 <div><strong>⚡ Average Score</strong><span>{{ average_score }}</span></div>
                 <div><strong>🏆 Highest Score</strong><span>{{ highest_score }}</span></div>
             </div>
+<h2>🔥 Best Opportunities</h2>
+{% for item in best_opportunities %}
+<div class="issue best">
+    <strong>{{ item.repo }}</strong>
+    <p>Score: {{ item.score }} · Best Issue: {{ item.best_issue }}</p>
+    <p>{{ item.time }}</p>
+</div>
+{% endfor %}
 
             <h2>Daily Activity</h2>
             {% for day, count in daily_activity %}
