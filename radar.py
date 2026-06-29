@@ -136,7 +136,26 @@ def decision(score):
     if score >= 60:
         return "MAYBE — inspect manually before committing time"
     return "NO — low probability target for now"
+def primary_language(languages):
+    if not languages:
+        return "Unknown"
 
+    top_language = max(languages, key=languages.get)
+
+    badges = {
+        "Python": "🐍 Python",
+        "TypeScript": "⚡ TypeScript",
+        "JavaScript": "🟨 JavaScript",
+        "Rust": "🦀 Rust",
+        "Go": "🐹 Go",
+        "Java": "☕ Java",
+        "PHP": "🐘 PHP",
+        "Ruby": "💎 Ruby",
+        "C++": "⚙️ C++",
+        "C": "⚙️ C",
+    }
+
+    return badges.get(top_language, top_language)
 
 def recommend_angle(languages):
     if "Python" in languages:
