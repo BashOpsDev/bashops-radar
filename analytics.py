@@ -4,9 +4,10 @@ from datetime import datetime, timezone
 from collections import Counter, defaultdict
 
 ANALYTICS_FILE = Path("analytics.csv")
+DEFAULT_STATUS = "New Target"
 
 
-def track_analysis(repo, score, best_issue, request):
+def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS):
     file_exists = ANALYTICS_FILE.exists()
 
     ip = request.client.host if request.client else "unknown"
@@ -23,6 +24,7 @@ def track_analysis(repo, score, best_issue, request):
                 "best_issue",
                 "ip",
                 "user_agent",
+                "status",
             ])
 
         writer.writerow([
@@ -32,6 +34,7 @@ def track_analysis(repo, score, best_issue, request):
             best_issue or "",
             ip,
             user_agent,
+            status,
         ])
 
 
@@ -40,7 +43,13 @@ def read_analytics():
         return []
 
     with ANALYTICS_FILE.open("r", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+        rows = list(csv.DictReader(f))
+
+    for row in rows:
+        if not row.get("status"):
+            row["status"] = DEFAULT_STATUS
+
+    return rows
 
 
 def format_time(value):
@@ -75,13 +84,16 @@ def analytics_summary():
     issue_counts = Counter()
     repo_scores = {}
     daily_counts = defaultdict(int)
+    status_counts = Counter()
 
     for row in rows:
         repo = row.get("repo", "unknown")
         issue = row.get("best_issue", "")
         score = row.get("score", "0")
+        status = row.get("status", DEFAULT_STATUS)
 
         repo_counts[repo] += 1
+        status_counts[status] += 1
 
         if issue:
             issue_counts[issue] += 1
@@ -91,13 +103,14 @@ def analytics_summary():
         except Exception:
             repo_scores[repo] = 0
 
+        row["pretty_time"] = format_time(row.get("timestamp", ""))
+
         try:
             dt = datetime.fromisoformat(row.get("timestamp", ""))
             day = dt.strftime("%d %b")
             daily_counts[day] += 1
-            row["pretty_time"] = dt.strftime("%d %b %Y • %H:%M UTC")
         except Exception:
-            row["pretty_time"] = row.get("timestamp", "")
+            pass
 
     top_repos = [
         {
@@ -136,10 +149,30 @@ def analytics_summary():
                 "repo": repo,
                 "score": row.get("score", "0"),
                 "best_issue": row.get("best_issue", ""),
+                "status": row.get("status", DEFAULT_STATUS),
                 "time": row.get("pretty_time", ""),
             })
 
     best_opportunities = best_opportunities[:5]
+
+    pipeline_statuses = [
+        "New Target",
+        "Researching",
+        "Working",
+        "PR Submitted",
+        "PR Merged",
+        "Founder Contacted",
+        "Paid Sprint",
+        "Retainer",
+    ]
+
+    pipeline_stats = [
+        {
+            "status": status,
+            "count": status_counts.get(status, 0),
+        }
+        for status in pipeline_statuses
+    ]
 
     return {
         "rows": rows,
@@ -153,4 +186,5 @@ def analytics_summary():
         "top_issues": top_issues,
         "daily_activity": daily_activity,
         "best_opportunities": best_opportunities,
+        "pipeline_stats": pipeline_stats,
     }
