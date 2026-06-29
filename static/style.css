@@ -310,6 +310,40 @@ footer { text-align: center; color: var(--muted); }
     margin-bottom: 20px;
 }
 
+.card,
+.workflow,
+.demo,
+.features,
+.roadmap,
+.pricing,
+.social-proof,
+footer,
+.reason-grid div,
+.feature-grid div,
+.grid div,
+.issue,
+.issue-row,
+.angle {
+    overflow-wrap: anywhere;
+}
+
+button,
+.nav-cta,
+.issue a,
+.issue-row a,
+.bottom-cta a {
+    transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+button:hover,
+.nav-cta:hover,
+.issue a:hover,
+.issue-row a:hover,
+.bottom-cta a:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px rgba(245,158,11,.18);
+}
+
 @media (max-width: 900px) {
     html, body {
         width: 100%;
