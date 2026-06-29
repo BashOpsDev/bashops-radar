@@ -52,6 +52,9 @@ def track_analysis(
     request,
     status=DEFAULT_STATUS,
     language="Unknown",
+    stars="",
+    forks="",
+    open_issues="",
 ):
     file_exists = ANALYTICS_FILE.exists()
 
@@ -71,6 +74,9 @@ def track_analysis(
                 "user_agent",
                 "status",
                 "language",
+                "stars",
+                "forks",
+                "open_issues",
             ])
 
         writer.writerow([
@@ -82,6 +88,9 @@ def track_analysis(
             user_agent,
             status,
             language or "Unknown",
+            stars or "",
+            forks or "",
+            open_issues or "",
         ])
 
 
@@ -98,6 +107,10 @@ def read_analytics():
 
         if not row.get("language"):
             row["language"] = "Unknown"
+
+        row["stars"] = row.get("stars", "")
+        row["forks"] = row.get("forks", "")
+        row["open_issues"] = row.get("open_issues", "")
 
         row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
         row["pretty_time"] = format_time(row.get("timestamp", ""))
@@ -126,6 +139,9 @@ def write_analytics(rows):
             "user_agent",
             "status",
             "language",
+            "stars",
+            "forks",
+            "open_issues",
         ]
 
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -141,6 +157,9 @@ def write_analytics(rows):
                 "user_agent": row.get("user_agent", ""),
                 "status": row.get("status", DEFAULT_STATUS),
                 "language": row.get("language", "Unknown"),
+                "stars": row.get("stars", ""),
+                "forks": row.get("forks", ""),
+                "open_issues": row.get("open_issues", ""),
             })
 
 
@@ -291,6 +310,9 @@ def analytics_summary():
                 "links": row.get("links", {}),
                 "pitch": row.get("pitch", ""),
                 "language": row.get("language", "Unknown"),
+                "stars": row.get("stars", ""),
+                "forks": row.get("forks", ""),
+                "open_issues": row.get("open_issues", ""),
                 "difficulty": row.get("difficulty", "Medium"),
                 "merge_probability": row.get("merge_probability", "Medium merge probability"),
                 "estimated_time": row.get("estimated_time", "1 day"),
