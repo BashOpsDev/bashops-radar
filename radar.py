@@ -181,8 +181,9 @@ def get_analysis(repo_url: str):
 
     issue_rankings.sort(key=lambda item: item[0], reverse=True)
     repo_score = score_repo(repo, issues, languages)
+    language_badge = primary_language(languages)
 
-    return owner, repo_name, repo, languages, issue_rankings, repo_score
+    return owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge
 
 
 def export_markdown_report(owner, repo_name, repo, languages, issue_rankings, repo_score):
