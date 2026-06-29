@@ -187,3 +187,33 @@ def analyze(request: Request, repo_url: str = Form(...)):
             name="index.html",
             context={"result": None, "error": str(e)},
         )
+    @app.get("/pipeline", response_class=HTMLResponse)
+def pipeline(request: Request):
+    summary = analytics_summary()
+    return templates.TemplateResponse(
+        request=request,
+        name="pipeline.html",
+        context=summary,
+    )
+
+
+@app.post("/update-status")
+def update_status(repo: str = Form(...), status: str = Form(...)):
+    update_pipeline_status(repo, status)
+    return RedirectResponse(url="/pipeline", status_code=303)
+
+
+@app.post("/generate-pitch", response_class=HTMLResponse)
+def pitch_preview(request: Request, repo: str = Form(...), best_issue: str = Form("")):
+    pitch = generate_pitch(repo, best_issue)
+    summary = analytics_summary()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="pipeline.html",
+        context={
+            **summary,
+            "generated_pitch": pitch,
+            "pitch_repo": repo,
+        },
+    )
