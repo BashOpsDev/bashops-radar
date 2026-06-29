@@ -183,6 +183,7 @@ def analyze(request: Request, repo_url: str = Form(...)):
             score=result["score"],
             best_issue=f"#{best_issue['number']}" if best_issue else "",
             request=request,
+            language=result.get("language", "Unknown"),
         )
 
         return templates.TemplateResponse(
