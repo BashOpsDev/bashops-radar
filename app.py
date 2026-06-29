@@ -99,7 +99,7 @@ def home(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"result": None, "error": None},
+        context={"result": None, "error": None, "limit_reached": False},
     )
 
 
@@ -154,7 +154,10 @@ def analyze(request: Request, repo_url: str = Form(...)):
                 name="index.html",
                 context={
                     "result": None,
-                    "error": "Free limit reached: 5 analyses per day. Upgrade to Pro for unlimited analyses.",
+                    context={     
+                        "result": None,     
+                        "error": None,     
+                        "limit_reached": True, },
                 },
             )
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
