@@ -57,6 +57,8 @@ def analyze(request: Request, repo_url: str = Form(...)):
             "issues": issue_rankings[:8],
             "languages": languages,
         }
+"recommended_action": f"Start with {best_issue['number']} — {best_issue['title']}" if best_issue else "Analyze another repository",
+"recommended_outcome": "Submit one focused PR, build trust, then pitch a 48-hour sprint.",
 
         return templates.TemplateResponse(
             request=request,
