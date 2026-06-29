@@ -1070,3 +1070,26 @@ button:hover,
 .copy-btn:hover {
     background: #22c55e;
 }
+.repo-link {
+    color: #fff;
+    text-decoration: none;
+}
+
+.repo-link:hover {
+    color: #ff9800;
+}
+
+.score-high {
+    background: #14532d;
+    color: #86efac;
+}
+
+.score-medium {
+    background: #78350f;
+    color: #fde68a;
+}
+
+.score-low {
+    background: #7f1d1d;
+    color: #fecaca;
+}
