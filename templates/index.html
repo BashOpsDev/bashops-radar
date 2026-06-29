@@ -90,6 +90,30 @@
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
+        {% if limit_reached %}
+<div class="upgrade-card">
+    <span class="section-label">Free Limit Reached</span>
+    <h2>You used your 5 free analyses today</h2>
+    <p>
+        BashOps Radar Free is limited to 5 repository analyses per day.
+        Upgrade to Pro for unlimited analyses, founder intelligence, daily briefing,
+        and contract engine.
+    </p>
+
+    <div class="upgrade-features">
+        <span>Unlimited analyses</span>
+        <span>Founder Intelligence</span>
+        <span>AI outreach messages</span>
+        <span>Daily briefing</span>
+        <span>Contract engine</span>
+    </div>
+
+    <div class="upgrade-actions">
+        <a href="/pricing" class="nav-cta">View Pricing</a>
+        <a href="/login" class="secondary-link">Join Beta</a>
+    </div>
+</div>
+{% endif %}
 
         {% if result %}
         <section class="card">
