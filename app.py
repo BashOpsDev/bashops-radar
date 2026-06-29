@@ -93,7 +93,15 @@ def analytics_dashboard(request: Request):
             "rows": summary["rows"][-20:],
         },
     )
+@app.get("/pipeline", response_class=HTMLResponse)
+def pipeline(request: Request):
+    summary = analytics_summary()
 
+    return templates.TemplateResponse(
+        request=request,
+        name="pipeline.html",
+        context=summary,
+    )
 
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
