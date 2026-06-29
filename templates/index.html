@@ -98,8 +98,21 @@
                     <h2>{{ result.repo }}</h2>
                     <p>{{ result.description }}</p>
                 </div>
-                <div class="score">{{ result.score }}<small>/100</small><span>{{ result.decision }}</span></div>
-            </div>
+               <div class="score-panel">
+    <div class="score-number">{{ result.score }}<small>/100</small></div>
+    <div class="score-label">{{ result.score_label }}</div>
+    <div class="score-action">{{ result.score_action }}</div>
+
+    <div class="score-meter">
+        <div class="score-fill" style="width: {{ result.score }}%;"></div>
+    </div>
+
+    <div class="score-meta">
+        <div><strong>{{ result.merge_probability }}</strong><span>Merge Probability</span></div>
+        <div><strong>{{ result.estimated_time }}</strong><span>Estimated Time</span></div>
+        <div><strong>{{ result.difficulty }}</strong><span>Difficulty</span></div>
+    </div>
+</div>
 
             <div class="grid">
                 <div><strong>★ {{ result.stars }}</strong><span>Stars</span></div>
