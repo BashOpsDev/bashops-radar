@@ -148,13 +148,22 @@ def daily_analysis_count(request: Request):
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
     try:
-        if daily_analysis_count(request) >= FREE_ANALYSIS_LIMIT:
+        if daily_analysis_count(request) >= FREE_ANALYSIS_LIMIT:     
+            return templates.TemplateResponse(         
+                request=request,         
+                name="index.html",         
+                context={"result": None, "error": None, "limit_reached": False},           
+                    "result": None,             
+                    "error": None,             
+                    "limit_reached": True,         
+                },     
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
-                context={
+                context={"result": None, "error": None, "limit_reached": False},
                     "result": None,
-                    context={     
+                    context={"result": None, "error": None, "limit_reached": False},     
                         "result": None,     
                         "error": None,     
                         "limit_reached": True, },
@@ -249,14 +258,14 @@ def analyze(request: Request, repo_url: str = Form(...)):
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"result": result, "error": None},
+            context={"result": None, "error": None, "limit_reached": False},
         )
 
     except Exception as e:
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"result": None, "error": str(e)},
+            context={"result": None, "error": None, "limit_reached": False},
         )
 BETA_FILE = Path("beta_signups.csv")
 FREE_ANALYSIS_LIMIT = 5
@@ -279,7 +288,7 @@ def pricing(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="pricing.html",
-        context={},
+        context={"result": None, "error": None, "limit_reached": False},
     )
 
 
@@ -304,7 +313,7 @@ def pitch_preview(request: Request, repo: str = Form(...), best_issue: str = For
     return templates.TemplateResponse(
         request=request,
         name="pipeline.html",
-        context={
+        context={"result": None, "error": None, "limit_reached": False},
             **summary,
             "generated_pitch": pitch,
             "pitch_repo": repo,
