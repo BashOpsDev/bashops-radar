@@ -12,29 +12,27 @@
             <h1>BashOps Radar Analytics</h1>
 
             <div class="grid">
-                <div>
-                    <strong>Total Analyses</strong>
-                    <span>{{ total_analyses }}</span>
-                </div>
-                <div>
-                    <strong>Unique Repos</strong>
-                    <span>{{ unique_repos }}</span>
-                </div>
-                <div>
-                    <strong>Average Score</strong>
-                    <span>{{ average_score }}</span>
-                </div>
-                <div>
-                    <strong>Highest Score</strong>
-                    <span>{{ highest_score }}</span>
-                </div>
+                <div><strong>📊 Total Analyses</strong><span>{{ total_analyses }}</span></div>
+                <div><strong>📦 Unique Repos</strong><span>{{ unique_repos }}</span></div>
+                <div><strong>👥 Visitors</strong><span>{{ unique_visitors }}</span></div>
+                <div><strong>🔁 Repeat Visitors</strong><span>{{ repeat_visitors }}</span></div>
+                <div><strong>⚡ Average Score</strong><span>{{ average_score }}</span></div>
+                <div><strong>🏆 Highest Score</strong><span>{{ highest_score }}</span></div>
             </div>
 
-            <h2>Top Repositories</h2>
-            {% for repo, count in top_repos %}
+            <h2>Daily Activity</h2>
+            {% for day, count in daily_activity %}
             <div class="issue">
-                <strong>{{ repo }}</strong>
-                <p>{{ count }} analyses</p>
+                <strong>{{ day }}</strong>
+                <p>{{ "█" * count }} {{ count }} analyses</p>
+            </div>
+            {% endfor %}
+
+            <h2>Top Repositories</h2>
+            {% for item in top_repos %}
+            <div class="issue">
+                <strong>{{ item.repo }}</strong>
+                <p>Score: {{ item.score }} · {{ item.count }} analyses</p>
             </div>
             {% endfor %}
 
@@ -47,7 +45,7 @@
             {% endfor %}
 
             <h2>Recent Analyses</h2>
-            {% for row in rows %}
+            {% for row in rows[-20:] %}
             <div class="issue">
                 <strong>{{ row.repo }}</strong>
                 <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
