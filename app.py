@@ -28,6 +28,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+BETA_FILE = Path("beta_signups.csv")
+FREE_ANALYSIS_LIMIT = 5
 
 if GEMINI_API_KEY and genai:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -94,6 +96,29 @@ Keep it practical, direct, and under 180 words.
         }
 
 
+def daily_analysis_count(request: Request):
+    analytics_file = Path("analytics.csv")
+
+    if not analytics_file.exists():
+        return 0
+
+    ip = request.client.host if request.client else "unknown"
+    today = datetime.now(timezone.utc).date().isoformat()
+    count = 0
+
+    with analytics_file.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            timestamp = row.get("timestamp", "")
+            row_ip = row.get("ip", "")
+
+            if timestamp.startswith(today) and row_ip == ip:
+                count += 1
+
+    return count
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(
@@ -101,6 +126,37 @@ def home(request: Request):
         name="index.html",
         context={"result": None, "error": None, "limit_reached": False},
     )
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pricing.html",
+        context={"result": None, "error": None, "limit_reached": False},
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login(request: Request, joined: bool = False):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"joined": joined},
+    )
+
+
+@app.post("/beta-signup")
+def beta_signup(email: str = Form(...)):
+    file_exists = BETA_FILE.exists()
+
+    with BETA_FILE.open("a", encoding="utf-8") as f:
+        if not file_exists:
+            f.write("timestamp,email\n")
+
+        f.write(f"{datetime.now(timezone.utc).isoformat()},{email}\n")
+
+    return RedirectResponse(url="/login?joined=true", status_code=303)
 
 
 @app.get("/admin/analytics", response_class=HTMLResponse)
@@ -124,51 +180,21 @@ def pipeline(request: Request):
         context=summary,
     )
 
-def daily_analysis_count(request: Request):
-    analytics_file = Path("analytics.csv")
 
-    if not analytics_file.exists():
-        return 0
-
-    ip = request.client.host if request.client else "unknown"
-    today = datetime.now(timezone.utc).date().isoformat()
-    count = 0
-
-    with analytics_file.open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-
-        for row in reader:
-            timestamp = row.get("timestamp", "")
-            row_ip = row.get("ip", "")
-
-            if timestamp.startswith(today) and row_ip == ip:
-                count += 1
-
-    return count
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
     try:
-        if daily_analysis_count(request) >= FREE_ANALYSIS_LIMIT:     
-            return templates.TemplateResponse(         
-                request=request,         
-                name="index.html",         
-                context={"result": None, "error": None, "limit_reached": False},           
-                    "result": None,             
-                    "error": None,             
-                    "limit_reached": True,         
-                },     
-            )
+        if daily_analysis_count(request) >= FREE_ANALYSIS_LIMIT:
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
-                context={"result": None, "error": None, "limit_reached": False},
+                context={
                     "result": None,
-                    context={"result": None, "error": None, "limit_reached": False},     
-                        "result": None,     
-                        "error": None,     
-                        "limit_reached": True, },
+                    "error": None,
+                    "limit_reached": True,
                 },
             )
+
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
         best_issue = None
@@ -258,47 +284,17 @@ def analyze(request: Request, repo_url: str = Form(...)):
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"result": None, "error": None, "limit_reached": False},
+            context={"result": result, "error": None, "limit_reached": False},
         )
 
     except Exception as e:
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"result": None, "error": None, "limit_reached": False},
+            context={"result": None, "error": str(e), "limit_reached": False},
         )
-BETA_FILE = Path("beta_signups.csv")
-FREE_ANALYSIS_LIMIT = 5
 
 
-@app.post("/beta-signup")
-def beta_signup(email: str = Form(...)):
-    file_exists = BETA_FILE.exists()
-
-    with BETA_FILE.open("a", encoding="utf-8") as f:
-        if not file_exists:
-            f.write("timestamp,email\n")
-
-        f.write(f"{datetime.now(timezone.utc).isoformat()},{email}\n")
-
-    return RedirectResponse(url="/login?joined=true", status_code=303)
-    
-@app.get("/pricing", response_class=HTMLResponse)
-def pricing(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="pricing.html",
-        context={"result": None, "error": None, "limit_reached": False},
-    )
-
-
-@app.get("/login", response_class=HTMLResponse)
-def login(request: Request, joined: bool = False):
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"joined": joined},
-    )
 @app.post("/update-status")
 def update_status(repo: str = Form(...), status: str = Form(...)):
     update_pipeline_status(repo, status)
@@ -313,7 +309,7 @@ def pitch_preview(request: Request, repo: str = Form(...), best_issue: str = For
     return templates.TemplateResponse(
         request=request,
         name="pipeline.html",
-        context={"result": None, "error": None, "limit_reached": False},
+        context={
             **summary,
             "generated_pitch": pitch,
             "pitch_repo": repo,
