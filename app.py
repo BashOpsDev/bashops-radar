@@ -1,11 +1,16 @@
 import os
-from analytics import analytics_summary, track_analysis, update_pipeline_status, generate_pitch
+
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from analytics import analytics_summary, track_analysis
+from analytics import (
+    analytics_summary,
+    track_analysis,
+    update_pipeline_status,
+    generate_pitch,
+)
 from radar import get_analysis, decision, recommend_angle
 
 try:
@@ -83,16 +88,10 @@ def analytics_dashboard(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="analytics.html",
-        context={
-            "total_analyses": summary["total_analyses"],
-            "unique_repos": summary["unique_repos"],
-            "average_score": summary["average_score"],
-            "highest_score": summary["highest_score"],
-            "top_repos": summary["top_repos"],
-            "top_issues": summary["top_issues"],
-            "rows": summary["rows"][-20:],
-        },
+        context=summary,
     )
+
+
 @app.get("/pipeline", response_class=HTMLResponse)
 def pipeline(request: Request):
     summary = analytics_summary()
@@ -102,6 +101,7 @@ def pipeline(request: Request):
         name="pipeline.html",
         context=summary,
     )
+
 
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
@@ -143,19 +143,29 @@ def analyze(request: Request, repo_url: str = Form(...)):
             "open_issues": repo.get("open_issues_count"),
             "last_push": repo.get("pushed_at"),
             "score": repo_score,
-            "score_label": "Excellent"
-            if repo_score >= 90
-            else "Strong"
-            if repo_score >= 80
-            else "Moderate"
-            if repo_score >= 60
-            else "Weak",
-            "score_action": "CONTRIBUTE NOW"
-            if repo_score >= 85
-            else "INSPECT MANUALLY"
-            if repo_score >= 60
-            else "SKIP FOR NOW",
-            "merge_probability": "High" if repo_score >= 85 else "Medium" if repo_score >= 60 else "Low",
+            "score_label": (
+                "Excellent"
+                if repo_score >= 90
+                else "Strong"
+                if repo_score >= 80
+                else "Moderate"
+                if repo_score >= 60
+                else "Weak"
+            ),
+            "score_action": (
+                "CONTRIBUTE NOW"
+                if repo_score >= 85
+                else "INSPECT MANUALLY"
+                if repo_score >= 60
+                else "SKIP FOR NOW"
+            ),
+            "merge_probability": (
+                "High"
+                if repo_score >= 85
+                else "Medium"
+                if repo_score >= 60
+                else "Low"
+            ),
             "estimated_time": "2-4 hours" if repo_score >= 85 else "4-8 hours",
             "difficulty": "Medium",
             "decision": decision(repo_score),
@@ -187,14 +197,6 @@ def analyze(request: Request, repo_url: str = Form(...)):
             name="index.html",
             context={"result": None, "error": str(e)},
         )
-    @app.get("/pipeline", response_class=HTMLResponse)
-def pipeline(request: Request):
-    summary = analytics_summary()
-    return templates.TemplateResponse(
-        request=request,
-        name="pipeline.html",
-        context=summary,
-    )
 
 
 @app.post("/update-status")
