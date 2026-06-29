@@ -48,8 +48,8 @@
                         <p>{{ row.pretty_time }}</p>
                     </div>
 
-                    <div class="score-pill">
-                        {{ row.score }}/100
+                <div class="score-pill {% if row.score|int >= 85 %}score-high{% elif row.score|int >= 65 %}score-medium{% else %}score-low{% endif %}">
+                    {{ row.score }}/100
                     </div>
                 </div>
 
