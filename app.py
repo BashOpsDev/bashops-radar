@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -127,6 +127,24 @@ def home(request: Request):
         context={"result": None, "error": None, "limit_reached": False},
     )
 
+@app.get("/export-pipeline")
+def export_pipeline():
+
+    file = Path("analytics.csv")
+
+    if not file.exists():
+
+        return RedirectResponse("/pipeline")
+
+    return FileResponse(
+
+        path=file,
+
+        filename="bashops_pipeline.csv",
+
+        media_type="text/csv"
+
+    )
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
