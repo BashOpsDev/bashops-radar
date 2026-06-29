@@ -409,3 +409,34 @@ h2 {
         flex-direction: column;
     }
 }
+
+.export-btn{
+
+background:#f59e0b;
+
+color:#111827;
+
+padding:12px 18px;
+
+border-radius:12px;
+
+font-weight:700;
+
+text-decoration:none;
+
+display:inline-flex;
+
+align-items:center;
+
+gap:8px;
+
+transition:.25s;
+
+}
+
+
+.export-btn:hover{
+
+transform:translateY(-2px);
+
+}
