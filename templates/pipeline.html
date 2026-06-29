@@ -35,21 +35,46 @@
         </div>
         {% endif %}
 
-        <h2>Current Targets</h2>
+        <div class="pipeline-toolbar">
+            <h2>Current Targets</h2>
+
+            <input
+                type="text"
+                id="pipelineSearch"
+                class="search-box"
+                placeholder="🔍 Search repositories, language or status..."
+                onkeyup="filterPipeline()"
+            >
+        </div>
 
         <div class="pipeline-list">
             {% for row in rows[-20:] %}
-            <div class="pipeline-card">
+            <div class="pipeline-card searchable-card">
+                <div class="search-meta" style="display:none;">
+                    {{ row.repo }}
+                    {{ row.language }}
+                    {{ row.status }}
+                    {{ row.best_issue }}
+                    {{ row.merge_probability }}
+                    {{ row.difficulty }}
+                </div>
+
                 <div class="pipeline-card-top">
                     <div>
                         <span class="status-badge">{{ row.status }}</span>
-                        <h3>     <a href="{{ row.links.repo_url }}" target="_blank" class="repo-link">         {{ row.repo }}     </a> </h3>
+
+                        <h3 class="repo-name">
+                            <a href="{{ row.links.repo_url }}" target="_blank" class="repo-link">
+                                {{ row.repo }}
+                            </a>
+                        </h3>
+
                         <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
                         <p>{{ row.pretty_time }}</p>
                     </div>
 
-                <div class="score-pill {% if row.score|int >= 85 %}score-high{% elif row.score|int >= 65 %}score-medium{% else %}score-low{% endif %}">
-                    {{ row.score }}/100
+                    <div class="score-pill {% if row.score|int >= 85 %}score-high{% elif row.score|int >= 65 %}score-medium{% else %}score-low{% endif %}">
+                        {{ row.score }}/100
                     </div>
                 </div>
 
@@ -116,6 +141,7 @@
                 <div class="pipeline-actions">
                     <form method="post" action="/update-status" class="pipeline-form">
                         <input type="hidden" name="repo" value="{{ row.repo }}">
+
                         <select name="status">
                             {% for status in pipeline_statuses %}
                             <option value="{{ status }}" {% if row.status == status %}selected{% endif %}>
@@ -123,12 +149,14 @@
                             </option>
                             {% endfor %}
                         </select>
+
                         <button type="submit">Update Status</button>
                     </form>
 
                     <form method="post" action="/generate-pitch" class="pipeline-form">
                         <input type="hidden" name="repo" value="{{ row.repo }}">
                         <input type="hidden" name="best_issue" value="{{ row.best_issue }}">
+
                         <button type="submit">Generate Founder Pitch</button>
                     </form>
                 </div>
@@ -158,6 +186,22 @@ function copyPitch(id) {
             document.execCommand("copy");
             alert("Pitch copied!");
         });
+}
+
+function filterPipeline() {
+    const input = document.getElementById("pipelineSearch");
+    const filter = input.value.toLowerCase();
+    const cards = document.querySelectorAll(".searchable-card");
+
+    cards.forEach(card => {
+        const text = card.innerText.toLowerCase();
+
+        if (text.includes(filter)) {
+            card.style.display = "";
+        } else {
+            card.style.display = "none";
+        }
+    });
 }
 </script>
 
