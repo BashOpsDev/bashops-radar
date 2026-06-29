@@ -16,6 +16,18 @@
                     <strong>Total Analyses</strong>
                     <span>{{ total_analyses }}</span>
                 </div>
+                <div>
+                    <strong>Unique Repos</strong>
+                    <span>{{ unique_repos }}</span>
+                </div>
+                <div>
+                    <strong>Average Score</strong>
+                    <span>{{ average_score }}</span>
+                </div>
+                <div>
+                    <strong>Highest Score</strong>
+                    <span>{{ highest_score }}</span>
+                </div>
             </div>
 
             <h2>Top Repositories</h2>
@@ -26,12 +38,20 @@
             </div>
             {% endfor %}
 
+            <h2>Most Popular Issues</h2>
+            {% for issue, count in top_issues %}
+            <div class="issue">
+                <strong>{{ issue }}</strong>
+                <p>{{ count }} times recommended</p>
+            </div>
+            {% endfor %}
+
             <h2>Recent Analyses</h2>
             {% for row in rows %}
             <div class="issue">
                 <strong>{{ row.repo }}</strong>
                 <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
-                <p>{{ row.timestamp }}</p>
+                <p>{{ row.pretty_time }}</p>
             </div>
             {% endfor %}
         </section>
