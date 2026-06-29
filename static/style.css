@@ -1169,3 +1169,22 @@ button:hover,
     outline:none;
     border-color:#ff9800;
 }
+.toolbar-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.sort-box{
+    padding:12px 14px;
+    border-radius:12px;
+    background:#0b1220;
+    color:white;
+    border:1px solid rgba(255,153,0,.35);
+    min-width:190px;
+}
+
+.sort-box:focus{
+    outline:none;
+    border-color:#ff9800;
+}

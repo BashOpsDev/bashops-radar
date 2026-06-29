@@ -36,20 +36,34 @@
         {% endif %}
 
         <div class="pipeline-toolbar">
-            <h2>Current Targets</h2>
+    <h2>Current Targets</h2>
 
-            <input
-                type="text"
-                id="pipelineSearch"
-                class="search-box"
-                placeholder="🔍 Search repositories, language or status..."
-                onkeyup="filterPipeline()"
-            >
-        </div>
+    <div class="toolbar-actions">
+
+        <input
+            type="text"
+            id="pipelineSearch"
+            class="search-box"
+            placeholder="🔍 Search repositories, language or status..."
+            onkeyup="filterPipeline()"
+        >
+
+        <select id="sortPipeline" class="sort-box" onchange="sortPipeline()">
+            <option value="score-desc">⭐ Highest Score</option>
+            <option value="score-asc">⭐ Lowest Score</option>
+            <option value="newest">🕒 Newest</option>
+            <option value="status">📌 Status</option>
+        </select>
+
+    </div>
+</div>
 
         <div class="pipeline-list">
             {% for row in rows[-20:] %}
-            <div class="pipeline-card searchable-card">
+        <div class="pipeline-card searchable-card"
+             data-score="{{ row.score }}"
+             data-status="{{ row.status }}"
+             data-time="{{ row.timestamp }}">
                 <div class="search-meta" style="display:none;">
                     {{ row.repo }}
                     {{ row.language }}
@@ -202,6 +216,37 @@ function filterPipeline() {
             card.style.display = "none";
         }
     });
+}
+<script>
+function sortPipeline() {
+
+    const list = document.querySelector(".pipeline-list");
+    const cards = Array.from(document.querySelectorAll(".searchable-card"));
+    const mode = document.getElementById("sortPipeline").value;
+
+    cards.sort((a, b) => {
+
+        if (mode === "score-desc") {
+            return Number(b.dataset.score) - Number(a.dataset.score);
+        }
+
+        if (mode === "score-asc") {
+            return Number(a.dataset.score) - Number(b.dataset.score);
+        }
+
+        if (mode === "status") {
+            return a.dataset.status.localeCompare(b.dataset.status);
+        }
+
+        if (mode === "newest") {
+            return b.dataset.time.localeCompare(a.dataset.time);
+        }
+
+        return 0;
+    });
+
+    cards.forEach(card => list.appendChild(card));
+
 }
 </script>
 
