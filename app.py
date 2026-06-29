@@ -106,7 +106,7 @@ def pipeline(request: Request):
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
     try:
-        owner, repo_name, repo, languages, issue_rankings, repo_score = get_analysis(repo_url)
+        owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
         best_issue = None
         if issue_rankings:
