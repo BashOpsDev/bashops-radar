@@ -1,16 +1,35 @@
-<nav class="navbar">
-    <a href="/" class="logo">BashOps <span>Radar</span></a>
+<nav class="app-navbar">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">
+            <span class="nav-logo">&gt;_</span>
+            <span>
+                <strong>BashOps <em>Radar</em></strong>
+                <small>AI Opportunity Intelligence</small>
+            </span>
+        </a>
 
-    <div class="nav-links">
-        <a href="/">Analyze</a>
-        <a href="/dashboard">Dashboard</a>
-        <a href="/pipeline">Pipeline</a>
-        <a href="/admin/analytics">Analytics</a>
-        <a href="/pricing">Pricing</a>
-    </div>
+        <button class="nav-toggle" onclick="toggleNav()">☰</button>
 
-    <div class="nav-actions">
-        <a href="/login" class="secondary-btn">Login</a>
-        <a href="/pricing" class="primary-btn">Upgrade</a>
+        <div class="nav-menu" id="navMenu">
+            <div class="nav-center">
+                <a href="/#features">Features</a>
+                <a href="/#roadmap">Roadmap</a>
+                <a href="/pricing">Pricing</a>
+                <a href="/pipeline">Pipeline</a>
+                <a href="/admin/analytics">Analytics</a>
+            </div>
+
+            <div class="nav-right">
+                <a href="/dashboard" class="nav-outline">Dashboard</a>
+                <a href="/" class="nav-primary">Analyze Repository →</a>
+            </div>
+        </div>
     </div>
 </nav>
+
+<script>
+function toggleNav() {
+    const menu = document.getElementById("navMenu");
+    menu.classList.toggle("open");
+}
+</script>
