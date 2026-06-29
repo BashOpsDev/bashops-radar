@@ -690,3 +690,17 @@ button:hover,
         display: none;
     }
 }
+.ai-summary-card {
+    margin: 26px 0;
+    background: rgba(245,158,11,.08);
+    border: 1px solid rgba(245,158,11,.35);
+    border-radius: 20px;
+    padding: 24px;
+}
+
+.ai-summary-card p {
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.7;
+    white-space: pre-line;
+}
