@@ -45,7 +45,14 @@ def repo_links(repo_url: str, best_issue_url: str = ""):
     }
 
 
-def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS, language="Unknown"):
+def track_analysis(
+    repo,
+    score,
+    best_issue,
+    request,
+    status=DEFAULT_STATUS,
+    language="Unknown",
+):
     file_exists = ANALYTICS_FILE.exists()
 
     ip = request.client.host if request.client else "unknown"
@@ -63,6 +70,7 @@ def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS, lang
                 "ip",
                 "user_agent",
                 "status",
+                "language",
             ])
 
         writer.writerow([
@@ -73,6 +81,7 @@ def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS, lang
             ip,
             user_agent,
             status,
+            language or "Unknown",
         ])
 
 
@@ -87,6 +96,9 @@ def read_analytics():
         if not row.get("status"):
             row["status"] = DEFAULT_STATUS
 
+        if not row.get("language"):
+            row["language"] = "Unknown"
+
         row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
         row["pretty_time"] = format_time(row.get("timestamp", ""))
 
@@ -96,7 +108,6 @@ def read_analytics():
         row["links"] = repo_links(repo, best_issue)
         row["pitch"] = generate_pitch(repo, best_issue)
 
-        row["language"] = row.get("language") or "Unknown"
         row["difficulty"] = row.get("difficulty") or estimate_difficulty(row.get("score", 0))
         row["merge_probability"] = row.get("merge_probability") or estimate_merge_probability(row.get("score", 0))
         row["estimated_time"] = row.get("estimated_time") or estimate_completion_time(row.get("score", 0))
@@ -114,6 +125,7 @@ def write_analytics(rows):
             "ip",
             "user_agent",
             "status",
+            "language",
         ]
 
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -128,6 +140,7 @@ def write_analytics(rows):
                 "ip": row.get("ip", ""),
                 "user_agent": row.get("user_agent", ""),
                 "status": row.get("status", DEFAULT_STATUS),
+                "language": row.get("language", "Unknown"),
             })
 
 
