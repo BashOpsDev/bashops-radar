@@ -64,28 +64,29 @@ Write a concise analysis with:
 Keep it practical, direct, and under 180 words.
 """
 
+    def generate_ai_summary(prompt):
     try:
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
-    response = model.generate_content(prompt)
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        response = model.generate_content(prompt)
 
-    return {
-        "text": response.text.strip() if response.text else "AI summary temporarily unavailable.",
-        "status": "available",
-    }
-
-except Exception as e:
-    error = str(e).lower()
-
-    if "429" in error or "quota" in error or "rate limit" in error:
         return {
-            "text": "Gemini free-tier quota reached. Core repository analysis completed successfully.",
-            "status": "unavailable",
+            "text": response.text.strip() if response.text else "AI summary temporarily unavailable.",
+            "status": "available",
         }
 
-    return {
-        "text": "AI summary temporarily unavailable. Core repository analysis completed successfully.",
-        "status": "unavailable",
-    }
+    except Exception as e:
+        error = str(e).lower()
+
+        if "429" in error or "quota" in error or "rate limit" in error:
+            return {
+                "text": "Gemini free-tier quota reached. Core repository analysis completed successfully.",
+                "status": "unavailable",
+            }
+
+        return {
+            "text": "AI summary temporarily unavailable. Core repository analysis completed successfully.",
+            "status": "unavailable",
+        }
 
 
 @app.get("/", response_class=HTMLResponse)
