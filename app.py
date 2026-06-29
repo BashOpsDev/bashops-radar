@@ -78,3 +78,46 @@ def analyze(request: Request, repo_url: str = Form(...)):
             name="index.html",
             context={"result": None, "error": str(e)},
         )
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+
+def generate_ai_summary(repo_name, repo, best_issue, repo_score, angle):
+    if not GEMINI_API_KEY:
+        return "AI summary is not enabled yet. Add GEMINI_API_KEY to enable Gemini analysis."
+
+    issue_text = "No best issue found."
+    if best_issue:
+        issue_text = f"#{best_issue['number']} - {best_issue['title']} ({best_issue['type']}, score {best_issue['score']}/100)"
+
+    prompt = f"""
+You are BashOps Radar, an AI opportunity analyst for developers.
+
+Analyze this GitHub repository as a proof-of-work opportunity.
+
+Repository: {repo_name}
+Description: {repo.get("description")}
+Stars: {repo.get("stargazers_count")}
+Forks: {repo.get("forks_count")}
+Open Issues: {repo.get("open_issues_count")}
+Opportunity Score: {repo_score}/100
+Best Issue: {issue_text}
+Proof-of-Work Angle: {angle}
+
+Write a concise analysis with:
+1. Why this repo is worth or not worth contributing to
+2. Why the best issue is a good first target
+3. How the developer should approach the PR
+4. Whether this could lead to a paid sprint
+
+Keep it practical, direct, and under 180 words.
+"""
+
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"AI summary failed: {e}"
