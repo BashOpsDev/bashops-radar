@@ -29,6 +29,22 @@ STATUS_PROGRESS = {
 }
 
 
+def repo_links(repo_url: str, best_issue_url: str = ""):
+    repo_url = (repo_url or "").strip()
+
+    org_url = ""
+    if "github.com/" in repo_url:
+        parts = repo_url.split("github.com/")[-1].strip("/").split("/")
+        if len(parts) >= 1:
+            org_url = f"https://github.com/{parts[0]}"
+
+    return {
+        "repo_url": repo_url,
+        "best_issue_url": best_issue_url or f"{repo_url}/issues",
+        "org_url": org_url,
+    }
+
+
 def track_analysis(repo, score, best_issue, request, status=DEFAULT_STATUS):
     file_exists = ANALYTICS_FILE.exists()
 
@@ -73,6 +89,17 @@ def read_analytics():
 
         row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
         row["pretty_time"] = format_time(row.get("timestamp", ""))
+
+        repo = row.get("repo", "")
+        best_issue = row.get("best_issue", "")
+
+        row["links"] = repo_links(repo, best_issue)
+        row["pitch"] = generate_pitch(repo, best_issue)
+
+        row["language"] = row.get("language") or "Unknown"
+        row["difficulty"] = row.get("difficulty") or estimate_difficulty(row.get("score", 0))
+        row["merge_probability"] = row.get("merge_probability") or estimate_merge_probability(row.get("score", 0))
+        row["estimated_time"] = row.get("estimated_time") or estimate_completion_time(row.get("score", 0))
 
     return rows
 
@@ -128,6 +155,45 @@ def format_time(value):
         return dt.strftime("%d %b %Y • %H:%M UTC")
     except Exception:
         return value
+
+
+def estimate_difficulty(score):
+    try:
+        score = int(float(score))
+    except Exception:
+        score = 0
+
+    if score >= 80:
+        return "Easy"
+    if score >= 60:
+        return "Medium"
+    return "Hard"
+
+
+def estimate_merge_probability(score):
+    try:
+        score = int(float(score))
+    except Exception:
+        score = 0
+
+    if score >= 80:
+        return "High merge probability"
+    if score >= 60:
+        return "Medium merge probability"
+    return "Low merge probability"
+
+
+def estimate_completion_time(score):
+    try:
+        score = int(float(score))
+    except Exception:
+        score = 0
+
+    if score >= 80:
+        return "2–4h"
+    if score >= 60:
+        return "1 day"
+    return "2 days"
 
 
 def analytics_summary():
@@ -209,6 +275,12 @@ def analytics_summary():
                 "status": row.get("status", DEFAULT_STATUS),
                 "progress": STATUS_PROGRESS.get(row.get("status", DEFAULT_STATUS), 12),
                 "time": row.get("pretty_time", ""),
+                "links": row.get("links", {}),
+                "pitch": row.get("pitch", ""),
+                "language": row.get("language", "Unknown"),
+                "difficulty": row.get("difficulty", "Medium"),
+                "merge_probability": row.get("merge_probability", "Medium merge probability"),
+                "estimated_time": row.get("estimated_time", "1 day"),
             })
 
     pipeline_stats = [
