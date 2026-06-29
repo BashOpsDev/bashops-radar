@@ -698,6 +698,71 @@ button:hover,
     padding: 24px;
 }
 
+.pipeline-form {
+    display: flex;
+    gap: 12px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.pipeline-form select {
+    background: #0b1118;
+    color: #f8fafc;
+    border: 1px solid rgba(255, 153, 0, 0.35);
+    border-radius: 12px;
+    padding: 12px 14px;
+    min-width: 180px;
+}
+
+.pipeline-form button {
+    background: linear-gradient(135deg, #ffb000, #ff7a00);
+    color: #090d12;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.progress-wrap {
+    width: 100%;
+    height: 12px;
+    background: #111827;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 14px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(135deg, #ffb000, #ff7a00);
+    border-radius: 999px;
+}
+
+.pitch-box {
+    white-space: pre-wrap;
+    color: #cbd5e1;
+    line-height: 1.7;
+    font-family: inherit;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 153, 0, 0.25);
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 14px;
+}
+
+@media (max-width: 768px) {
+    .pipeline-form {
+        flex-direction: column;
+    }
+
+    .pipeline-form select,
+    .pipeline-form button {
+        width: 100%;
+    }
+}
+
 .ai-summary-card p {
     color: var(--muted);
     font-size: 16px;
