@@ -56,10 +56,9 @@ def analytics_summary():
 
     total_analyses = len(rows)
     unique_repos = len(set(row.get("repo", "") for row in rows if row.get("repo")))
-    unique_visitors = len(set(row.get("ip", "") for row in rows if row.get("ip")))
-    repeat_visitors = 0
 
     visitor_counts = Counter(row.get("ip", "") for row in rows if row.get("ip"))
+    unique_visitors = len(visitor_counts)
     repeat_visitors = len([ip for ip, count in visitor_counts.items() if count > 1])
 
     scores = []
@@ -96,10 +95,9 @@ def analytics_summary():
             dt = datetime.fromisoformat(row.get("timestamp", ""))
             day = dt.strftime("%d %b")
             daily_counts[day] += 1
+            row["pretty_time"] = dt.strftime("%d %b %Y • %H:%M UTC")
         except Exception:
-            pass
-
-        row["pretty_time"] = format_time(row.get("timestamp", ""))
+            row["pretty_time"] = row.get("timestamp", "")
 
     top_repos = [
         {
@@ -111,34 +109,48 @@ def analytics_summary():
     ]
 
     top_issues = issue_counts.most_common(10)
-    daily_activity = list(daily_counts.items())[-7:]
 
-best_opportunities = []
+    daily_activity = [
+        {
+            "day": day,
+            "count": count,
+            "bar": "█" * min(count, 20),
+        }
+        for day, count in list(daily_counts.items())[-7:]
+    ]
 
-seen = set()
-for row in sorted(rows, key=lambda x: x.get("score", "0"), reverse=True):
-    repo = row.get("repo", "")
-    if repo and repo not in seen:
-        seen.add(repo)
-        best_opportunities.append({
-            "repo": repo,
-            "score": row.get("score", "0"),
-            "best_issue": row.get("best_issue", ""),
-            "time": row.get("pretty_time", ""),
-        })
+    best_opportunities = []
+    seen = set()
 
-best_opportunities = best_opportunities[:5]
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: int(float(row.get("score", 0))) if row.get("score") else 0,
+        reverse=True,
+    )
+
+    for row in sorted_rows:
+        repo = row.get("repo", "")
+        if repo and repo not in seen:
+            seen.add(repo)
+            best_opportunities.append({
+                "repo": repo,
+                "score": row.get("score", "0"),
+                "best_issue": row.get("best_issue", ""),
+                "time": row.get("pretty_time", ""),
+            })
+
+    best_opportunities = best_opportunities[:5]
 
     return {
         "rows": rows,
         "total_analyses": total_analyses,
         "unique_repos": unique_repos,
         "unique_visitors": unique_visitors,
-        "best_opportunities": best_opportunities,
         "repeat_visitors": repeat_visitors,
         "average_score": average_score,
         "highest_score": highest_score,
         "top_repos": top_repos,
         "top_issues": top_issues,
         "daily_activity": daily_activity,
+        "best_opportunities": best_opportunities,
     }
