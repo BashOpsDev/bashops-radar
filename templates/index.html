@@ -126,9 +126,27 @@
                 <div>
 <div class="next-action-card">
     <span class="section-label">Recommended Next Action</span>
-<div class="ai-summary-card">
+<div class="ai-summary-header">
     <span class="section-label">AI Opportunity Summary</span>
+
+    {% if result.ai_status == "available" %}
+    <span class="ai-status available">AI Available</span>
+    {% else %}
+    <span class="ai-status unavailable">AI Temporarily Unavailable</span>
+    {% endif %}
+
+    <span class="pro-badge">Pro Soon</span>
+</div>
+
+<div class="ai-summary-box">
     <p>{{ result.ai_summary }}</p>
+
+    {% if result.ai_status == "unavailable" %}
+    <form method="post" action="/analyze">
+        <input type="hidden" name="repo_url" value="{{ result.repo_url }}">
+        <button type="submit" class="retry-btn">Retry AI Summary</button>
+    </form>
+    {% endif %}
 </div>
     <h3>{{ result.recommended_action }}</h3>
     <p>{{ result.recommended_outcome }}</p>

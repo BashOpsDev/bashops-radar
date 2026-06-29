@@ -65,11 +65,27 @@ Keep it practical, direct, and under 180 words.
 """
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
-        response = model.generate_content(prompt)
-        return response.text or "AI summary could not be generated."
-    except Exception as e:
-        return f"AI summary failed: {e}"
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    response = model.generate_content(prompt)
+
+    return {
+        "text": response.text.strip() if response.text else "AI summary temporarily unavailable.",
+        "status": "available",
+    }
+
+except Exception as e:
+    error = str(e).lower()
+
+    if "429" in error or "quota" in error or "rate limit" in error:
+        return {
+            "text": "Gemini free-tier quota reached. Core repository analysis completed successfully.",
+            "status": "unavailable",
+        }
+
+    return {
+        "text": "AI summary temporarily unavailable. Core repository analysis completed successfully.",
+        "status": "unavailable",
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -170,7 +186,8 @@ def analyze(request: Request, repo_url: str = Form(...)):
             "difficulty": "Medium",
             "decision": decision(repo_score),
             "angle": angle,
-            "ai_summary": ai_summary,
+            "ai_summary": ai_summary["text"],
+            "ai_status": ai_summary["status"],
             "best_issue": best_issue,
             "recommended_action": recommended_action,
             "recommended_outcome": "Submit one focused PR, build trust, then pitch a 48-hour sprint.",

@@ -1093,3 +1093,55 @@ button:hover,
     background: #7f1d1d;
     color: #fecaca;
 }
+.ai-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.ai-status,
+.pro-badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ai-status.available {
+    background: #14532d;
+    color: #86efac;
+}
+
+.ai-status.unavailable {
+    background: #7f1d1d;
+    color: #fecaca;
+}
+
+.pro-badge {
+    background: #312e81;
+    color: #c4b5fd;
+}
+
+.ai-summary-box {
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 153, 0, 0.35);
+    background: rgba(255, 153, 0, 0.04);
+}
+
+.retry-btn {
+    margin-top: 14px;
+    border: none;
+    padding: 11px 16px;
+    border-radius: 10px;
+    background: #ff9800;
+    color: #020617;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.retry-btn:hover {
+    background: #ffb020;
+}
