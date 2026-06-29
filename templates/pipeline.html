@@ -43,7 +43,7 @@
                 <div class="pipeline-card-top">
                     <div>
                         <span class="status-badge">{{ row.status }}</span>
-                        <h3>{{ row.repo }}</h3>
+                        <h3>     <a href="{{ row.links.repo_url }}" target="_blank" class="repo-link">         {{ row.repo }}     </a> </h3>
                         <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
                         <p>{{ row.pretty_time }}</p>
                     </div>
