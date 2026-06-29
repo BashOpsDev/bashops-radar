@@ -46,16 +46,16 @@ def analyze(request: Request, repo_url: str = Form(...)):
             "open_issues": repo.get("open_issues_count"),
             "last_push": repo.get("pushed_at"),
             "score": repo_score,
-            "decision": decision(repo_score),
-            "angle": recommend_angle(languages),
-            "best_issue": best_issue,
-            "issues": issue_rankings[:8],
-            "languages": languages,
+            "decision":
 "score_label": "Excellent" if repo_score >= 90 else "Strong" if repo_score >= 80 else "Moderate" if repo_score >= 60 else "Weak",
 "score_action": "CONTRIBUTE NOW" if repo_score >= 85 else "INSPECT MANUALLY" if repo_score >= 60 else "SKIP FOR NOW",
 "merge_probability": "High" if repo_score >= 85 else "Medium" if repo_score >= 60 else "Low",
 "estimated_time": "2–4 hours" if repo_score >= 85 else "4–8 hours",
-"difficulty": "Medium",
+"difficulty": "Medium", decision(repo_score),
+            "angle": recommend_angle(languages),
+            "best_issue": best_issue,
+            "issues": issue_rankings[:8],
+            "languages": languages,
         }
 
         return templates.TemplateResponse(
