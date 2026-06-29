@@ -26,7 +26,12 @@
         <div class="pitch-panel">
             <span class="section-label">Generated Founder Pitch</span>
             <h2>{{ pitch_repo }}</h2>
-            <pre class="pitch-box">{{ generated_pitch }}</pre>
+
+            <textarea id="generatedPitch" class="pitch-textarea" readonly>{{ generated_pitch }}</textarea>
+
+            <button type="button" class="copy-btn" onclick="copyPitch('generatedPitch')">
+                Copy Generated Pitch
+            </button>
         </div>
         {% endif %}
 
@@ -46,6 +51,27 @@
                     <div class="score-pill">
                         {{ row.score }}/100
                     </div>
+                </div>
+
+                <div class="quick-links">
+                    <a href="{{ row.links.repo_url }}" target="_blank" class="link-btn">
+                        Open Repo
+                    </a>
+
+                    <a href="{{ row.links.best_issue_url }}" target="_blank" class="link-btn">
+                        Open Best Issue
+                    </a>
+
+                    <a href="{{ row.links.org_url }}" target="_blank" class="link-btn">
+                        Open Org
+                    </a>
+                </div>
+
+                <div class="badges">
+                    <span class="badge language">{{ row.language or "Unknown" }}</span>
+                    <span class="badge difficulty">{{ row.difficulty or "Medium" }}</span>
+                    <span class="badge probability">{{ row.merge_probability or "Medium merge probability" }}</span>
+                    <span class="badge time">{{ row.estimated_time or "1 day" }}</span>
                 </div>
 
                 <div class="progress-wrap">
@@ -75,6 +101,18 @@
                     </p>
                 </div>
 
+                {% if row.pitch %}
+                <div class="pitch-panel mini-pitch">
+                    <span class="section-label">Founder Pitch</span>
+
+                    <textarea id="pitch-{{ loop.index }}" class="pitch-textarea" readonly>{{ row.pitch }}</textarea>
+
+                    <button type="button" class="copy-btn" onclick="copyPitch('pitch-{{ loop.index }}')">
+                        Copy Pitch
+                    </button>
+                </div>
+                {% endif %}
+
                 <div class="pipeline-actions">
                     <form method="post" action="/update-status" class="pipeline-form">
                         <input type="hidden" name="repo" value="{{ row.repo }}">
@@ -99,5 +137,29 @@
         </div>
     </section>
 </main>
+
+<script>
+function copyPitch(id) {
+    const pitchBox = document.getElementById(id);
+
+    if (!pitchBox) {
+        alert("Pitch not found.");
+        return;
+    }
+
+    pitchBox.select();
+    pitchBox.setSelectionRange(0, 99999);
+
+    navigator.clipboard.writeText(pitchBox.value)
+        .then(() => {
+            alert("Pitch copied!");
+        })
+        .catch(() => {
+            document.execCommand("copy");
+            alert("Pitch copied!");
+        });
+}
+</script>
+
 </body>
 </html>
