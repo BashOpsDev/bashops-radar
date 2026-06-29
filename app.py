@@ -4,6 +4,8 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pathlib import Path
+from datetime import datetime, timezone
 
 from analytics import (
     analytics_summary,
@@ -223,7 +225,21 @@ def analyze(request: Request, repo_url: str = Form(...)):
             name="index.html",
             context={"result": None, "error": str(e)},
         )
+BETA_FILE = Path("beta_signups.csv")
 
+
+@app.post("/beta-signup")
+def beta_signup(email: str = Form(...)):
+    file_exists = BETA_FILE.exists()
+
+    with BETA_FILE.open("a", encoding="utf-8") as f:
+        if not file_exists:
+            f.write("timestamp,email\n")
+
+        f.write(f"{datetime.now(timezone.utc).isoformat()},{email}\n")
+
+    return RedirectResponse(url="/login?joined=true", status_code=303)
+    
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
     return templates.TemplateResponse(
