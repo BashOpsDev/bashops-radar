@@ -224,7 +224,22 @@ def analyze(request: Request, repo_url: str = Form(...)):
             context={"result": None, "error": str(e)},
         )
 
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="pricing.html",
+        context={},
+    )
 
+
+@app.get("/login", response_class=HTMLResponse)
+def login(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={},
+    )
 @app.post("/update-status")
 def update_status(repo: str = Form(...), status: str = Form(...)):
     update_pipeline_status(repo, status)
