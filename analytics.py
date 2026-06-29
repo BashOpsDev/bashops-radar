@@ -134,6 +134,7 @@ best_opportunities = best_opportunities[:5]
         "total_analyses": total_analyses,
         "unique_repos": unique_repos,
         "unique_visitors": unique_visitors,
+        "best_opportunities": best_opportunities,
         "repeat_visitors": repeat_visitors,
         "average_score": average_score,
         "highest_score": highest_score,
