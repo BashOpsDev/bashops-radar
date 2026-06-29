@@ -1,66 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BashOps Radar Analytics</title>
+    <title>BashOps Radar Pipeline</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <main>
-        <section class="card">
-            <span class="section-label">Internal Analytics</span>
-            <h1>BashOps Radar Analytics</h1>
+<main>
+    <section class="card">
+        <span class="section-label">Opportunity Pipeline</span>
+        <h1>BashOps Radar Pipeline</h1>
+        <p class="angle">Track repositories from discovery to paid sprint.</p>
 
-            <div class="grid">
-                <div><strong>📊 Total Analyses</strong><span>{{ total_analyses }}</span></div>
-                <div><strong>📦 Unique Repos</strong><span>{{ unique_repos }}</span></div>
-                <div><strong>👥 Visitors</strong><span>{{ unique_visitors }}</span></div>
-                <div><strong>🔁 Repeat Visitors</strong><span>{{ repeat_visitors }}</span></div>
-                <div><strong>⚡ Average Score</strong><span>{{ average_score }}</span></div>
-                <div><strong>🏆 Highest Score</strong><span>{{ highest_score }}</span></div>
-            </div>
-<h2>🔥 Best Opportunities</h2>
-{% for item in best_opportunities %}
-<div class="issue best">
-    <strong>{{ item.repo }}</strong>
-    <p>Score: {{ item.score }} · Best Issue: {{ item.best_issue }}</p>
-    <p>{{ item.time }}</p>
-</div>
-{% endfor %}
-
-            <h2>Daily Activity</h2>
-            {% for day, count in daily_activity %}
-            <div class="issue">
-                <strong>{{ day }}</strong>
-                <p>{{ "█" * count }} {{ count }} analyses</p>
+        <h2>Pipeline Stats</h2>
+        <div class="grid">
+            {% for item in pipeline_stats %}
+            <div>
+                <strong>{{ item.status }}</strong>
+                <span>{{ item.count }}</span>
             </div>
             {% endfor %}
+        </div>
 
-            <h2>Top Repositories</h2>
-            {% for item in top_repos %}
-            <div class="issue">
-                <strong>{{ item.repo }}</strong>
-                <p>Score: {{ item.score }} · {{ item.count }} analyses</p>
-            </div>
-            {% endfor %}
+        {% if generated_pitch %}
+        <h2>Generated Founder Pitch</h2>
+        <div class="issue best">
+            <strong>{{ pitch_repo }}</strong>
+            <pre class="pitch-box">{{ generated_pitch }}</pre>
+        </div>
+        {% endif %}
 
-            <h2>Most Popular Issues</h2>
-            {% for issue, count in top_issues %}
-            <div class="issue">
-                <strong>{{ issue }}</strong>
-                <p>{{ count }} times recommended</p>
-            </div>
-            {% endfor %}
+        <h2>Current Targets</h2>
 
-            <h2>Recent Analyses</h2>
-            {% for row in rows[-20:] %}
-            <div class="issue">
-                <strong>{{ row.repo }}</strong>
-                <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
-                <p>{{ row.pretty_time }}</p>
+        {% for row in rows[-20:] %}
+        <div class="issue best">
+            <strong>{{ row.repo }}</strong>
+            <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
+            <p>Status: {{ row.status }}</p>
+            <p>{{ row.pretty_time }}</p>
+
+            <div class="progress-wrap">
+                <div class="progress-bar" style="width: {{ row.progress }}%;"></div>
             </div>
-            {% endfor %}
-        </section>
-    </main>
+
+            <form method="post" action="/update-status" class="pipeline-form">
+                <input type="hidden" name="repo" value="{{ row.repo }}">
+                <select name="status">
+                    {% for status in pipeline_statuses %}
+                    <option value="{{ status }}" {% if row.status == status %}selected{% endif %}>
+                        {{ status }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Update</button>
+            </form>
+
+            <form method="post" action="/generate-pitch" class="pipeline-form">
+                <input type="hidden" name="repo" value="{{ row.repo }}">
+                <input type="hidden" name="best_issue" value="{{ row.best_issue }}">
+                <button type="submit">Generate Founder Pitch</button>
+            </form>
+        </div>
+        {% endfor %}
+    </section>
+</main>
 </body>
 </html>
