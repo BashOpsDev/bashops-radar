@@ -59,7 +59,7 @@ Keep it practical, direct, and under 180 words.
 """
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
         response = model.generate_content(prompt)
         return response.text or "AI summary could not be generated."
     except Exception as e:
