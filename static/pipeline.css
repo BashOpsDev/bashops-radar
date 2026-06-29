@@ -354,3 +354,40 @@ h2 {
         font-size: 24px;
     }
 }
+
+@media (min-width: 900px) {
+
+    .pipeline-card {
+        max-width: 100%;
+    }
+
+    .pipeline-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 30px;
+    }
+
+    .pipeline-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .quick-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .next-action {
+        width: 100%;
+    }
+}
