@@ -12,51 +12,91 @@
         <h1>BashOps Radar Pipeline</h1>
         <p class="angle">Track repositories from discovery to paid sprint.</p>
 
-        <div class="grid">
-            <div>
-                <strong>📥 New Target</strong>
-                <span>Analyze repo</span>
+        <h2>Pipeline Stats</h2>
+        <div class="pipeline-stats">
+            {% for item in pipeline_stats %}
+            <div class="stat-card">
+                <span>{{ item.status }}</span>
+                <strong>{{ item.count }}</strong>
             </div>
-            <div>
-                <strong>🔍 Researching</strong>
-                <span>Check issues</span>
-            </div>
-            <div>
-                <strong>🛠 Working</strong>
-                <span>Fix issue</span>
-            </div>
-            <div>
-                <strong>📤 PR Submitted</strong>
-                <span>Waiting review</span>
-            </div>
-            <div>
-                <strong>✅ PR Merged</strong>
-                <span>Build trust</span>
-            </div>
-            <div>
-                <strong>📧 Founder Contacted</strong>
-                <span>Pitch sprint</span>
-            </div>
-            <div>
-                <strong>💰 Paid Sprint</strong>
-                <span>Deliver work</span>
-            </div>
-            <div>
-                <strong>🤝 Retainer</strong>
-                <span>Long-term client</span>
-            </div>
+            {% endfor %}
         </div>
+
+        {% if generated_pitch %}
+        <div class="pitch-panel">
+            <span class="section-label">Generated Founder Pitch</span>
+            <h2>{{ pitch_repo }}</h2>
+            <pre class="pitch-box">{{ generated_pitch }}</pre>
+        </div>
+        {% endif %}
 
         <h2>Current Targets</h2>
 
-        {% for row in rows[-10:] %}
-        <div class="issue best">
-            <strong>{{ row.repo }}</strong>
-            <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
-            <p>Status: New Target</p>
-            <p>{{ row.pretty_time }}</p>
+        <div class="pipeline-list">
+            {% for row in rows[-20:] %}
+            <div class="pipeline-card">
+                <div class="pipeline-card-top">
+                    <div>
+                        <span class="status-badge">{{ row.status }}</span>
+                        <h3>{{ row.repo }}</h3>
+                        <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
+                        <p>{{ row.pretty_time }}</p>
+                    </div>
+
+                    <div class="score-pill">
+                        {{ row.score }}/100
+                    </div>
+                </div>
+
+                <div class="progress-wrap">
+                    <div class="progress-bar" style="width: {{ row.progress }}%;"></div>
+                </div>
+
+                <div class="next-action">
+                    <strong>Next Action</strong>
+                    <p>
+                        {% if row.status == "New Target" %}
+                        Research the issue and confirm it is safe to work on.
+                        {% elif row.status == "Researching" %}
+                        Read the codebase and prepare a small fix plan.
+                        {% elif row.status == "Working" %}
+                        Finish the fix and add tests where practical.
+                        {% elif row.status == "PR Submitted" %}
+                        Monitor review comments and respond quickly.
+                        {% elif row.status == "PR Merged" %}
+                        Prepare founder outreach.
+                        {% elif row.status == "Founder Contacted" %}
+                        Follow up with a focused sprint offer.
+                        {% elif row.status == "Paid Sprint" %}
+                        Deliver the sprint and document results.
+                        {% else %}
+                        Maintain relationship and look for retainer opportunities.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="pipeline-actions">
+                    <form method="post" action="/update-status" class="pipeline-form">
+                        <input type="hidden" name="repo" value="{{ row.repo }}">
+                        <select name="status">
+                            {% for status in pipeline_statuses %}
+                            <option value="{{ status }}" {% if row.status == status %}selected{% endif %}>
+                                {{ status }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit">Update Status</button>
+                    </form>
+
+                    <form method="post" action="/generate-pitch" class="pipeline-form">
+                        <input type="hidden" name="repo" value="{{ row.repo }}">
+                        <input type="hidden" name="best_issue" value="{{ row.best_issue }}">
+                        <button type="submit">Generate Founder Pitch</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
     </section>
 </main>
 </body>
