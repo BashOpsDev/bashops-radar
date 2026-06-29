@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BashOps Radar Analytics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main>
+        <section class="card">
+            <span class="section-label">Internal Analytics</span>
+            <h1>BashOps Radar Analytics</h1>
+
+            <div class="grid">
+                <div>
+                    <strong>Total Analyses</strong>
+                    <span>{{ total_analyses }}</span>
+                </div>
+            </div>
+
+            <h2>Top Repositories</h2>
+            {% for repo, count in top_repos %}
+            <div class="issue">
+                <strong>{{ repo }}</strong>
+                <p>{{ count }} analyses</p>
+            </div>
+            {% endfor %}
+
+            <h2>Recent Analyses</h2>
+            {% for row in rows %}
+            <div class="issue">
+                <strong>{{ row.repo }}</strong>
+                <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
+                <p>{{ row.timestamp }}</p>
+            </div>
+            {% endfor %}
+        </section>
+    </main>
+</body>
+</html>
