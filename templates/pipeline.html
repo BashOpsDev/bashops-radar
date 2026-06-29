@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BashOps Radar Pipeline</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+    <section class="card">
+        <span class="section-label">Opportunity Pipeline</span>
+        <h1>BashOps Radar Pipeline</h1>
+        <p class="angle">Track repositories from discovery to paid sprint.</p>
+
+        <div class="grid">
+            <div>
+                <strong>📥 New Target</strong>
+                <span>Analyze repo</span>
+            </div>
+            <div>
+                <strong>🔍 Researching</strong>
+                <span>Check issues</span>
+            </div>
+            <div>
+                <strong>🛠 Working</strong>
+                <span>Fix issue</span>
+            </div>
+            <div>
+                <strong>📤 PR Submitted</strong>
+                <span>Waiting review</span>
+            </div>
+            <div>
+                <strong>✅ PR Merged</strong>
+                <span>Build trust</span>
+            </div>
+            <div>
+                <strong>📧 Founder Contacted</strong>
+                <span>Pitch sprint</span>
+            </div>
+            <div>
+                <strong>💰 Paid Sprint</strong>
+                <span>Deliver work</span>
+            </div>
+            <div>
+                <strong>🤝 Retainer</strong>
+                <span>Long-term client</span>
+            </div>
+        </div>
+
+        <h2>Current Targets</h2>
+
+        {% for row in rows[-10:] %}
+        <div class="issue best">
+            <strong>{{ row.repo }}</strong>
+            <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
+            <p>Status: New Target</p>
+            <p>{{ row.pretty_time }}</p>
+        </div>
+        {% endfor %}
+    </section>
+</main>
+</body>
+</html>
