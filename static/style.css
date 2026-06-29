@@ -311,8 +311,144 @@ footer { text-align: center; color: var(--muted); }
 }
 
 @media (max-width: 900px) {
-    .hero, .report-grid, .demo { grid-template-columns: 1fr; display: block; }
-    .workflow-grid, .feature-grid, .grid, .roadmap-grid, .pricing-grid { grid-template-columns: 1fr; }
-    .nav, .nav-links, .top, form { flex-direction: column; align-items: flex-start; }
-    h1 { font-size: 40px; }
+    html, body {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    main {
+        width: 100%;
+        max-width: 100%;
+        padding: 16px;
+        overflow-x: hidden;
+    }
+
+    .nav {
+        gap: 18px;
+    }
+
+    .nav,
+    .nav-links,
+    .top,
+    form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .nav-links {
+        width: 100%;
+        gap: 10px;
+    }
+
+    .nav-links a,
+    .nav-cta,
+    button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .hero,
+    .report-grid,
+    .demo {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+
+    h1 {
+        font-size: 38px;
+        line-height: 1.08;
+    }
+
+    h2 {
+        font-size: 26px;
+    }
+
+    .hero p,
+    .demo p {
+        font-size: 15px;
+    }
+
+    .checks {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .radar-ring {
+        width: 240px;
+        height: 240px;
+        margin: 0 auto;
+    }
+
+    .radar-core {
+        width: 110px;
+        height: 110px;
+        font-size: 28px;
+    }
+
+    .workflow-grid,
+    .feature-grid,
+    .grid,
+    .roadmap-grid,
+    .pricing-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .workflow,
+    .demo,
+    .features,
+    .card,
+    .roadmap,
+    .pricing,
+    .social-proof,
+    footer {
+        padding: 22px;
+        border-radius: 16px;
+    }
+
+    .score-panel,
+    .score,
+    .demo-score {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .score-number {
+        font-size: 44px;
+    }
+
+    .score-meta div {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .grid div,
+    .issue,
+    .issue-row,
+    .angle {
+        width: 100%;
+        min-width: 0;
+        word-break: break-word;
+    }
+
+    .issue-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .issue-row span,
+    .issue-row a {
+        width: fit-content;
+    }
+
+    input,
+    button {
+        width: 100%;
+    }
+
+    .bottom-cta {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
 }
