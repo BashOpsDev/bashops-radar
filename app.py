@@ -1,11 +1,11 @@
 import os
 
-from analytics import track_analysis, read_analytics
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from analytics import read_analytics, track_analysis
 from radar import get_analysis, decision, recommend_angle
 
 try:
@@ -76,6 +76,29 @@ def home(request: Request):
     )
 
 
+@app.get("/admin/analytics", response_class=HTMLResponse)
+def analytics_dashboard(request: Request):
+    rows = read_analytics()
+    total_analyses = len(rows)
+
+    repo_counts = {}
+    for row in rows:
+        repo = row.get("repo", "unknown")
+        repo_counts[repo] = repo_counts.get(repo, 0) + 1
+
+    top_repos = sorted(repo_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="analytics.html",
+        context={
+            "total_analyses": total_analyses,
+            "top_repos": top_repos,
+            "rows": rows[-20:],
+        },
+    )
+
+
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
     try:
@@ -141,16 +164,17 @@ def analyze(request: Request, repo_url: str = Form(...)):
             "languages": languages,
         }
 
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={"result": result, "error": None},
-        )
-track_analysis(
+        track_analysis(
             repo=result["repo"],
             score=result["score"],
             best_issue=f"#{best_issue['number']}" if best_issue else "",
             request=request,
+        )
+
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={"result": result, "error": None},
         )
 
     except Exception as e:
@@ -159,25 +183,3 @@ track_analysis(
             name="index.html",
             context={"result": None, "error": str(e)},
         )
-@app.get("/admin/analytics", response_class=HTMLResponse)
-def analytics_dashboard(request: Request):
-    rows = read_analytics()
-
-    total_analyses = len(rows)
-
-    repo_counts = {}
-    for row in rows:
-        repo = row.get("repo", "unknown")
-        repo_counts[repo] = repo_counts.get(repo, 0) + 1
-
-    top_repos = sorted(repo_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-
-    return templates.TemplateResponse(
-        request=request,
-        name="analytics.html",
-        context={
-            "total_analyses": total_analyses,
-            "top_repos": top_repos,
-            "rows": rows[-20:],
-        },
-    )
