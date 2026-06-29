@@ -41,6 +41,14 @@ def analyze(request: Request, repo_url: str = Form(...)):
         recommended_action = "Analyze another repository"
         if best_issue:
             recommended_action = f"Start with #{best_issue['number']} - {best_issue['title']}"
+angle = recommend_angle(languages)
+        ai_summary = generate_ai_summary(
+            repo_name=f"{owner}/{repo_name}",
+            repo=repo,
+            best_issue=best_issue,
+            repo_score=repo_score,
+            angle=angle,
+        )
 
         result = {
             "repo": f"{owner}/{repo_name}",
