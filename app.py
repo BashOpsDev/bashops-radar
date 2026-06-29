@@ -1,11 +1,12 @@
 import os
+import csv
+from pathlib import Path
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
-from datetime import datetime, timezone
 
 from analytics import (
     analytics_summary,
@@ -123,10 +124,39 @@ def pipeline(request: Request):
         context=summary,
     )
 
+def daily_analysis_count(request: Request):
+    analytics_file = Path("analytics.csv")
 
+    if not analytics_file.exists():
+        return 0
+
+    ip = request.client.host if request.client else "unknown"
+    today = datetime.now(timezone.utc).date().isoformat()
+    count = 0
+
+    with analytics_file.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            timestamp = row.get("timestamp", "")
+            row_ip = row.get("ip", "")
+
+            if timestamp.startswith(today) and row_ip == ip:
+                count += 1
+
+    return count
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
     try:
+        if daily_analysis_count(request) >= FREE_ANALYSIS_LIMIT:
+            return templates.TemplateResponse(
+                request=request,
+                name="index.html",
+                context={
+                    "result": None,
+                    "error": "Free limit reached: 5 analyses per day. Upgrade to Pro for unlimited analyses.",
+                },
+            )
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
         best_issue = None
@@ -226,6 +256,7 @@ def analyze(request: Request, repo_url: str = Form(...)):
             context={"result": None, "error": str(e)},
         )
 BETA_FILE = Path("beta_signups.csv")
+FREE_ANALYSIS_LIMIT = 5
 
 
 @app.post("/beta-signup")
