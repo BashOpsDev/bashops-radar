@@ -293,7 +293,16 @@ def analyze(request: Request, repo_url: str = Form(...)):
             name="index.html",
             context={"result": None, "error": str(e), "limit_reached": False},
         )
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
 
+    summary = analytics_summary()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context=summary,
+    )
 
 @app.post("/update-status")
 def update_status(repo: str = Form(...), status: str = Form(...)):
