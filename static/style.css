@@ -623,3 +623,70 @@ button:hover,
         grid-template-columns: 1fr;
     }
 }
+/* Mobile hero/nav polish */
+@media (max-width: 520px) {
+    .nav {
+        padding: 22px 0 26px;
+        gap: 18px;
+    }
+
+    .brand {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .logo-mark {
+        width: 64px;
+        height: 64px;
+    }
+
+    .nav-links {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        width: 100%;
+    }
+
+    .nav-links a:not(.nav-cta) {
+        text-align: center;
+        font-size: 14px;
+        padding: 8px 0;
+    }
+
+    .nav-cta {
+        grid-column: 1 / -1;
+        padding: 16px;
+        font-size: 16px;
+    }
+
+    .hero {
+        padding-top: 10px;
+        margin-bottom: 24px;
+    }
+
+    .badge {
+        font-size: 12px;
+        width: 100%;
+        text-align: center;
+    }
+
+    h1 {
+        font-size: 44px;
+        line-height: 1.08;
+    }
+
+    .hero p {
+        font-size: 17px;
+        line-height: 1.7;
+    }
+
+    .checks span {
+        font-size: 15px;
+        padding: 12px 16px;
+    }
+
+    .radar-visual {
+        display: none;
+    }
+}
