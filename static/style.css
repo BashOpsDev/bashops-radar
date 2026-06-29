@@ -1188,3 +1188,23 @@ button:hover,
     outline:none;
     border-color:#ff9800;
 }
+.repo-metrics {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0 12px;
+}
+
+.repo-metrics span {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #0b1220;
+    border: 1px solid rgba(255, 153, 0, 0.25);
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.quick-links button.link-btn {
+    font-family: inherit;
+}

@@ -83,9 +83,15 @@
                             </a>
                         </h3>
 
-                        <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
-                        <p>{{ row.pretty_time }}</p>
-                    </div>
+        <div class="repo-metrics">
+            <span>{{ row.language or "Unknown" }}</span>
+            <span>⭐ {{ row.stars or "N/A" }} Stars</span>
+            <span>🍴 {{ row.forks or "N/A" }} Forks</span>
+            <span>🐞 {{ row.open_issues or "N/A" }} Issues</span>
+        </div>
+
+        <p>Score: {{ row.score }} · Best Issue: {{ row.best_issue }}</p>
+        <p>{{ row.pretty_time }}</p>
 
                     <div class="score-pill {% if row.score|int >= 85 %}score-high{% elif row.score|int >= 65 %}score-medium{% else %}score-low{% endif %}">
                         {{ row.score }}/100
@@ -94,15 +100,23 @@
 
                 <div class="quick-links">
                     <a href="{{ row.links.repo_url }}" target="_blank" class="link-btn">
-                        Open Repo
+                        📂 Repository
                     </a>
 
                     <a href="{{ row.links.best_issue_url }}" target="_blank" class="link-btn">
-                        Open Best Issue
+                        🎯 Best Issue
                     </a>
 
                     <a href="{{ row.links.org_url }}" target="_blank" class="link-btn">
-                        Open Org
+                        🏢 Organization
+                    </a>
+
+                    <button type="button" class="link-btn" onclick="copyText('{{ row.links.repo_url }}')">
+                        📋 Copy Repo
+                    </button>
+
+                    <a href="{{ row.links.repo_url }}" target="_blank" class="link-btn">
+                        🔗 GitHub
                     </a>
                 </div>
 
@@ -148,6 +162,15 @@
 
                     <button type="button" class="copy-btn" onclick="copyPitch('pitch-{{ loop.index }}')">
                         Copy Pitch
+                function copyText(text) {
+                    navigator.clipboard.writeText(text)
+                        .then(() => {
+                            alert("Repository link copied!");
+                        })
+                        .catch(() => {
+                            alert("Could not copy link.");
+                        });
+                }
                     </button>
                 </details>
                 {% endif %}
