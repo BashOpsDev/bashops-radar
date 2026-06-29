@@ -1,6 +1,7 @@
 import csv
 from pathlib import Path
 from datetime import datetime, timezone
+from collections import Counter, defaultdict
 
 ANALYTICS_FILE = Path("analytics.csv")
 
@@ -55,40 +56,72 @@ def analytics_summary():
 
     total_analyses = len(rows)
     unique_repos = len(set(row.get("repo", "") for row in rows if row.get("repo")))
+    unique_visitors = len(set(row.get("ip", "") for row in rows if row.get("ip")))
+    repeat_visitors = 0
+
+    visitor_counts = Counter(row.get("ip", "") for row in rows if row.get("ip"))
+    repeat_visitors = len([ip for ip, count in visitor_counts.items() if count > 1])
 
     scores = []
     for row in rows:
         try:
-            scores.append(int(row.get("score", 0)))
+            scores.append(int(float(row.get("score", 0))))
         except Exception:
             pass
 
     average_score = round(sum(scores) / len(scores), 1) if scores else 0
     highest_score = max(scores) if scores else 0
 
-    repo_counts = {}
-    issue_counts = {}
+    repo_counts = Counter()
+    issue_counts = Counter()
+    repo_scores = {}
+    daily_counts = defaultdict(int)
 
     for row in rows:
         repo = row.get("repo", "unknown")
         issue = row.get("best_issue", "")
+        score = row.get("score", "0")
 
-        repo_counts[repo] = repo_counts.get(repo, 0) + 1
+        repo_counts[repo] += 1
 
         if issue:
-            issue_counts[issue] = issue_counts.get(issue, 0) + 1
+            issue_counts[issue] += 1
+
+        try:
+            repo_scores[repo] = int(float(score))
+        except Exception:
+            repo_scores[repo] = 0
+
+        try:
+            dt = datetime.fromisoformat(row.get("timestamp", ""))
+            day = dt.strftime("%d %b")
+            daily_counts[day] += 1
+        except Exception:
+            pass
 
         row["pretty_time"] = format_time(row.get("timestamp", ""))
 
-    top_repos = sorted(repo_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    top_issues = sorted(issue_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_repos = [
+        {
+            "repo": repo,
+            "count": count,
+            "score": repo_scores.get(repo, 0),
+        }
+        for repo, count in repo_counts.most_common(10)
+    ]
+
+    top_issues = issue_counts.most_common(10)
+    daily_activity = list(daily_counts.items())[-7:]
 
     return {
         "rows": rows,
         "total_analyses": total_analyses,
         "unique_repos": unique_repos,
+        "unique_visitors": unique_visitors,
+        "repeat_visitors": repeat_visitors,
         "average_score": average_score,
         "highest_score": highest_score,
         "top_repos": top_repos,
         "top_issues": top_issues,
+        "daily_activity": daily_activity,
     }
