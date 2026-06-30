@@ -158,7 +158,18 @@ def home(request: Request):
         name="index.html",
         context={"result": None, "error": None, "limit_reached": False},
     )
-
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "result": None,
+            "error": None,
+            "limit_reached": False,
+            "current_user": get_current_user(request),
+        },
+    )
 @app.get("/export-pipeline")
 def export_pipeline():
 
