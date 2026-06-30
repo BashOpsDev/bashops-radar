@@ -331,7 +331,6 @@ def analyze(request: Request, repo_url: str = Form(...)):
 
         if not current_user:
             return RedirectResponse(url="/login", status_code=303)
-                },
             )
 
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
