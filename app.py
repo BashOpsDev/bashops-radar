@@ -198,7 +198,12 @@ def pricing(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="pricing.html",
-        context={"result": None, "error": None, "limit_reached": False},
+        context={
+            "result": None, 
+            "error": None, 
+            "limit_reached": False},
+            "current_user": get_current_user(request),
+         },
     )
 
 
@@ -263,7 +268,10 @@ def register_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="register.html",
-        context={"error": None},
+        context={
+            "error": None},
+            "current_user": get_current_user(request),
+        },
     )
 
 
@@ -303,6 +311,7 @@ def register_user(
 @app.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_dashboard(request: Request):
     summary = analytics_summary()
+    summary["current_user"] = get_current_user(request)
 
     return templates.TemplateResponse(
         request=request,
@@ -314,6 +323,7 @@ def analytics_dashboard(request: Request):
 @app.get("/pipeline", response_class=HTMLResponse)
 def pipeline(request: Request):
     summary = analytics_summary()
+    summary["current_user"] = get_current_user(request)
 
     return templates.TemplateResponse(
         request=request,
