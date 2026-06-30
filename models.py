@@ -13,7 +13,6 @@ class User(Base):
     email = Column(String(255), unique=True, index=True)
     password_hash = Column(String(255))
     plan = Column(String(50), default="free")
-
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     targets = relationship("Target", back_populates="user")
@@ -23,7 +22,6 @@ class Target(Base):
     __tablename__ = "targets"
 
     id = Column(Integer, primary_key=True)
-
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
 
     repo = Column(String(255), index=True)
@@ -31,6 +29,11 @@ class Target(Base):
     score = Column(Float)
     status = Column(String(50), default="New Target")
     best_issue = Column(String(100))
+
+    stars = Column(String(50))
+    forks = Column(String(50))
+    open_issues = Column(String(50))
+
     merge_probability = Column(String(100))
     difficulty = Column(String(100))
     estimated_time = Column(String(100))
