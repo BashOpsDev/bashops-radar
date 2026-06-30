@@ -1532,16 +1532,6 @@ main > .nav {
     }
 }
 
-.nav-menu{
-    max-height:0;
-    overflow:hidden;
-    transition:max-height .35s ease;
-}
-
-.nav-menu.open{
-    max-height:700px;
-}
-
 .register-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(260px, 1fr));
@@ -1745,6 +1735,30 @@ main > .nav {
     }
 
     .auth-side h1 {
-        font-size: 40px;
+        font-size: 40px;/* Fix navbar menu visibility */
+.nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    max-height: none;
+    overflow: visible;
+}
+
+@media (max-width: 860px) {
+    .nav-menu {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        padding-top: 16px;
+        max-height: none;
+    }
+
+    .nav-menu.open {
+        display: flex;
     }
 }
+    }
+}
+
+
