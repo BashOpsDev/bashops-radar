@@ -39,6 +39,12 @@ except Exception:
 
 app = FastAPI(title="BashOps Radar")
 Base.metadata.create_all(bind=engine)
+SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
