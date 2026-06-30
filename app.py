@@ -199,11 +199,11 @@ def pricing(request: Request):
         request=request,
         name="pricing.html",
         context={
-            "result": None, 
-            "error": None, 
-            "limit_reached": False},
+            "result": None,
+            "error": None,
+            "limit_reached": False,
             "current_user": get_current_user(request),
-         },
+        },
     )
 
 
