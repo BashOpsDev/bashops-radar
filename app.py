@@ -41,13 +41,18 @@ except Exception:
 
 app = FastAPI(title="BashOps Radar")
 Base.metadata.create_all(bind=engine)
-try:
-    with engine.begin() as connection:
-        connection.execute(
-            text("ALTER TABLE targets ADD COLUMN user_id INTEGER")
-        )
-except Exception:
-    pass
+def safe_add_column(column_sql: str):
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(column_sql))
+    except Exception:
+        pass
+
+
+safe_add_column("ALTER TABLE targets ADD COLUMN user_id INTEGER")
+safe_add_column("ALTER TABLE targets ADD COLUMN stars VARCHAR(50)")
+safe_add_column("ALTER TABLE targets ADD COLUMN forks VARCHAR(50)")
+safe_add_column("ALTER TABLE targets ADD COLUMN open_issues VARCHAR(50)")
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 if not SECRET_KEY:     
