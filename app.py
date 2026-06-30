@@ -359,18 +359,20 @@ def analyze(request: Request, repo_url: str = Form(...)):
 
         if not current_user:
             return RedirectResponse(url="/login", status_code=303)
-    if current_user.plan != "pro" and daily_analysis_count(current_user.id) >= FREE_ANALYSIS_LIMIT:
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "result": None,
-            "error": None,
-            "limit_reached": True,
-            "current_user": current_user,
-        },
-    )
 
+        if current_user.plan != "pro" and daily_analysis_count(current_user.id) >= FREE_ANALYSIS_LIMIT:
+            return templates.TemplateResponse(
+                request=request,
+                name="index.html",
+                context={
+                    "result": None,
+                    "error": None,
+                    "limit_reached": True,
+                    "current_user": current_user,
+                },
+            )
+
+        owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
         best_issue = None
