@@ -43,10 +43,14 @@
             <h2>Access your workspace</h2>
             <p class="angle">Accounts are being prepared for Public Beta.</p>
 
-            {% if joined %}
+            {% if registered %}
             <div class="success-card">
-                ✅ You're on the BashOps Radar beta list. We'll notify you when accounts open.
+                ✅ Account created successfully. Please login.
             </div>
+            {% endif %}
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
             {% endif %}
 
             <form method="post" action="/login" class="auth-form">
