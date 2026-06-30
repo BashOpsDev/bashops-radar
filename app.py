@@ -39,7 +39,7 @@ except Exception:
 
 app = FastAPI(title="BashOps Radar")
 Base.metadata.create_all(bind=engine)
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key")
+SECRET_KEY = os.getenv("SECRET_KEY")  if not SECRET_KEY:     raise RuntimeError("SECRET_KEY environment variable is required.")
 
 app.add_middleware(
     SessionMiddleware,
