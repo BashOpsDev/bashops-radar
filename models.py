@@ -25,3 +25,35 @@ class User(Base):
         DateTime(timezone=True),
         server_default=func.now(),
     )
+from sqlalchemy import Text
+from sqlalchemy import Float
+
+
+class Target(Base):
+
+    __tablename__ = "targets"
+
+    id = Column(Integer, primary_key=True)
+
+    repo = Column(String(255), index=True)
+
+    language = Column(String(100))
+
+    score = Column(Float)
+
+    status = Column(String(50), default="New Target")
+
+    best_issue = Column(String(100))
+
+    merge_probability = Column(String(100))
+
+    difficulty = Column(String(100))
+
+    estimated_time = Column(String(100))
+
+    pitch = Column(Text)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
