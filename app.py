@@ -1,5 +1,9 @@
 import os
 import csv
+from database import Base
+from database import engine
+
+import models
 from pathlib import Path
 from datetime import datetime, timezone
 
