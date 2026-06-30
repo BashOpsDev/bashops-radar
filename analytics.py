@@ -2,6 +2,7 @@ import csv
 from pathlib import Path
 from datetime import datetime, timezone
 from collections import Counter, defaultdict
+
 from database import SessionLocal
 from models import Target
 
@@ -38,7 +39,6 @@ def repo_links(repo_url: str, best_issue_url: str = ""):
         repo_url = f"https://github.com/{repo_url}"
 
     org_url = ""
-
     if "github.com/" in repo_url:
         parts = repo_url.split("github.com/")[-1].strip("/").split("/")
         if len(parts) >= 1:
@@ -49,207 +49,6 @@ def repo_links(repo_url: str, best_issue_url: str = ""):
         "best_issue_url": best_issue_url or f"{repo_url}/issues",
         "org_url": org_url,
     }
-
-
-def track_analysis(
-    repo,
-    score,
-    best_issue,
-    request,
-    status=DEFAULT_STATUS,
-    language="Unknown",
-    stars="",
-    forks="",
-    open_issues="",
-    user_id=None,
-):
-    file_exists = ANALYTICS_FILE.exists()
-
-    ip = request.client.host if request.client else "unknown"
-    user_agent = request.headers.get("user-agent", "unknown")
-
-    with ANALYTICS_FILE.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-
-        if not file_exists:
-            writer.writerow([
-                "timestamp",
-                "repo",
-                "score",
-                "best_issue",
-                "ip",
-                "user_agent",
-                "status",
-                "language",
-                "stars",
-                "forks",
-                "open_issues",
-            ])
-
-        writer.writerow([
-            datetime.now(timezone.utc).isoformat(),
-            repo,
-            score,
-            best_issue or "",
-            ip,
-            user_agent,
-            status,
-            language or "Unknown",
-            stars or "",
-            forks or "",
-            open_issues or "",
-        ])
-    try:
-        db = SessionLocal()
-
-        target = Target(
-            user_id=user_id,
-            repo=repo,
-            language=language or "Unknown",
-            score=float(score or 0),
-            status=status,
-            best_issue=best_issue or "",
-            stars=str(stars or ""),
-            forks=str(forks or ""),
-            open_issues=str(open_issues or ""),
-            merge_probability=estimate_merge_probability(score),
-            difficulty=estimate_difficulty(score),
-            estimated_time=estimate_completion_time(score),
-            pitch=generate_pitch(repo, best_issue),
-        )
-
-        db.add(target)
-        db.commit()
-        db.close()
-
-    except Exception:
-        pass
-    if user_id is not None:
-        db = SessionLocal()
-
-        targets = (
-            db.query(Target)
-            .filter(Target.user_id == user_id)
-            .order_by(Target.created_at.desc())
-            .all()
-        )
-
-        rows = []
-
-        for target in targets:
-            timestamp = target.created_at.isoformat() if target.created_at else ""
-
-            row = {
-                "timestamp": timestamp,
-                "repo": target.repo or "",
-                "score": str(int(target.score or 0)),
-                "best_issue": target.best_issue or "",
-                "ip": "",
-                "user_agent": "",
-                "status": target.status or DEFAULT_STATUS,
-                "language": target.language or "Unknown",
-                "stars": target.stars or "",
-                "forks": target.forks or "",
-                "open_issues": target.open_issues or "",
-            }
-
-            row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
-            row["pretty_time"] = format_time(timestamp)
-            row["links"] = repo_links(row["repo"], row["best_issue"])
-            row["pitch"] = target.pitch or generate_pitch(row["repo"], row["best_issue"])
-            row["difficulty"] = target.difficulty or estimate_difficulty(row["score"])
-            row["merge_probability"] = target.merge_probability or estimate_merge_probability(row["score"])
-            row["estimated_time"] = target.estimated_time or estimate_completion_time(row["score"])
-
-            rows.append(row)
-
-        db.close()
-        return rows
-def read_analytics(user_id=None):
-    if not ANALYTICS_FILE.exists():
-        return []
-
-    with ANALYTICS_FILE.open("r", encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
-
-    for row in rows:
-        if not row.get("status"):
-            row["status"] = DEFAULT_STATUS
-
-        if not row.get("language"):
-            row["language"] = "Unknown"
-
-        row["stars"] = row.get("stars", "")
-        row["forks"] = row.get("forks", "")
-        row["open_issues"] = row.get("open_issues", "")
-
-        row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
-        row["pretty_time"] = format_time(row.get("timestamp", ""))
-
-        repo = row.get("repo", "")
-        best_issue = row.get("best_issue", "")
-
-        row["links"] = repo_links(repo, best_issue)
-        row["pitch"] = generate_pitch(repo, best_issue)
-
-        row["difficulty"] = row.get("difficulty") or estimate_difficulty(row.get("score", 0))
-        row["merge_probability"] = row.get("merge_probability") or estimate_merge_probability(row.get("score", 0))
-        row["estimated_time"] = row.get("estimated_time") or estimate_completion_time(row.get("score", 0))
-
-    return rows
-
-
-def write_analytics(rows):
-    with ANALYTICS_FILE.open("w", newline="", encoding="utf-8") as f:
-        fieldnames = [
-            "timestamp",
-            "repo",
-            "score",
-            "best_issue",
-            "ip",
-            "user_agent",
-            "status",
-            "language",
-            "stars",
-            "forks",
-            "open_issues",
-        ]
-
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-
-        for row in rows:
-            writer.writerow({
-                "timestamp": row.get("timestamp", ""),
-                "repo": row.get("repo", ""),
-                "score": row.get("score", ""),
-                "best_issue": row.get("best_issue", ""),
-                "ip": row.get("ip", ""),
-                "user_agent": row.get("user_agent", ""),
-                "status": row.get("status", DEFAULT_STATUS),
-                "language": row.get("language", "Unknown"),
-                "stars": row.get("stars", ""),
-                "forks": row.get("forks", ""),
-                "open_issues": row.get("open_issues", ""),
-            })
-
-
-def update_pipeline_status(repo, status):
-    if status not in PIPELINE_STATUSES:
-        return False
-
-    rows = read_analytics()
-    updated = False
-
-    for row in rows:
-        if row.get("repo") == repo:
-            row["status"] = status
-            updated = True
-
-    if updated:
-        write_analytics(rows)
-
-    return updated
 
 
 def format_time(value):
@@ -299,15 +98,164 @@ def estimate_completion_time(score):
     return "2 days"
 
 
+def generate_pitch(repo, best_issue):
+    issue_text = f"issue {best_issue}" if best_issue else "a high-value issue"
+
+    return f"""Hi,
+
+I reviewed {repo} and noticed {issue_text}, which looks like a strong proof-of-work opportunity.
+
+I can investigate it, submit a focused PR, and include a clear technical summary with tests where practical.
+
+If the first contribution is useful, I would be happy to help with a focused 48-hour backend/API reliability sprint.
+
+Best,
+Bashir"""
+
+
+def target_to_row(target):
+    timestamp = target.created_at.isoformat() if target.created_at else ""
+
+    row = {
+        "timestamp": timestamp,
+        "repo": target.repo or "",
+        "score": str(int(target.score or 0)),
+        "best_issue": target.best_issue or "",
+        "status": target.status or DEFAULT_STATUS,
+        "language": target.language or "Unknown",
+        "stars": target.stars or "",
+        "forks": target.forks or "",
+        "open_issues": target.open_issues or "",
+    }
+
+    row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
+    row["pretty_time"] = format_time(timestamp)
+    row["links"] = repo_links(row["repo"], row["best_issue"])
+    row["pitch"] = target.pitch or generate_pitch(row["repo"], row["best_issue"])
+    row["difficulty"] = target.difficulty or estimate_difficulty(row["score"])
+    row["merge_probability"] = target.merge_probability or estimate_merge_probability(row["score"])
+    row["estimated_time"] = target.estimated_time or estimate_completion_time(row["score"])
+
+    return row
+
+
+def track_analysis(
+    repo,
+    score,
+    best_issue,
+    request,
+    status=DEFAULT_STATUS,
+    language="Unknown",
+    stars="",
+    forks="",
+    open_issues="",
+    user_id=None,
+):
+    db = SessionLocal()
+
+    target = Target(
+        user_id=user_id,
+        repo=repo,
+        language=language or "Unknown",
+        score=float(score or 0),
+        status=status,
+        best_issue=best_issue or "",
+        stars=str(stars or ""),
+        forks=str(forks or ""),
+        open_issues=str(open_issues or ""),
+        merge_probability=estimate_merge_probability(score),
+        difficulty=estimate_difficulty(score),
+        estimated_time=estimate_completion_time(score),
+        pitch=generate_pitch(repo, best_issue),
+    )
+
+    db.add(target)
+    db.commit()
+    db.close()
+
+
+def read_analytics(user_id=None):
+    db = SessionLocal()
+
+    query = db.query(Target)
+
+    if user_id is not None:
+        query = query.filter(Target.user_id == user_id)
+
+    targets = query.order_by(Target.created_at.desc()).all()
+    rows = [target_to_row(target) for target in targets]
+
+    db.close()
+    return rows
+
+
+def write_analytics(rows):
+    with ANALYTICS_FILE.open("w", newline="", encoding="utf-8") as f:
+        fieldnames = [
+            "timestamp",
+            "repo",
+            "score",
+            "best_issue",
+            "status",
+            "language",
+            "stars",
+            "forks",
+            "open_issues",
+        ]
+
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for row in rows:
+            writer.writerow({
+                "timestamp": row.get("timestamp", ""),
+                "repo": row.get("repo", ""),
+                "score": row.get("score", ""),
+                "best_issue": row.get("best_issue", ""),
+                "status": row.get("status", DEFAULT_STATUS),
+                "language": row.get("language", "Unknown"),
+                "stars": row.get("stars", ""),
+                "forks": row.get("forks", ""),
+                "open_issues": row.get("open_issues", ""),
+            })
+
+
+def export_user_csv(user_id=None):
+    rows = read_analytics(user_id=user_id)
+    write_analytics(rows)
+    return ANALYTICS_FILE
+
+
+def update_pipeline_status(repo, status, user_id=None):
+    if status not in PIPELINE_STATUSES:
+        return False
+
+    db = SessionLocal()
+
+    query = db.query(Target).filter(Target.repo == repo)
+
+    if user_id is not None:
+        query = query.filter(Target.user_id == user_id)
+
+    targets = query.all()
+
+    if not targets:
+        db.close()
+        return False
+
+    for target in targets:
+        target.status = status
+
+    db.commit()
+    db.close()
+    return True
+
+
 def analytics_summary(user_id=None):
     rows = read_analytics(user_id=user_id)
 
     total_analyses = len(rows)
     unique_repos = len(set(row.get("repo", "") for row in rows if row.get("repo")))
-
-    visitor_counts = Counter(row.get("ip", "") for row in rows if row.get("ip"))
-    unique_visitors = len(visitor_counts)
-    repeat_visitors = len([ip for ip, count in visitor_counts.items() if count > 1])
 
     scores = []
     for row in rows:
@@ -371,23 +319,7 @@ def analytics_summary(user_id=None):
         repo = row.get("repo", "")
         if repo and repo not in seen:
             seen.add(repo)
-            best_opportunities.append({
-                "repo": repo,
-                "score": row.get("score", "0"),
-                "best_issue": row.get("best_issue", ""),
-                "status": row.get("status", DEFAULT_STATUS),
-                "progress": STATUS_PROGRESS.get(row.get("status", DEFAULT_STATUS), 12),
-                "time": row.get("pretty_time", ""),
-                "links": row.get("links", {}),
-                "pitch": row.get("pitch", ""),
-                "language": row.get("language", "Unknown"),
-                "stars": row.get("stars", ""),
-                "forks": row.get("forks", ""),
-                "open_issues": row.get("open_issues", ""),
-                "difficulty": row.get("difficulty", "Medium"),
-                "merge_probability": row.get("merge_probability", "Medium merge probability"),
-                "estimated_time": row.get("estimated_time", "1 day"),
-            })
+            best_opportunities.append(row)
 
     pipeline_stats = [
         {"status": status, "count": status_counts.get(status, 0)}
@@ -398,8 +330,8 @@ def analytics_summary(user_id=None):
         "rows": rows,
         "total_analyses": total_analyses,
         "unique_repos": unique_repos,
-        "unique_visitors": unique_visitors,
-        "repeat_visitors": repeat_visitors,
+        "unique_visitors": 0,
+        "repeat_visitors": 0,
         "average_score": average_score,
         "highest_score": highest_score,
         "top_repos": top_repos,
@@ -409,18 +341,3 @@ def analytics_summary(user_id=None):
         "pipeline_stats": pipeline_stats,
         "pipeline_statuses": PIPELINE_STATUSES,
     }
-
-
-def generate_pitch(repo, best_issue):
-    issue_text = f"issue {best_issue}" if best_issue else "a high-value issue"
-
-    return f"""Hi,
-
-I reviewed {repo} and noticed {issue_text}, which looks like a strong proof-of-work opportunity.
-
-I can investigate it, submit a focused PR, and include a clear technical summary with tests where practical.
-
-If the first contribution is useful, I would be happy to help with a focused 48-hour backend/API reliability sprint.
-
-Best,
-Bashir"""
