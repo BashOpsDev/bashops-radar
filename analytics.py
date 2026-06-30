@@ -34,7 +34,11 @@ STATUS_PROGRESS = {
 def repo_links(repo_url: str, best_issue_url: str = ""):
     repo_url = (repo_url or "").strip()
 
+    if repo_url and "github.com/" not in repo_url and "/" in repo_url:
+        repo_url = f"https://github.com/{repo_url}"
+
     org_url = ""
+
     if "github.com/" in repo_url:
         parts = repo_url.split("github.com/")[-1].strip("/").split("/")
         if len(parts) >= 1:
@@ -120,8 +124,48 @@ def track_analysis(
 
     except Exception:
         pass
+    if user_id is not None:
+        db = SessionLocal()
 
-def read_analytics():
+        targets = (
+            db.query(Target)
+            .filter(Target.user_id == user_id)
+            .order_by(Target.created_at.desc())
+            .all()
+        )
+
+        rows = []
+
+        for target in targets:
+            timestamp = target.created_at.isoformat() if target.created_at else ""
+
+            row = {
+                "timestamp": timestamp,
+                "repo": target.repo or "",
+                "score": str(int(target.score or 0)),
+                "best_issue": target.best_issue or "",
+                "ip": "",
+                "user_agent": "",
+                "status": target.status or DEFAULT_STATUS,
+                "language": target.language or "Unknown",
+                "stars": target.stars or "",
+                "forks": target.forks or "",
+                "open_issues": target.open_issues or "",
+            }
+
+            row["progress"] = STATUS_PROGRESS.get(row["status"], 12)
+            row["pretty_time"] = format_time(timestamp)
+            row["links"] = repo_links(row["repo"], row["best_issue"])
+            row["pitch"] = target.pitch or generate_pitch(row["repo"], row["best_issue"])
+            row["difficulty"] = target.difficulty or estimate_difficulty(row["score"])
+            row["merge_probability"] = target.merge_probability or estimate_merge_probability(row["score"])
+            row["estimated_time"] = target.estimated_time or estimate_completion_time(row["score"])
+
+            rows.append(row)
+
+        db.close()
+        return rows
+def read_analytics(user_id=None):
     if not ANALYTICS_FILE.exists():
         return []
 
@@ -255,8 +299,8 @@ def estimate_completion_time(score):
     return "2 days"
 
 
-def analytics_summary():
-    rows = read_analytics()
+def analytics_summary(user_id=None):
+    rows = read_analytics(user_id=user_id)
 
     total_analyses = len(rows)
     unique_repos = len(set(row.get("repo", "") for row in rows if row.get("repo")))
