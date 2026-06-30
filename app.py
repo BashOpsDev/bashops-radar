@@ -7,6 +7,11 @@ import models
 from pathlib import Path
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import Session
+from database import SessionLocal
+from models import User
+from auth import hash_password, verify_password
+
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -180,6 +185,47 @@ def beta_signup(email: str = Form(...)):
         f.write(f"{datetime.now(timezone.utc).isoformat()},{email}\n")
 
     return RedirectResponse(url="/login?joined=true", status_code=303)
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"error": None},
+    )
+
+
+@app.post("/register")
+def register_user(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    db: Session = SessionLocal()
+
+    existing_user = db.query(User).filter(User.email == email).first()
+
+    if existing_user:
+        db.close()
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"error": "Email already registered. Please login instead."},
+        )
+
+    user = User(
+        name=name,
+        email=email,
+        password_hash=hash_password(password),
+        plan="free",
+    )
+
+    db.add(user)
+    db.commit()
+    db.close()
+
+    return RedirectResponse(url="/login?registered=true", status_code=303)
 
 
 @app.get("/admin/analytics", response_class=HTMLResponse)
