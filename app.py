@@ -14,6 +14,7 @@ from auth import verify_password
 import models
 from pathlib import Path
 from datetime import datetime, timezone
+from models import User, Target
 
 from sqlalchemy.orm import Session
 from database import SessionLocal
@@ -30,6 +31,7 @@ from analytics import (
     track_analysis,
     update_pipeline_status,
     generate_pitch,
+    export_user_csv,
 )
 from radar import get_analysis, decision, recommend_angle
 
@@ -137,33 +139,25 @@ Keep it practical, direct, and under 180 words.
         }
 
 
-def daily_analysis_count(request: Request):
-    analytics_file = Path("analytics.csv")
+def daily_analysis_count(user_id: int):
+    db: Session = SessionLocal()
 
-    if not analytics_file.exists():
-        return 0
+    today = datetime.now(timezone.utc).date()
 
-    ip = request.client.host if request.client else "unknown"
-    today = datetime.now(timezone.utc).date().isoformat()
-    count = 0
+    count = (
+        db.query(Target)
+        .filter(Target.user_id == user_id)
+        .all()
+    )
 
-    with analytics_file.open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+    total = 0
 
-        for row in reader:
-            timestamp = row.get("timestamp", "")
-            row_ip = row.get("ip", "")
+    for target in count:
+        if target.created_at and target.created_at.date() == today:
+            total += 1
 
-            if timestamp.startswith(today) and row_ip == ip:
-                count += 1
-
-    return count
-def get_current_user(request: Request):
-    user_id = request.session.get("user_id")
-
-    if not user_id:
-        return None
-
+    db.close()
+    return total
     db: Session = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
     db.close()
@@ -183,24 +177,20 @@ def home(request: Request):
         },
     )
 @app.get("/export-pipeline")
-def export_pipeline():
+def export_pipeline(request: Request):
+    current_user = get_current_user(request)
 
-    file = Path("analytics.csv")
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
 
-    if not file.exists():
-
-        return RedirectResponse("/pipeline")
+    file_path = export_user_csv(user_id=current_user.id)
 
     return FileResponse(
-
-        path=file,
-
+        path=file_path,
         filename="bashops_pipeline.csv",
-
-        media_type="text/csv"
-
+        media_type="text/csv",
     )
-
+    
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
     return templates.TemplateResponse(
@@ -332,15 +322,19 @@ def register_user(
 
 @app.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_dashboard(request: Request):
-    summary = analytics_summary()
-    summary["current_user"] = get_current_user(request)
+    current_user = get_current_user(request)
+
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    summary = analytics_summary(user_id=current_user.id)
+    summary["current_user"] = current_user
 
     return templates.TemplateResponse(
         request=request,
         name="analytics.html",
         context=summary,
     )
-
 
 @app.get("/pipeline", response_class=HTMLResponse)
 def pipeline(request: Request):
@@ -365,6 +359,17 @@ def analyze(request: Request, repo_url: str = Form(...)):
 
         if not current_user:
             return RedirectResponse(url="/login", status_code=303)
+    if current_user.plan != "pro" and daily_analysis_count(current_user.id) >= FREE_ANALYSIS_LIMIT:
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "result": None,
+            "error": None,
+            "limit_reached": True,
+            "current_user": current_user,
+        },
+    )
 
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
@@ -481,15 +486,35 @@ def dashboard(request: Request):
         context=summary,
     )
 @app.post("/update-status")
-def update_status(repo: str = Form(...), status: str = Form(...)):
-    update_pipeline_status(repo, status)
+def update_status(
+    request: Request,
+    repo: str = Form(...),
+    status: str = Form(...),
+):
+    current_user = get_current_user(request)
+
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    update_pipeline_status(
+        repo=repo,
+        status=status,
+        user_id=current_user.id,
+    )
+
     return RedirectResponse(url="/pipeline", status_code=303)
 
 
 @app.post("/generate-pitch", response_class=HTMLResponse)
 def pitch_preview(request: Request, repo: str = Form(...), best_issue: str = Form("")):
+    current_user = get_current_user(request)
+
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
     pitch = generate_pitch(repo, best_issue)
-    summary = analytics_summary()
+    summary = analytics_summary(user_id=current_user.id)
+    summary["current_user"] = current_user
 
     return templates.TemplateResponse(
         request=request,
