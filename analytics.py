@@ -99,6 +99,7 @@ def track_analysis(
         db = SessionLocal()
 
         target = Target(
+            user_id=user_id,
             repo=repo,
             language=language or "Unknown",
             score=float(score or 0),
