@@ -6,28 +6,61 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    {% include "components/navbar.html" %}
+{% include "components/navbar.html" %}
+
 <main>
-    <section class="card">
-        <span class="section-label">Public Beta</span>
-        <h1>Join BashOps Radar Beta</h1>
-        <p class="angle">
-            Accounts and subscriptions are coming soon. For now, join the beta list and get early access.
-        </p>
+    <section class="auth-shell">
+        <div class="auth-side">
+            <div class="auth-logo">&gt;_</div>
 
-        <form method="post" action="/beta-signup">
-            <input type="email" name="email" placeholder="Enter your email" required>
-            <button type="submit">Join Beta</button>
-        </form>
+            <span class="section-label">Welcome Back</span>
+            <h1>Continue your <span>Proof-of-Work</span> pipeline</h1>
+            <p>
+                Login to continue analyzing repositories, managing your pipeline,
+                and preparing founder outreach.
+            </p>
 
-        <p class="angle">
-            Pro will include unlimited analyses, founder intelligence, AI outreach, daily briefing, and contract engine.
-        </p>
-        {% if joined %}
-<div class="success-card">
-    ✅ You're on the BashOps Radar beta list. We'll notify you when accounts open.
-</div>
-{% endif %}
+            <div class="auth-benefits">
+                <div>
+                    <strong>🎯 Saved Targets</strong>
+                    <span>Return to your best repository opportunities anytime.</span>
+                </div>
+
+                <div>
+                    <strong>🚀 Founder Outreach</strong>
+                    <span>Generate and copy focused sprint pitches.</span>
+                </div>
+
+                <div>
+                    <strong>📈 Dashboard</strong>
+                    <span>Track scores, progress, and pipeline status.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-card">
+            <span class="section-label">Login</span>
+            <h2>Access your workspace</h2>
+            <p class="angle">Accounts are being prepared for Public Beta.</p>
+
+            {% if joined %}
+            <div class="success-card">
+                ✅ You're on the BashOps Radar beta list. We'll notify you when accounts open.
+            </div>
+            {% endif %}
+
+            <form method="post" action="/login" class="auth-form">
+                <input type="email" name="email" placeholder="Email address" required>
+                <input type="password" name="password" placeholder="Password" required>
+
+                <button type="submit">Login</button>
+            </form>
+
+            <p class="auth-switch">
+                New here?
+                <a href="/register">Create account</a>
+            </p>
+        </div>
     </section>
 </main>
 </body>
