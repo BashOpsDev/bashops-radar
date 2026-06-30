@@ -291,6 +291,8 @@ def register_user(
 ):
     db: Session = SessionLocal()
 
+    email = email.strip().lower()
+
     existing_user = db.query(User).filter(User.email == email).first()
 
     if existing_user:
@@ -308,8 +310,21 @@ def register_user(
         plan="free",
     )
 
-    db.add(user)
-    db.commit()
+    try:
+        db.add(user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        db.close()
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "error": "An account with this email already exists. Please login instead.",
+                "current_user": get_current_user(request),
+        },
+    )
+
     db.close()
 
     return RedirectResponse(url="/login?registered=true", status_code=303)
