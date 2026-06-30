@@ -329,15 +329,19 @@ def analytics_dashboard(request: Request):
 
 @app.get("/pipeline", response_class=HTMLResponse)
 def pipeline(request: Request):
-    summary = analytics_summary()
-    summary["current_user"] = get_current_user(request)
+    current_user = get_current_user(request)
+
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    summary = analytics_summary(user_id=current_user.id)
+    summary["current_user"] = current_user
 
     return templates.TemplateResponse(
         request=request,
         name="pipeline.html",
         context=summary,
     )
-
 
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
@@ -453,7 +457,7 @@ def dashboard(request: Request):
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
 
-    summary = analytics_summary()
+    summary = analytics_summary(user_id=current_user.id)
     summary["current_user"] = current_user
 
     return templates.TemplateResponse(
