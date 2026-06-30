@@ -41,10 +41,13 @@ except Exception:
 
 app = FastAPI(title="BashOps Radar")
 Base.metadata.create_all(bind=engine)
-with engine.begin() as connection:
-    connection.execute(
-        text("ALTER TABLE targets ADD COLUMN IF NOT EXISTS user_id INTEGER")
-    )
+try:
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE targets ADD COLUMN user_id INTEGER")
+        )
+except Exception:
+    pass
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 if not SECRET_KEY:     
