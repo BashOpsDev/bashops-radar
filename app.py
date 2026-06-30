@@ -269,11 +269,10 @@ def register_page(request: Request):
         request=request,
         name="register.html",
         context={
-            "error": None},
+            "error": None,
             "current_user": get_current_user(request),
         },
     )
-
 
 @app.post("/register")
 def register_user(
