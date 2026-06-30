@@ -12,3 +12,4 @@ alembic
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+itsdangerous
