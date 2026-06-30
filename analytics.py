@@ -57,6 +57,7 @@ def track_analysis(
     stars="",
     forks="",
     open_issues="",
+    user_id=None,
 ):
     file_exists = ANALYTICS_FILE.exists()
 
