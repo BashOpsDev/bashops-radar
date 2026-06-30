@@ -9,25 +9,57 @@
 {% include "components/navbar.html" %}
 
 <main>
-    <section class="card">
-        <span class="section-label">Create Account</span>
-        <h1>Join BashOps Radar</h1>
-        <p class="angle">Create your workspace and start tracking proof-of-work opportunities.</p>
+    <section class="auth-shell">
+        <div class="auth-side">
+            <div class="auth-logo">&gt;_</div>
 
-        {% if error %}
-        <div class="error">{{ error }}</div>
-        {% endif %}
+            <span class="section-label">Create Account</span>
+            <h1>Join BashOps <span>Radar</span></h1>
+            <p>
+                Create your workspace, analyze repositories, track proof-of-work opportunities,
+                and move promising targets toward paid sprints.
+            </p>
 
-        <form method="post" action="/register" class="register-form">
-            <input type="text" name="name" placeholder="Your name" required>
-            <input type="email" name="email" placeholder="Email address" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Create Account</button>
-        </form>
+            <div class="auth-benefits">
+                <div>
+                    <strong>⚡ Discover Opportunities</strong>
+                    <span>Find high-probability GitHub repos worth your time.</span>
+                </div>
 
-        <p class="angle">
-            Already have an account? <a href="/login" class="secondary-link">Login</a>
-        </p>
+                <div>
+                    <strong>📊 Track Progress</strong>
+                    <span>Manage targets from research to founder outreach.</span>
+                </div>
+
+                <div>
+                    <strong>💰 Convert to Paid Work</strong>
+                    <span>Generate pitches and build a repeatable client workflow.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-card">
+            <span class="section-label">Workspace</span>
+            <h2>Create your account</h2>
+            <p class="angle">Start building your proof-of-work pipeline.</p>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="/register" class="auth-form">
+                <input type="text" name="name" placeholder="Your name" required>
+                <input type="email" name="email" placeholder="Email address" required>
+                <input type="password" name="password" placeholder="Password" required>
+
+                <button type="submit">Create Account</button>
+            </form>
+
+            <p class="auth-switch">
+                Already have an account?
+                <a href="/login">Login</a>
+            </p>
+        </div>
     </section>
 </main>
 </body>
