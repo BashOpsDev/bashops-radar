@@ -1,5 +1,7 @@
 import csv
 import sys
+import os
+import requests
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -21,16 +23,42 @@ def parse_github_url(url: str):
 
 def github_get(endpoint: str):
     try:
-        response = requests.get(f"https://api.github.com{endpoint}", timeout=30)
+        response = requests.get(
+    f"https://api.github.com{endpoint}",
+    headers=github_headers(),
+    timeout=30,
+)
     except requests.exceptions.Timeout:
         raise Exception("GitHub API timed out. Check your internet connection and try again.")
     except requests.exceptions.ConnectionError:
         raise Exception("Could not connect to GitHub API. Check your internet connection and try again.")
 
+    if response.status_code == 401:
+        raise Exception("GitHub authentication failed. Check your GITHUB_TOKEN.")
+
+    if response.status_code == 403:
+        raise Exception("GitHub API rate limit exceeded.")
+
     if response.status_code != 200:
-        raise Exception(f"GitHub API error: {response.status_code} - {response.text}")
+        raise Exception(
+        f"GitHub API error ({response.status_code})."
+    )
 
     return response.json()
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
+
+def github_headers():
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "BashOps-Radar",
+    }
+
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
+    return headers
 
 
 def days_since(date_string: str) -> int:
