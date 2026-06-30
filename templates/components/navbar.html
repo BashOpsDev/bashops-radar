@@ -18,19 +18,17 @@
                 <a href="/admin/analytics">Analytics</a>
             </div>
 
-            <div class="nav-right">
-    <a href="/dashboard" class="nav-outline">Dashboard</a>
+    <div class="nav-right">
+        {% if current_user %}
+            <a href="/dashboard" class="nav-outline">Dashboard</a>
+            <a href="/logout" class="nav-outline">Logout</a>
+        {% else %}
+            <a href="/pipeline" class="nav-outline">Demo Dashboard</a>
+            <a href="/register" class="nav-outline">Register</a>
+            <a href="/login" class="nav-outline">Login</a>
+        {% endif %}
 
-    {% if current_user %}
-        <a href="/dashboard" class="nav-outline">Dashboard</a>
-        <a href="/logout" class="nav-outline">Logout</a>
-    {% else %}
-        <a href="/pipeline" class="nav-outline">Demo Dashboard</a>
-        <a href="/register" class="nav-outline">Register</a>
-        <a href="/login" class="nav-outline">Login</a>
-    {% endif %}
-
-    <a href="/" class="nav-primary">Analyze Repository →</a>
+        <a href="/" class="nav-primary">Analyze Repository →</a>
 </div>
         </div>        
     </div>
