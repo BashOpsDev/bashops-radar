@@ -27,6 +27,7 @@ except Exception:
 
 
 app = FastAPI(title="BashOps Radar")
+Base.metadata.create_all(bind=engine)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
