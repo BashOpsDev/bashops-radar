@@ -1531,3 +1531,13 @@ main > .nav {
         text-align: center;
     }
 }
+
+.nav-menu{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .35s ease;
+}
+
+.nav-menu.open{
+    max-height:700px;
+}
