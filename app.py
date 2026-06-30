@@ -329,6 +329,7 @@ def analyze(request: Request, repo_url: str = Form(...)):
                     "result": None,
                     "error": None,
                     "limit_reached": True,
+                    "current_user": get_current_user(request),
                 },
             )
 
