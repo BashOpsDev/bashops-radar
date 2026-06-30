@@ -45,7 +45,12 @@ with engine.begin() as connection:
     connection.execute(
         text("ALTER TABLE targets ADD COLUMN IF NOT EXISTS user_id INTEGER")
     )
-SECRET_KEY = os.getenv("SECRET_KEY")  if not SECRET_KEY:     raise RuntimeError("SECRET_KEY environment variable is required.")
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:     
+    raise RuntimeError(
+        "SECRET_KEY environment variable is required."
+    )
 
 app.add_middleware(
     SessionMiddleware,
@@ -157,13 +162,6 @@ def get_current_user(request: Request):
 
     return user
 
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={"result": None, "error": None, "limit_reached": False},
-    )
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(
@@ -331,7 +329,6 @@ def analyze(request: Request, repo_url: str = Form(...)):
 
         if not current_user:
             return RedirectResponse(url="/login", status_code=303)
-            )
 
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
