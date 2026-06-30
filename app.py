@@ -188,13 +188,48 @@ def pricing(request: Request):
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login(request: Request, joined: bool = False):
+def login(request: Request, joined: bool = False, registered: bool = False):
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"joined": joined},
+        context={
+            "joined": joined,
+            "registered": registered,
+            "error": None,
+            "current_user": get_current_user(request),
+        },
     )
+@app.post("/login")
+def login_user(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    db: Session = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
 
+    if not user or not verify_password(password, user.password_hash):
+        db.close()
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "joined": False,
+                "registered": False,
+                "error": "Invalid email or password.",
+                "current_user": None,
+            },
+        )
+
+    request.session["user_id"] = user.id
+    db.close()
+
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=303)
 
 @app.post("/beta-signup")
 def beta_signup(email: str = Form(...)):
@@ -386,15 +421,19 @@ def analyze(request: Request, repo_url: str = Form(...)):
         )
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
+    current_user = get_current_user(request)
+
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
 
     summary = analytics_summary()
+    summary["current_user"] = current_user
 
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
         context=summary,
     )
-
 @app.post("/update-status")
 def update_status(repo: str = Form(...), status: str = Form(...)):
     update_pipeline_status(repo, status)
