@@ -2,6 +2,8 @@ import csv
 from pathlib import Path
 from datetime import datetime, timezone
 from collections import Counter, defaultdict
+from database import SessionLocal
+from models import Target
 
 ANALYTICS_FILE = Path("analytics.csv")
 DEFAULT_STATUS = "New Target"
@@ -92,7 +94,27 @@ def track_analysis(
             forks or "",
             open_issues or "",
         ])
+    try:
+        db = SessionLocal()
 
+        target = Target(
+            repo=repo,
+            language=language or "Unknown",
+            score=float(score or 0),
+            status=status,
+            best_issue=best_issue or "",
+            merge_probability=estimate_merge_probability(score),
+            difficulty=estimate_difficulty(score),
+            estimated_time=estimate_completion_time(score),
+            pitch=generate_pitch(repo, best_issue),
+        )
+
+        db.add(target)
+        db.commit()
+        db.close()
+
+    except Exception:
+        pass
 
 def read_analytics():
     if not ANALYTICS_FILE.exists():
