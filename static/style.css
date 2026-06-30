@@ -1541,3 +1541,44 @@ main > .nav {
 .nav-menu.open{
     max-height:700px;
 }
+
+.register-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 18px;
+    max-width: 760px;
+    margin-top: 28px;
+}
+
+.register-form input {
+    width: 100%;
+    height: 58px;
+    padding: 0 18px;
+    border-radius: 14px;
+    border: 1px solid #283548;
+    background: #0d121b;
+    color: #fff;
+    font-size: 16px;
+}
+
+.register-form input:focus {
+    outline: none;
+    border-color: #ff9800;
+    box-shadow: 0 0 18px rgba(255, 152, 0, 0.18);
+}
+
+.register-form button {
+    grid-column: 1 / -1;
+    height: 60px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ffb000, #ff7a00);
+    color: #111 !important;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+@media (max-width: 900px) {
+    .register-form {
+        grid-template-columns: 1fr;
+    }
+}
