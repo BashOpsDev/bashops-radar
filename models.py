@@ -1,4 +1,5 @@
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from database import Base
@@ -15,11 +16,15 @@ class User(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    targets = relationship("Target", back_populates="user")
+
 
 class Target(Base):
     __tablename__ = "targets"
 
     id = Column(Integer, primary_key=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
 
     repo = Column(String(255), index=True)
     language = Column(String(100))
@@ -32,3 +37,5 @@ class Target(Base):
     pitch = Column(Text)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="targets")
