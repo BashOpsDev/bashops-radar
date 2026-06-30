@@ -3,6 +3,7 @@ import csv
 import os
 from database import Base
 from database import engine
+from sqlalchemy import text
 
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
@@ -40,6 +41,10 @@ except Exception:
 
 app = FastAPI(title="BashOps Radar")
 Base.metadata.create_all(bind=engine)
+with engine.begin() as connection:
+    connection.execute(
+        text("ALTER TABLE targets ADD COLUMN IF NOT EXISTS user_id INTEGER")
+    )
 SECRET_KEY = os.getenv("SECRET_KEY")  if not SECRET_KEY:     raise RuntimeError("SECRET_KEY environment variable is required.")
 
 app.add_middleware(
@@ -322,15 +327,10 @@ def pipeline(request: Request):
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(request: Request, repo_url: str = Form(...)):
     try:
-        if daily_analysis_count(request) >= FREE_ANALYSIS_LIMIT:
-            return templates.TemplateResponse(
-                request=request,
-                name="index.html",
-                context={
-                    "result": None,
-                    "error": None,
-                    "limit_reached": True,
-                    "current_user": get_current_user(request),
+        current_user = get_current_user(request)
+
+        if not current_user:
+            return RedirectResponse(url="/login", status_code=303)
                 },
             )
 
@@ -418,6 +418,7 @@ def analyze(request: Request, repo_url: str = Form(...)):
             stars=result.get("stars", ""),
             forks=result.get("forks", ""),
             open_issues=result.get("open_issues", ""),
+            user_id=current_user.id,
         )
 
         return templates.TemplateResponse(
