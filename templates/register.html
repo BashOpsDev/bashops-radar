@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register - BashOps Radar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <meta name="robots" content="noindex">
+</head>
+<body>
+{% include "components/navbar.html" %}
+
+<main>
+    <section class="auth-shell">
+        <div class="auth-side">
+            <div class="auth-logo">&gt;_</div>
+
+            <span class="section-label">Create Account</span>
+            <h1>Join BashOps <span>Radar</span></h1>
+            <p>
+                Create your workspace, analyze repositories, track proof-of-work opportunities,
+                and move promising targets toward paid sprints.
+            </p>
+
+            <div class="auth-benefits">
+                <div>
+                    <strong>⚡ Discover Opportunities</strong>
+                    <span>Find high-probability GitHub repos worth your time.</span>
+                </div>
+
+                <div>
+                    <strong>📊 Track Progress</strong>
+                    <span>Manage targets from research to founder outreach.</span>
+                </div>
+
+                <div>
+                    <strong>💰 Convert to Paid Work</strong>
+                    <span>Generate pitches and build a repeatable client workflow.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-card">
+            <span class="section-label">Workspace</span>
+            <h2>Create your account</h2>
+            <p class="angle">Start building your proof-of-work pipeline.</p>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="/register" class="auth-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="text" name="name" placeholder="Your name" required>
+                <input type="email" name="email" placeholder="Email address" required>
+                <input type="password" name="password" placeholder="Password" required>
+
+                <button type="submit">Create Account</button>
+            </form>
+
+            <p class="auth-switch">
+                Already have an account?
+                <a href="/login">Login</a>
+            </p>
+        </div>
+    </section>
+</main>
+</body>
+</html>

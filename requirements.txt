@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+jinja2
+requests
+rich
+python-dotenv
+python-multipart
+google-generativeai
+sqlalchemy
+psycopg2-binary
+alembic
+passlib[bcrypt]
+bcrypt==4.0.1
+python-jose[cryptography]
+itsdangerous
+stripe==15.3.0

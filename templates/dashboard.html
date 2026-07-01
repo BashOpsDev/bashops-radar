@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard | BashOps Radar</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+{% include "components/navbar.html" %}
+
+<main class="container">
+
+<section class="card">
+
+<span class="section-label">
+Workspace
+</span>
+
+<h1>BashOps Dashboard</h1>
+
+<p class="angle">
+Your Proof-of-Work command center.
+</p>
+
+<div class="dashboard-grid">
+
+<div class="dashboard-box">
+<h2>{{ total_analyses }}</h2>
+<p>Total Analyses</p>
+</div>
+
+<div class="dashboard-box">
+<h2>{{ unique_repos }}</h2>
+<p>Repositories</p>
+</div>
+
+<div class="dashboard-box">
+<h2>{{ average_score }}</h2>
+<p>Average Score</p>
+</div>
+
+<div class="dashboard-box">
+<h2>{{ highest_score }}</h2>
+<p>Highest Score</p>
+</div>
+
+</div>
+
+</section>
+
+
+<section class="card">
+
+<h2>Quick Actions</h2>
+
+<div class="quick-actions">
+
+<a href="/" class="nav-cta">
+Analyze Repository
+</a>
+
+<a href="/pipeline" class="nav-cta">
+Open Pipeline
+</a>
+
+{% if is_admin %}
+<a href="/admin/analytics" class="nav-cta">
+Analytics
+</a>
+{% endif %}
+
+<a href="/pricing" class="nav-cta">
+Upgrade
+</a>
+
+</div>
+
+</section>
+
+
+
+<section class="card">
+
+<h2>Top Opportunities</h2>
+
+{% for repo in best_opportunities %}
+
+<div class="dashboard-repo">
+
+<div>
+
+<strong>{{ repo.repo }}</strong>
+
+<p>
+Score {{ repo.score }}/100
+</p>
+
+</div>
+
+<a href="/pipeline">
+View
+</a>
+
+</div>
+
+{% endfor %}
+
+</section>
+
+</main>
+
+</body>
+</html>

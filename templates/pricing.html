@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pricing - BashOps Radar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="BashOps Radar pricing: analyze GitHub repos for free, or go Pro for unlimited AI-scored opportunities and AI-generated founder outreach pitches.">
+    <meta property="og:title" content="BashOps Radar Pricing">
+    <meta property="og:description" content="Start free. Upgrade to Pro for unlimited AI-scored repo analysis and AI-generated founder outreach.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ site_url }}/pricing">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {% include "components/navbar.html" %}
+<main>
+    <section class="pricing">
+        <span class="section-label">Pricing</span>
+        <h1>Choose your Proof-of-Work engine</h1>
+        <p>Start free. Upgrade when BashOps Radar becomes part of your daily client acquisition workflow.</p>
+
+        {% if billing_error %}
+        <div class="error">{{ billing_error }}</div>
+        {% endif %}
+
+        {% if current_user and current_user.plan == "pro" %}
+        <div class="success-card">
+            You're on Pro. <a href="/billing/portal">Manage billing</a>
+        </div>
+        {% endif %}
+
+        <div class="pricing-grid">
+            <div>
+                <h2>Free</h2>
+                <p class="price">$0/month</p>
+                <p>For testing repositories and validating your workflow.</p>
+                <ul>
+                    <li>5 analyses/day</li>
+                    <li>Basic repo analysis</li>
+                    <li>Issue ranking</li>
+                    <li>Basic pipeline</li>
+                </ul>
+                <a class="nav-cta" href="/">Start Free</a>
+            </div>
+
+            <div class="pro">
+                <h2>Pro</h2>
+                <p class="price">${{ pro_price }}/month</p>
+                <p>For developers actively turning GitHub work into paid sprints.</p>
+                <ul>
+                    <li>Unlimited analyses</li>
+                    <li>AI-generated founder outreach pitches</li>
+                    <li>Unlimited pipeline &amp; history</li>
+                    <li>CSV export</li>
+                </ul>
+                {% if current_user and current_user.plan == "pro" %}
+                <a class="nav-cta" href="/billing/portal">Manage billing</a>
+                {% else %}
+                <a class="nav-cta" href="/billing/upgrade">Upgrade to Pro</a>
+                {% endif %}
+            </div>
+
+            <div>
+                <h2>Team</h2>
+                <p class="price">Coming Soon</p>
+                <p>For small teams and agencies using proof-of-work sales.</p>
+                <ul>
+                    <li>Shared workspace</li>
+                    <li>Team dashboard</li>
+                    <li>API access</li>
+                    <li>Priority support</li>
+                </ul>
+                <a class="nav-cta" href="/login">Contact</a>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

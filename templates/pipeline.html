@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BashOps Radar Pipeline</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/pipeline.css">
+    <meta name="robots" content="noindex">
+</head>
+<body>
+    {% include "components/navbar.html" %}
+<main>
+    <section class="card">
+        <span class="section-label">Opportunity Pipeline</span>
+        <h1>BashOps Radar Pipeline</h1>
+        <p class="angle">Track repositories from discovery to paid sprint.</p>
+
+        <h2>Pipeline Stats</h2>
+        <div class="pipeline-stats">
+            {% for item in pipeline_stats %}
+            <div class="stat-card">
+                <span>{{ item.status }}</span>
+                <strong>{{ item.count }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if generated_pitch %}
+        <div class="pitch-panel">
+            <span class="section-label">Generated Founder Pitch</span>
+            <h2>{{ pitch_repo }}</h2>
+
+            <textarea id="generatedPitch" class="pitch-textarea" readonly>{{ generated_pitch }}</textarea>
+
+            <button type="button" class="copy-btn" onclick="copyPitch('generatedPitch')">
+                Copy Generated Pitch
+            </button>
+        </div>
+        {% endif %}
+
+        <div class="pipeline-toolbar">
+            <h2>Current Targets</h2>
+
+            <div class="toolbar-actions">
+                <input
+                    type="text"
+                    id="pipelineSearch"
+                    class="search-box"
+                    placeholder="🔍 Search repositories, language or status..."
+                    onkeyup="filterPipeline()"
+                >
+
+                <select id="sortPipeline" class="sort-box" onchange="sortPipeline()">
+                    <option value="score-desc">⭐ Highest Score</option>
+                    <option value="score-asc">⭐ Lowest Score</option>
+                    <option value="newest">🕒 Newest</option>
+                    <option value="status">📌 Status</option>
+                </select>
+            </div>
+        </div>
+<a href="/export-pipeline"
+class="export-btn">
+
+⬇ Export CSV
+
+</a>
+
+        <div class="pipeline-list">
+            {% for row in rows[-20:] %}
+            <div class="pipeline-card searchable-card"
+                 data-score="{{ row.score }}"
+                 data-status="{{ row.status }}"
+                 data-time="{{ row.timestamp }}">
+
+                <div class="search-meta" style="display:none;">
+                    {{ row.repo }}
+                    {{ row.language }}
+                    {{ row.status }}
+                    {{ row.best_issue }}
+                    {{ row.merge_probability }}
+                    {{ row.difficulty }}
+                </div>
+
+                <div class="pipeline-card-header">
+                    <div>
+                        <span class="status-badge">{{ row.status }}</span>
+
+                        <h3 class="repo-name">
+                            <a href="{{ row.links.repo_url }}" target="_blank" class="repo-link">
+                                {{ row.repo }}
+                            </a>
+                        </h3>
+
+                        <div class="repo-metrics">
+                            <span>{{ row.language or "Unknown" }}</span>
+                            <span>⭐ {{ row.stars or "N/A" }} Stars</span>
+                            <span>🍴 {{ row.forks or "N/A" }} Forks</span>
+                            <span>🐞 {{ row.open_issues or "N/A" }} Issues</span>
+                        </div>
+
+                        <p class="repo-subtext">
+                            Score: {{ row.score }} · Best Issue: {{ row.best_issue }}
+                        </p>
+
+                        <p class="repo-subtext">{{ row.pretty_time }}</p>
+                    </div>
+
+                    <div class="score-pill {% if row.score|int >= 85 %}score-high{% elif row.score|int >= 65 %}score-medium{% else %}score-low{% endif %}">
+                        {{ row.score }}/100
+                    </div>
+                </div>
+
+                <div class="quick-links">
+                    <a href="{{ row.links.repo_url }}" target="_blank" class="link-btn">📂 Repository</a>
+                    <a href="{{ row.links.best_issue_url }}" target="_blank" class="link-btn">🎯 Best Issue</a>
+                    <a href="{{ row.links.org_url }}" target="_blank" class="link-btn">🏢 Organization</a>
+                    <button type="button" class="link-btn" onclick="copyText('{{ row.links.repo_url }}')">📋 Copy Repo</button>
+                    <a href="{{ row.links.repo_url }}" target="_blank" class="link-btn">🔗 GitHub</a>
+                </div>
+
+                <div class="badges">
+                    <span class="badge">{{ row.language or "Unknown" }}</span>
+                    <span class="badge">{{ row.difficulty or "Medium" }}</span>
+                    <span class="badge">{{ row.merge_probability or "Medium merge probability" }}</span>
+                    <span class="badge">{{ row.estimated_time or "1 day" }}</span>
+                </div>
+
+                <div class="progress-wrap">
+                    <div class="progress-bar" style="width: {{ row.progress }}%;"></div>
+                </div>
+
+                <div class="next-action">
+                    <strong>Next Action</strong>
+                    <p>
+                        {% if row.status == "New Target" %}
+                        Research the issue and confirm it is safe to work on.
+                        {% elif row.status == "Researching" %}
+                        Read the codebase and prepare a small fix plan.
+                        {% elif row.status == "Working" %}
+                        Finish the fix and add tests where practical.
+                        {% elif row.status == "PR Submitted" %}
+                        Monitor review comments and respond quickly.
+                        {% elif row.status == "PR Merged" %}
+                        Prepare founder outreach.
+                        {% elif row.status == "Founder Contacted" %}
+                        Follow up with a focused sprint offer.
+                        {% elif row.status == "Paid Sprint" %}
+                        Deliver the sprint and document results.
+                        {% else %}
+                        Maintain relationship and look for retainer opportunities.
+                        {% endif %}
+                    </p>
+                </div>
+
+                {% if row.pitch %}
+                <details class="pitch-panel mini-pitch">
+                    <summary>Founder Pitch</summary>
+
+                    <textarea id="pitch-{{ loop.index }}" class="pitch-textarea" readonly>{{ row.pitch }}</textarea>
+
+                    <button type="button" class="copy-btn" onclick="copyPitch('pitch-{{ loop.index }}')">
+                        Copy Pitch
+                    </button>
+                </details>
+                {% endif %}
+
+                <div class="pipeline-actions">
+                    <form method="post" action="/update-status" class="pipeline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="repo" value="{{ row.repo }}">
+
+                        <select name="status">
+                            {% for status in pipeline_statuses %}
+                            <option value="{{ status }}" {% if row.status == status %}selected{% endif %}>
+                                {{ status }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <button type="submit">Update Status</button>
+                    </form>
+
+                    <form method="post" action="/generate-pitch" class="pipeline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="repo" value="{{ row.repo }}">
+                        <input type="hidden" name="best_issue" value="{{ row.best_issue }}">
+
+                        <button type="submit">Generate Founder Pitch</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+
+<script>
+function copyPitch(id) {
+    const pitchBox = document.getElementById(id);
+
+    if (!pitchBox) {
+        alert("Pitch not found.");
+        return;
+    }
+
+    pitchBox.select();
+    pitchBox.setSelectionRange(0, 99999);
+
+    navigator.clipboard.writeText(pitchBox.value)
+        .then(() => {
+            alert("Pitch copied!");
+        })
+        .catch(() => {
+            document.execCommand("copy");
+            alert("Pitch copied!");
+        });
+}
+
+function copyText(text) {
+    navigator.clipboard.writeText(text)
+        .then(() => {
+            alert("Repository link copied!");
+        })
+        .catch(() => {
+            alert("Could not copy link.");
+        });
+}
+
+function filterPipeline() {
+    const input = document.getElementById("pipelineSearch");
+    const filter = input.value.toLowerCase();
+    const cards = document.querySelectorAll(".searchable-card");
+
+    cards.forEach(card => {
+        const text = card.innerText.toLowerCase();
+
+        if (text.includes(filter)) {
+            card.style.display = "";
+        } else {
+            card.style.display = "none";
+        }
+    });
+}
+
+function sortPipeline() {
+    const list = document.querySelector(".pipeline-list");
+    const cards = Array.from(document.querySelectorAll(".searchable-card"));
+    const mode = document.getElementById("sortPipeline").value;
+
+    cards.sort((a, b) => {
+        if (mode === "score-desc") {
+            return Number(b.dataset.score) - Number(a.dataset.score);
+        }
+
+        if (mode === "score-asc") {
+            return Number(a.dataset.score) - Number(b.dataset.score);
+        }
+
+        if (mode === "status") {
+            return a.dataset.status.localeCompare(b.dataset.status);
+        }
+
+        if (mode === "newest") {
+            return b.dataset.time.localeCompare(a.dataset.time);
+        }
+
+        return 0;
+    });
+
+    cards.forEach(card => list.appendChild(card));
+}
+</script>
+
+</body>
+</html>

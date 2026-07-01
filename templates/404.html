@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Page Not Found - BashOps Radar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {% include "components/navbar.html" %}
+    <main>
+        <section class="hero" style="text-align:center;">
+            <div class="badge">404</div>
+            <h1>That page doesn't exist.</h1>
+            <p>
+                The link might be broken, or the page may have moved.
+                Head back to the homepage or check out your pipeline.
+            </p>
+            <div class="checks" style="justify-content:center;">
+                <a class="nav-cta" href="/">Go to Homepage</a>
+                <a class="nav-outline" href="/pipeline">Open Pipeline</a>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
