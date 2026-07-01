@@ -642,7 +642,20 @@ def dashboard(request: Request):
         context={**summary, **user_context(request, current_user), **csrf_context(request)},
     )
 
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    return templates.TemplateResponse("terms.html", {"request": request})
 
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+
+@app.get("/refund", response_class=HTMLResponse)
+async def refund_page(request: Request):
+    return templates.TemplateResponse("refund.html", {"request": request})
+    
 @app.post("/update-status")
 def update_status(
     request: Request,
