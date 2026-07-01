@@ -220,7 +220,7 @@ def sitemap_xml():
     # Only the public, indexable marketing pages — the app pages behind
     # login are excluded via robots.txt above and noindex tags on the
     # pages themselves.
-    urls = ["/", "/pricing", "/login", "/register"]
+    urls = ["/", "/pricing", "/login", "/register", "/terms", "/privacy", "/refund"]
     body = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for path in urls:
         body.append(f"<url><loc>{config.SITE_URL}{path}</loc></url>")
