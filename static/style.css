@@ -1761,4 +1761,41 @@ main > .nav {
     }
 }
 
+.legal-page {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.legal-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 36px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.legal-card h1 {
+  font-size: 34px;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.legal-card h2 {
+  margin-top: 28px;
+  font-size: 20px;
+  color: #111827;
+}
+
+.legal-card p {
+  color: #374151;
+  line-height: 1.7;
+  margin-top: 10px;
+}
+
+.legal-card .muted {
+  color: #6b7280;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
 
