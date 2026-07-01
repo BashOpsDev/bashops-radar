@@ -643,18 +643,30 @@ def dashboard(request: Request):
     )
 
 @app.get("/terms", response_class=HTMLResponse)
-async def terms_page(request: Request):
-    return templates.TemplateResponse("terms.html", {"request": request})
+def terms_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="terms.html",
+        context={**user_context(request)},
+    )
 
 
 @app.get("/privacy", response_class=HTMLResponse)
-async def privacy_page(request: Request):
-    return templates.TemplateResponse("privacy.html", {"request": request})
+def privacy_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={**user_context(request)},
+    )
 
 
 @app.get("/refund", response_class=HTMLResponse)
-async def refund_page(request: Request):
-    return templates.TemplateResponse("refund.html", {"request": request})
+def refund_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="refund.html",
+        context={**user_context(request)},
+    )
     
 @app.post("/update-status")
 def update_status(
