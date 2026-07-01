@@ -2,7 +2,7 @@
 Integration tests using FastAPI's TestClient against a throwaway SQLite
 database (never the real DATABASE_URL). Covers the flows that matter most
 for correctness: auth, CSRF, per-user data isolation, admin gating, and
-Stripe webhook handling.
+Paddle webhook handling.
 
 Run with: pytest tests/test_app.py -v
 Requires SECRET_KEY and DATABASE_URL to be set to a disposable sqlite file
@@ -179,23 +179,23 @@ def test_free_user_gets_static_pitch_not_persisted_as_ai(client):
     assert "proof-of-work opportunity" in r.text  # the free fallback template
 
 
-# --- Stripe webhook -------------------------------------------------------
+# --- Paddle webhook -------------------------------------------------------
 
-def _signed_webhook_request(client, event: dict, secret="whsec_test_secret"):
+def _signed_webhook_request(client, event: dict, secret="paddle_test_secret"):
     payload = json.dumps(event).encode()
     timestamp = int(time.time())
-    signed_payload = f"{timestamp}.".encode() + payload
+    signed_payload = f"{timestamp}:".encode() + payload
     signature = hmac.new(secret.encode(), signed_payload, hashlib.sha256).hexdigest()
-    header = f"t={timestamp},v1={signature}"
-    return client.post("/billing/webhook", content=payload, headers={"stripe-signature": header})
+    header = f"ts={timestamp};h1={signature}"
+    return client.post("/billing/webhook", content=payload, headers={"Paddle-Signature": header})
 
 
 def test_webhook_rejects_bad_signature(client):
-    r = client.post("/billing/webhook", content=b"{}", headers={"stripe-signature": "bogus"})
+    r = client.post("/billing/webhook", content=b"{}", headers={"Paddle-Signature": "bogus"})
     assert r.status_code == 400
 
 
-def test_webhook_checkout_completed_upgrades_user(client):
+def test_webhook_transaction_completed_upgrades_user(client):
     from database import SessionLocal
     from models import User
 
@@ -209,9 +209,13 @@ def test_webhook_checkout_completed_upgrades_user(client):
 
     event = {
         "id": "evt_1",
-        "object": "event",
-        "type": "checkout.session.completed",
-        "data": {"object": {"client_reference_id": str(user_id), "customer": "cus_x", "subscription": "sub_x"}},
+        "event_type": "transaction.completed",
+        "data": {
+            "custom_data": {"user_id": str(user_id)},
+            "customer_id": "ctm_x",
+            "subscription_id": "sub_x",
+            "status": "completed",
+        },
     }
     r = _signed_webhook_request(client, event)
     assert r.status_code == 200
@@ -219,11 +223,11 @@ def test_webhook_checkout_completed_upgrades_user(client):
     db = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
     assert user.plan == "pro"
-    assert user.stripe_customer_id == "cus_x"
+    assert user.paddle_customer_id == "ctm_x"
     db.close()
 
 
-def test_webhook_subscription_deleted_downgrades_user(client):
+def test_webhook_subscription_canceled_downgrades_user(client):
     from database import SessionLocal
     from models import User
 
@@ -232,16 +236,15 @@ def test_webhook_subscription_deleted_downgrades_user(client):
     db = SessionLocal()
     user = db.query(User).filter(User.email == "user@example.com").first()
     user.plan = "pro"
-    user.stripe_subscription_id = "sub_x"
+    user.paddle_subscription_id = "sub_x"
     user_id = user.id
     db.commit()
     db.close()
 
     event = {
         "id": "evt_2",
-        "object": "event",
-        "type": "customer.subscription.deleted",
-        "data": {"object": {"id": "sub_x", "status": "canceled"}},
+        "event_type": "subscription.canceled",
+        "data": {"id": "sub_x", "status": "canceled"},
     }
     r = _signed_webhook_request(client, event)
     assert r.status_code == 200

@@ -1,13 +1,9 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Page Not Found - BashOps Radar</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+{% block title %}Page Not Found - BashOps Radar{% endblock %}
+{% block extra_head %}
     <meta name="robots" content="noindex">
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    {% include "components/navbar.html" %}
+{% endblock %}
+{% block content %}
     <main>
         <section class="hero" style="text-align:center;">
             <div class="badge">404</div>
@@ -22,5 +18,4 @@
             </div>
         </section>
     </main>
-</body>
-</html>
+{% endblock %}

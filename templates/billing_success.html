@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Payment Received - BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block content %}
+<main>
+    <section class="card">
+        <span class="section-label">Payment</span>
+        <h1>Payment received.</h1>
+        <p class="angle">Your Pro plan will activate shortly after Paddle confirms the subscription webhook.</p>
+        <a class="nav-cta" href="/dashboard">Go to Dashboard</a>
+    </section>
+</main>
+{% endblock %}

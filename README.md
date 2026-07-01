@@ -74,11 +74,10 @@ directory — they never touch your real `DATABASE_URL`.
 - **`GEMINI_API_KEY`** — enables real AI-generated repo summaries and
   founder outreach pitches (Pro-only). Without it, both fall back to
   static templates.
-- **Stripe** (`STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`,
-  `STRIPE_WEBHOOK_SECRET`) — enables the Pro
-  upgrade flow. See `billing.py`'s module docstring for the exact Stripe
-  Dashboard setup steps. Until these are set, the upgrade button shows a
-  clear "not configured" message rather than a broken checkout.
+- **Paddle** (`PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`, `PADDLE_PRICE_ID`,
+  `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENV`) enables the Pro upgrade flow.
+  Until `PADDLE_CLIENT_TOKEN` and `PADDLE_PRICE_ID` are set, the upgrade
+  button shows a clear "not configured" message rather than a broken checkout.
 
 ## Goal
 

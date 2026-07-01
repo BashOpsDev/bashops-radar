@@ -1,13 +1,10 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>BashOps Radar Pipeline</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+{% block title %}BashOps Radar Pipeline{% endblock %}
+{% block extra_head %}
     <link rel="stylesheet" href="/static/pipeline.css">
     <meta name="robots" content="noindex">
-</head>
-<body>
-    {% include "components/navbar.html" %}
+{% endblock %}
+{% block content %}
 <main>
     <section class="card">
         <span class="section-label">Opportunity Pipeline</span>
@@ -193,6 +190,8 @@ class="export-btn">
     </section>
 </main>
 
+{% endblock %}
+{% block extra_scripts %}
 <script>
 function copyPitch(id) {
     const pitchBox = document.getElementById(id);
@@ -269,6 +268,4 @@ function sortPipeline() {
     cards.forEach(card => list.appendChild(card));
 }
 </script>
-
-</body>
-</html>
+{% endblock %}

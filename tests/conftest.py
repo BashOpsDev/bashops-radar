@@ -29,9 +29,8 @@ _TEST_DB_URL = f"sqlite:///{_TEST_DB_PATH}"
 
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["DATABASE_URL"] = _TEST_DB_URL
-os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret"
-os.environ["STRIPE_SECRET_KEY"] = "sk_test_dummy_key"
-for _var in ("STRIPE_PRO_PRICE_ID", "STRIPE_PRICE_ID_PRO", "ADMIN_EMAILS", "ADMIN_EMAIL", "GEMINI_API_KEY", "GITHUB_TOKEN"):
+os.environ["PADDLE_WEBHOOK_SECRET"] = "paddle_test_secret"
+for _var in ("PADDLE_API_KEY", "PADDLE_CLIENT_TOKEN", "PADDLE_PRICE_ID", "ADMIN_EMAILS", "ADMIN_EMAIL", "GEMINI_API_KEY", "GITHUB_TOKEN"):
     os.environ.pop(_var, None)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

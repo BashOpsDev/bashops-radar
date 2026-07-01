@@ -1,17 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>BashOps Radar — Turn Open Source Into Paid Work</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
+{% block title %}BashOps Radar - Turn Open Source Into Paid Work{% endblock %}
+{% block extra_head %}
     <meta name="description" content="BashOps Radar analyzes GitHub repositories, scores proof-of-work opportunities, ranks issues, and helps developers convert open-source contributions into paid contracts.">
     <meta property="og:title" content="BashOps Radar — Turn Open Source Into Paid Work">
     <meta property="og:description" content="AI-scored GitHub opportunities, best-first-issue picks, and founder outreach pitches for developers building proof-of-work into paid contracts.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ site_url }}/">
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    {% include "components/navbar.html" %}
+{% endblock %}
+{% block content %}
     <main>
         <section class="hero">
             <div class="hero-copy">
@@ -254,11 +250,5 @@
             <p>Sourcebot · Aegra · Sova · Nango · Stagewise</p>
         </section>
 
-        <footer>
-            <strong>BashOps Radar</strong>
-            <p>AI Opportunity Intelligence for Developers. Built by BashOps.</p>
-            <span>© 2026 BashOps Radar</span>
-        </footer>
     </main>
-</body>
-</html>
+{% endblock %}

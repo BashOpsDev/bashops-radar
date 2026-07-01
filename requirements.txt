@@ -13,4 +13,3 @@ passlib[bcrypt]
 bcrypt==4.0.1
 python-jose[cryptography]
 itsdangerous
-stripe==15.3.0

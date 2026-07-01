@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}BashOps Radar{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="app-navbar">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">
+            <span class="nav-logo">&gt;_</span>
+            <span>
+                <strong>BashOps <em>Radar</em></strong>
+                <small>AI Opportunity Intelligence</small>
+            </span>
+        </a>
+        <button class="nav-toggle" type="button" onclick="toggleNav()">Menu</button>
+        <div class="nav-menu" id="navMenu">
+            <div class="nav-center">
+                <a href="/#features">Features</a>
+                <a href="/pricing">Pricing</a>
+                <a href="/pipeline">Pipeline</a>
+                {% if is_admin %}
+                <a href="/admin/analytics">Analytics</a>
+                {% endif %}
+            </div>
+            <div class="nav-right">
+                {% if current_user %}
+                <a href="/dashboard" class="nav-outline">Dashboard</a>
+                <a href="/logout" class="nav-outline">Logout</a>
+                {% else %}
+                <a href="/register" class="nav-outline">Register</a>
+                <a href="/login" class="nav-outline">Login</a>
+                {% endif %}
+                <a href="/" class="nav-primary">Analyze Repository</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+{% block content %}{% endblock %}
+
+<footer>
+    <strong>BashOps Radar</strong>
+    <p>AI Opportunity Intelligence for Developers. Built by BashOps.</p>
+    <p>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/refund">Refund Policy</a>
+        <a href="/contact">Contact</a>
+    </p>
+    <span>Copyright 2026 BashOps Radar</span>
+</footer>
+
+<script>
+function toggleNav() {
+    const menu = document.getElementById("navMenu");
+    if (menu) {
+        menu.classList.toggle("open");
+    }
+}
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

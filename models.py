@@ -14,13 +14,8 @@ class User(Base):
     password_hash = Column(String(255))
     plan = Column(String(50), default="free")
 
-    # Populated once a user completes Stripe Checkout. stripe_customer_id
-    # lets us open a Billing Portal session for them later without asking
-    # for card details again; stripe_subscription_id + subscription_status
-    # let the webhook handler know exactly which subscription to sync when
-    # Stripe sends update/cancellation events.
-    stripe_customer_id = Column(String(255), nullable=True, index=True)
-    stripe_subscription_id = Column(String(255), nullable=True, index=True)
+    paddle_customer_id = Column(String(255), nullable=True, index=True)
+    paddle_subscription_id = Column(String(255), nullable=True, index=True)
     subscription_status = Column(String(50), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

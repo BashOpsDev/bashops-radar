@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.exception_handlers import http_exception_handler
@@ -28,8 +28,7 @@ from analytics import (
     save_pitch,
     daily_analysis_count,
 )
-import billing
-from stripe import SignatureVerificationError, StripeError
+import paddle_billing
 from radar import get_analysis, decision, recommend_angle
 import config
 
@@ -220,7 +219,7 @@ def sitemap_xml():
     # Only the public, indexable marketing pages — the app pages behind
     # login are excluded via robots.txt above and noindex tags on the
     # pages themselves.
-    urls = ["/", "/pricing", "/login", "/register"]
+    urls = ["/", "/pricing", "/login", "/register", "/terms", "/privacy", "/refund", "/contact"]
     body = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for path in urls:
         body.append(f"<url><loc>{config.SITE_URL}{path}</loc></url>")
@@ -287,6 +286,42 @@ def pricing(request: Request):
             "site_url": config.SITE_URL,
             **user_context(request),
         },
+    )
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="terms.html",
+        context={**user_context(request), "site_url": config.SITE_URL},
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={**user_context(request), "site_url": config.SITE_URL},
+    )
+
+
+@app.get("/refund", response_class=HTMLResponse)
+def refund(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="refund.html",
+        context={**user_context(request), "site_url": config.SITE_URL},
+    )
+
+
+@app.get("/contact", response_class=HTMLResponse)
+def contact(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={**user_context(request), "site_url": config.SITE_URL},
     )
 
 
@@ -706,12 +741,7 @@ def pitch_preview(
     )
 
 
-# --- Billing (Stripe) ------------------------------------------------------
-# See billing.py for the full Dashboard setup steps required before these
-# routes work. Until STRIPE_SECRET_KEY / STRIPE_PRO_PRICE_ID are set, the
-# upgrade button shows a clear "billing not configured" message instead of
-# a broken redirect.
-
+# --- Billing (Paddle) ------------------------------------------------------
 @app.get("/billing/upgrade")
 def billing_upgrade(request: Request):
     current_user = get_current_user(request)
@@ -721,37 +751,31 @@ def billing_upgrade(request: Request):
     if current_user.plan == "pro":
         return RedirectResponse(url="/dashboard", status_code=303)
 
-    base_url = str(request.base_url).rstrip("/")
-
-    try:
-        checkout_url = billing.create_checkout_session(
-            user=current_user,
-            success_url=f"{base_url}/billing/success",
-            cancel_url=f"{base_url}/pricing",
-        )
-    except billing.BillingNotConfigured as e:
+    if not config.paddle_configured:
         return templates.TemplateResponse(
             request=request,
             name="pricing.html",
             context={
-                "billing_error": str(e),
+                "billing_error": "Billing is not configured yet. Set Paddle environment variables before accepting payments.",
                 "pro_price": config.PRO_PRICE_USD,
-                **user_context(request, current_user),
-            },
-        )
-    except StripeError as e:
-        print(f"[/billing/upgrade error] {e!r}")
-        return templates.TemplateResponse(
-            request=request,
-            name="pricing.html",
-            context={
-                "billing_error": "Something went wrong starting checkout. Please try again shortly.",
-                "pro_price": config.PRO_PRICE_USD,
+                "site_url": config.SITE_URL,
                 **user_context(request, current_user),
             },
         )
 
-    return RedirectResponse(url=checkout_url, status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="checkout.html",
+        context={
+            "paddle_client_token": config.PADDLE_CLIENT_TOKEN,
+            "paddle_price_id": config.PADDLE_PRICE_ID,
+            "paddle_env": config.PADDLE_ENV,
+            "user_email": current_user.email,
+            "user_id": current_user.id,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+        },
+    )
 
 
 @app.get("/billing/success")
@@ -762,55 +786,31 @@ def billing_success(request: Request):
     current_user = get_current_user(request)
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
-    return RedirectResponse(url="/dashboard?upgraded=true", status_code=303)
-
-
-@app.get("/billing/portal")
-def billing_portal_redirect(request: Request):
-    current_user = get_current_user(request)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    base_url = str(request.base_url).rstrip("/")
-
-    try:
-        portal_url = billing.create_portal_session(
-            user=current_user,
-            return_url=f"{base_url}/dashboard",
-        )
-    except billing.BillingNotConfigured:
-        return RedirectResponse(url="/pricing", status_code=303)
-    except StripeError as e:
-        print(f"[/billing/portal error] {e!r}")
-        return RedirectResponse(url="/dashboard", status_code=303)
-
-    return RedirectResponse(url=portal_url, status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="billing_success.html",
+        context={**user_context(request, current_user), "site_url": config.SITE_URL},
+    )
 
 
 @app.post("/billing/webhook")
-async def billing_webhook(request: Request):
+async def paddle_webhook(request: Request):
     payload = await request.body()
-    sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        event = billing.construct_webhook_event(payload, sig_header)
-    except billing.BillingNotConfigured as e:
+        event = paddle_billing.verify_paddle_webhook(payload, request.headers)
+    except paddle_billing.PaddleBillingNotConfigured as e:
         print(f"[/billing/webhook not configured] {e!r}")
         return JSONResponse({"error": "billing not configured"}, status_code=500)
-    except SignatureVerificationError:
-        # Wrong/missing signature — reject without processing. This is the
-        # only thing standing between this endpoint and anyone on the
-        # internet POSTing a fake "checkout completed" event to grant
-        # themselves Pro for free, so it fails closed.
+    except paddle_billing.PaddleSignatureError:
         return JSONResponse({"error": "invalid signature"}, status_code=400)
+    except Exception as e:
+        print(f"[/billing/webhook parse error] {e!r}")
+        return JSONResponse({"error": "invalid payload"}, status_code=400)
 
     try:
-        billing.handle_webhook_event(event)
+        paddle_billing.handle_paddle_webhook_event(event)
     except Exception as e:
-        # Stripe retries webhook deliveries on non-2xx responses, so a
-        # transient DB error here should surface as a failure (5xx) rather
-        # than being silently swallowed — otherwise a user could pay and
-        # never get upgraded with no record of why.
         print(f"[/billing/webhook handler error] {e!r}")
         return JSONResponse({"error": "webhook handling failed"}, status_code=500)
 
