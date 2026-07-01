@@ -802,7 +802,8 @@ async def paddle_webhook(request: Request):
     except paddle_billing.PaddleBillingNotConfigured as e:
         print(f"[/billing/webhook not configured] {e!r}")
         return JSONResponse({"error": "billing not configured"}, status_code=500)
-    except paddle_billing.PaddleSignatureError:
+    except paddle_billing.PaddleSignatureError as e:
+        print(f"[/billing/webhook signature error] {e!r}")
         return JSONResponse({"error": "invalid signature"}, status_code=400)
     except Exception as e:
         print(f"[/billing/webhook parse error] {e!r}")
