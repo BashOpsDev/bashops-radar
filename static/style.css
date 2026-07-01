@@ -1799,3 +1799,48 @@ main > .nav {
   margin-bottom: 24px;
 }
 
+.legal-page {
+  max-width: 900px;
+  margin: 60px auto;
+  padding: 0 20px;
+}
+
+.legal-card {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 140, 0, 0.35);
+  border-radius: 22px;
+  padding: 40px;
+  color: #e5e7eb;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+
+.legal-card h1 {
+  font-size: 42px;
+  margin-bottom: 8px;
+}
+
+.legal-card h2 {
+  margin-top: 28px;
+  color: #ff8a00;
+}
+
+.legal-card p {
+  line-height: 1.8;
+  color: #cbd5e1;
+}
+
+.legal-card .muted {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.legal-footer {
+  text-align: center;
+  padding: 30px;
+}
+
+.legal-footer a {
+  margin: 0 12px;
+  color: #ff8a00;
+  text-decoration: none;
+}
