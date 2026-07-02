@@ -1719,6 +1719,58 @@ main > .nav {
     font-weight: 900;
 }
 
+.auth-oauth {
+    margin-top: 18px;
+    display: flex;
+}
+
+.auth-oauth .nav-outline {
+    width: 100%;
+    text-align: center;
+}
+
+.auth-note {
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.checkbox-row input {
+    width: auto;
+    height: auto;
+    margin-top: 4px;
+    flex: 0 0 auto;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 860px;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+
+.admin-table th {
+    color: var(--primary);
+}
+
 @media (max-width: 900px) {
     .auth-shell {
         grid-template-columns: 1fr;

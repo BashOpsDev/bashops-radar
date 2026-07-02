@@ -18,6 +18,7 @@ class PaddleSignatureError(Exception):
 
 ACTIVE_STATUSES = {"active", "trialing"}
 INACTIVE_STATUSES = {"canceled", "cancelled", "past_due", "paused"}
+SIGNATURE_TOLERANCE_SECONDS = 5
 
 
 def _header_value(headers, name: str) -> str:
@@ -45,7 +46,7 @@ def verify_paddle_webhook(request_body: bytes, headers):
     except ValueError as exc:
         raise PaddleSignatureError("Invalid Paddle webhook timestamp.") from exc
 
-    if abs(int(time.time()) - timestamp_int) > 300:
+    if abs(int(time.time()) - timestamp_int) > SIGNATURE_TOLERANCE_SECONDS:
         raise PaddleSignatureError("Expired Paddle webhook timestamp.")
 
     signed_payload = f"{timestamp}:".encode("utf-8") + request_body

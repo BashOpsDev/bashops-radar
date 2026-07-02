@@ -41,7 +41,19 @@
 
             {% if registered %}
             <div class="success-card">
-                ✅ Account created successfully. Please login.
+                Account created successfully. Please login.
+            </div>
+            {% endif %}
+
+            {% if verified %}
+            <div class="success-card">
+                Email verified. You can log in now.
+            </div>
+            {% endif %}
+
+            {% if reset %}
+            <div class="success-card">
+                Password reset successfully. You can log in now.
             </div>
             {% endif %}
 
@@ -56,6 +68,18 @@
 
                 <button type="submit">Login</button>
             </form>
+
+            {% if github_oauth_configured %}
+            <div class="auth-oauth">
+                <a class="nav-outline" href="/auth/github/login">Continue with GitHub</a>
+            </div>
+            {% else %}
+            <p class="auth-note">GitHub login is not configured yet.</p>
+            {% endif %}
+
+            <p class="auth-switch">
+                <a href="/forgot-password">Forgot password?</a>
+            </p>
 
             <p class="auth-switch">
                 New here?

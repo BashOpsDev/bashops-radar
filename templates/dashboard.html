@@ -15,10 +15,20 @@ Workspace
 <h1>BashOps Dashboard</h1>
 
 <p class="angle">
-Your Proof-of-Work command center.
+Welcome back, {{ current_user.name or current_user.email }}. Your Proof-of-Work command center.
 </p>
 
 <div class="dashboard-grid">
+
+<div class="dashboard-box">
+<h2>{% if current_user.plan == "pro" %}Pro{% else %}Free{% endif %}</h2>
+<p>
+Current Plan
+{% if current_user.plan == "pro" %}
+<br><span class="pro-badge">Pro active</span>
+{% endif %}
+</p>
+</div>
 
 <div class="dashboard-box">
 <h2>{{ total_analyses }}</h2>
@@ -44,6 +54,40 @@ Your Proof-of-Work command center.
 
 </section>
 
+<section class="card">
+<h2>Plan Usage</h2>
+
+{% if current_user.plan == "pro" %}
+<div class="success-card">
+Pro active. You have unlimited repository analyses.
+{% if current_user.subscription_status %}
+Subscription status: {{ current_user.subscription_status | replace("_", " ") | title }}.
+{% endif %}
+</div>
+<div class="quick-actions">
+<a href="/billing/manage" class="nav-cta">Manage Billing</a>
+</div>
+{% else %}
+<div class="dashboard-grid">
+<div class="dashboard-box">
+<h2>{{ free_analysis_limit }}</h2>
+<p>Daily Limit</p>
+</div>
+<div class="dashboard-box">
+<h2>{{ analyses_used_today }}</h2>
+<p>Used Today</p>
+</div>
+<div class="dashboard-box">
+<h2>{{ analyses_remaining }}</h2>
+<p>Remaining Today</p>
+</div>
+</div>
+<div class="quick-actions">
+<a href="/billing/upgrade" class="nav-cta">Upgrade to Pro</a>
+</div>
+{% endif %}
+</section>
+
 
 <section class="card">
 
@@ -62,6 +106,9 @@ Open Pipeline
 {% if is_admin %}
 <a href="/admin/analytics" class="nav-cta">
 Analytics
+</a>
+<a href="/admin/users" class="nav-cta">
+Users
 </a>
 {% endif %}
 
@@ -100,6 +147,10 @@ View
 </div>
 
 {% endfor %}
+
+{% if not best_opportunities %}
+<p class="angle">No analyses yet. Analyze a repository to start your pipeline.</p>
+{% endif %}
 
 </section>
 

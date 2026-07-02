@@ -1,6 +1,9 @@
 import os
+import secrets
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
@@ -10,6 +13,7 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
+import requests
 
 from database import SessionLocal
 from models import User
@@ -29,6 +33,7 @@ from analytics import (
     daily_analysis_count,
 )
 import paddle_billing
+import email_utils
 from radar import get_analysis, decision, recommend_angle
 import config
 
@@ -63,6 +68,8 @@ templates = Jinja2Templates(directory="templates")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BETA_FILE = Path("beta_signups.csv")
 FREE_ANALYSIS_LIMIT = 5
+EMAIL_VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
+PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 60
 
 if GEMINI_API_KEY and genai:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -168,6 +175,79 @@ def check_csrf(request: Request, csrf_token: str) -> bool:
     # issued for this session, so a stolen token from a different session
     # can't be replayed.
     return verify_csrf_token(csrf_token) and csrf_token == session_token
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def token_age_seconds(sent_at) -> float:
+    if not sent_at:
+        return float("inf")
+    if sent_at.tzinfo is None:
+        sent_at = sent_at.replace(tzinfo=timezone.utc)
+    return (now_utc() - sent_at).total_seconds()
+
+
+def validate_password_strength(password: str) -> Optional[str]:
+    if len(password or "") < 8:
+        return "Password must be at least 8 characters long."
+    if not any(char.isupper() for char in password):
+        return "Password must include at least one uppercase letter."
+    if not any(char.islower() for char in password):
+        return "Password must include at least one lowercase letter."
+    if not any(char.isdigit() for char in password):
+        return "Password must include at least one number."
+    return None
+
+
+def new_token() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def verification_link(token: str) -> str:
+    return f"{config.SITE_URL}/verify-email?token={token}"
+
+
+def reset_link(token: str) -> str:
+    return f"{config.SITE_URL}/reset-password?token={token}"
+
+
+def render_login(
+    request: Request,
+    error: Optional[str] = None,
+    joined: bool = False,
+    registered: bool = False,
+    verified: bool = False,
+    reset: bool = False,
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={
+            "joined": joined,
+            "registered": registered,
+            "verified": verified,
+            "reset": reset,
+            "error": error,
+            "github_oauth_configured": config.github_oauth_configured,
+            **user_context(request),
+            **csrf_context(request),
+        },
+    )
+
+
+def render_register(request: Request, error: Optional[str] = None):
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={
+            "error": error,
+            "github_oauth_configured": config.github_oauth_configured,
+            **user_context(request),
+            **csrf_context(request),
+        },
+    )
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -326,17 +406,19 @@ def contact(request: Request):
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login(request: Request, joined: bool = False, registered: bool = False):
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={
-            "joined": joined,
-            "registered": registered,
-            "error": None,
-            **user_context(request),
-            **csrf_context(request),
-        },
+def login(
+    request: Request,
+    joined: bool = False,
+    registered: bool = False,
+    verified: bool = False,
+    reset: bool = False,
+):
+    return render_login(
+        request,
+        joined=joined,
+        registered=registered,
+        verified=verified,
+        reset=reset,
     )
 
 
@@ -348,36 +430,18 @@ def login_user(
     csrf_token: str = Form(""),
 ):
     if not check_csrf(request, csrf_token):
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={
-                "joined": False,
-                "registered": False,
-                "error": "Your session expired. Please try again.",
-                "current_user": None,
-                "is_admin": False,
-                **csrf_context(request),
-            },
-        )
+        return render_login(request, error="Your session expired. Please try again.")
 
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.email == email).first()
+        normalized_email = email.strip().lower()
+        user = db.query(User).filter(User.email == normalized_email).first()
 
-        if not user or not verify_password(password, user.password_hash):
-            return templates.TemplateResponse(
-                request=request,
-                name="login.html",
-                context={
-                    "joined": False,
-                    "registered": False,
-                    "error": "Invalid email or password.",
-                    "current_user": None,
-                    "is_admin": False,
-                    **csrf_context(request),
-                },
-            )
+        if not user or not user.password_hash or not verify_password(password, user.password_hash):
+            return render_login(request, error="Invalid email or password.")
+
+        if not user.email_verified:
+            return render_login(request, error="Please verify your email before logging in.")
 
         request.session["user_id"] = user.id
     finally:
@@ -390,6 +454,121 @@ def login_user(
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
+
+
+@app.get("/auth/github/login")
+def github_login(request: Request):
+    if not config.github_oauth_configured:
+        return render_login(request, error="GitHub login is not configured yet.")
+
+    state = new_token()
+    request.session["github_oauth_state"] = state
+    params = {
+        "client_id": config.GITHUB_CLIENT_ID,
+        "redirect_uri": config.GITHUB_OAUTH_REDIRECT_URI,
+        "scope": "read:user user:email",
+        "state": state,
+        "allow_signup": "true",
+    }
+    return RedirectResponse(
+        url=f"https://github.com/login/oauth/authorize?{urlencode(params)}",
+        status_code=303,
+    )
+
+
+@app.get("/auth/github/callback", response_class=HTMLResponse)
+def github_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    if error:
+        return render_login(request, error="GitHub login was cancelled or failed.")
+
+    expected_state = request.session.pop("github_oauth_state", None)
+    if not expected_state or not state or not secrets.compare_digest(expected_state, state):
+        return render_login(request, error="GitHub login session expired. Please try again.")
+
+    if not config.github_oauth_configured:
+        return render_login(request, error="GitHub login is not configured yet.")
+
+    try:
+        token_response = requests.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": config.GITHUB_CLIENT_ID,
+                "client_secret": config.GITHUB_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": config.GITHUB_OAUTH_REDIRECT_URI,
+            },
+            headers={"Accept": "application/json"},
+            timeout=10,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get("access_token")
+        if not access_token:
+            return render_login(request, error="GitHub login failed. Please try again.")
+
+        auth_headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/vnd.github+json",
+        }
+        profile_response = requests.get("https://api.github.com/user", headers=auth_headers, timeout=10)
+        profile_response.raise_for_status()
+        profile = profile_response.json()
+
+        emails_response = requests.get("https://api.github.com/user/emails", headers=auth_headers, timeout=10)
+        emails_response.raise_for_status()
+        emails = emails_response.json()
+    except Exception as exc:
+        print(f"[/auth/github/callback error] {exc!r}")
+        return render_login(request, error="GitHub login failed. Please try again.")
+
+    verified_email = None
+    for item in emails:
+        if item.get("verified") and item.get("primary") and item.get("email"):
+            verified_email = item["email"].strip().lower()
+            break
+    if not verified_email:
+        for item in emails:
+            if item.get("verified") and item.get("email"):
+                verified_email = item["email"].strip().lower()
+                break
+
+    if not verified_email:
+        return render_login(request, error="GitHub did not return a verified email address.")
+
+    github_id = str(profile.get("id") or "")
+    github_username = profile.get("login") or ""
+    display_name = profile.get("name") or github_username or verified_email.split("@")[0]
+
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.github_id == github_id).first() if github_id else None
+        if not user:
+            user = db.query(User).filter(User.email == verified_email).first()
+            if user:
+                user.github_id = github_id
+                user.github_username = github_username
+                user.email_verified = True
+                if user.auth_provider == "email":
+                    user.auth_provider = "email,github"
+        if not user:
+            user = User(
+                name=display_name,
+                email=verified_email,
+                password_hash=None,
+                plan="free",
+                email_verified=True,
+                github_id=github_id,
+                github_username=github_username,
+                auth_provider="github",
+                marketing_opt_in=False,
+            )
+            db.add(user)
+
+        db.commit()
+        request.session["user_id"] = user.id
+    finally:
+        db.close()
+
+    return RedirectResponse(url="/dashboard", status_code=303)
 
 
 @app.post("/beta-signup")
@@ -407,11 +586,7 @@ def beta_signup(email: str = Form(...)):
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="register.html",
-        context={"error": None, **csrf_context(request)},
-    )
+    return render_register(request)
 
 
 @app.post("/register")
@@ -420,39 +595,261 @@ def register_user(
     name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    marketing_opt_in: bool = Form(False),
+    csrf_token: str = Form(""),
+):
+    if not check_csrf(request, csrf_token):
+        return render_register(request, error="Your session expired. Please try again.")
+
+    password_error = validate_password_strength(password)
+    if password_error:
+        return render_register(request, error=password_error)
+
+    normalized_email = email.strip().lower()
+
+    db: Session = SessionLocal()
+    try:
+        existing_user = db.query(User).filter(User.email == normalized_email).first()
+
+        if existing_user:
+            return render_register(request, error="Email already registered. Please login instead.")
+
+        token = new_token()
+        opted_in = bool(marketing_opt_in)
+        user = User(
+            name=name.strip(),
+            email=normalized_email,
+            password_hash=hash_password(password),
+            plan="free",
+            email_verified=False,
+            email_verification_token=token,
+            email_verification_sent_at=now_utc(),
+            marketing_opt_in=opted_in,
+            marketing_opt_in_at=now_utc() if opted_in else None,
+            auth_provider="email",
+        )
+
+        db.add(user)
+        db.commit()
+        email_utils.send_verification_email(normalized_email, verification_link(token))
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="verify_notice.html",
+        context={"email": normalized_email, **user_context(request), **csrf_context(request)},
+    )
+
+
+@app.get("/verify-email", response_class=HTMLResponse)
+def verify_email(request: Request, token: str = ""):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email_verification_token == token).first() if token else None
+        if (
+            not user
+            or token_age_seconds(user.email_verification_sent_at) > EMAIL_VERIFICATION_MAX_AGE_SECONDS
+        ):
+            return templates.TemplateResponse(
+                request=request,
+                name="verify_email_result.html",
+                context={
+                    "success": False,
+                    "message": "That verification link is invalid or expired.",
+                    **user_context(request),
+                    **csrf_context(request),
+                },
+                status_code=400,
+            )
+
+        user.email_verified = True
+        user.email_verification_token = None
+        user.email_verification_sent_at = None
+        db.commit()
+    finally:
+        db.close()
+
+    return RedirectResponse(url="/login?verified=true", status_code=303)
+
+
+@app.post("/resend-verification", response_class=HTMLResponse)
+def resend_verification(
+    request: Request,
+    email: str = Form(...),
     csrf_token: str = Form(""),
 ):
     if not check_csrf(request, csrf_token):
         return templates.TemplateResponse(
             request=request,
-            name="register.html",
-            context={"error": "Your session expired. Please try again.", **csrf_context(request)},
+            name="verify_notice.html",
+            context={
+                "email": email,
+                "message": "Your session expired. Please try again.",
+                **user_context(request),
+                **csrf_context(request),
+            },
+        )
+
+    normalized_email = email.strip().lower()
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == normalized_email).first()
+        if user and not user.email_verified:
+            token = new_token()
+            user.email_verification_token = token
+            user.email_verification_sent_at = now_utc()
+            db.commit()
+            email_utils.send_verification_email(normalized_email, verification_link(token))
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="verify_notice.html",
+        context={
+            "email": normalized_email,
+            "message": "If the account exists and is unverified, a new verification link has been sent.",
+            **user_context(request),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="forgot_password.html",
+        context={"message": None, "error": None, **user_context(request), **csrf_context(request)},
+    )
+
+
+@app.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password(
+    request: Request,
+    email: str = Form(...),
+    csrf_token: str = Form(""),
+):
+    generic_message = "If an account exists, reset instructions have been sent."
+    if not check_csrf(request, csrf_token):
+        return templates.TemplateResponse(
+            request=request,
+            name="forgot_password.html",
+            context={
+                "message": None,
+                "error": "Your session expired. Please try again.",
+                **user_context(request),
+                **csrf_context(request),
+            },
+        )
+
+    normalized_email = email.strip().lower()
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == normalized_email).first()
+        if user and user.password_hash:
+            token = new_token()
+            user.password_reset_token = token
+            user.password_reset_sent_at = now_utc()
+            db.commit()
+            email_utils.send_password_reset_email(normalized_email, reset_link(token))
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="forgot_password.html",
+        context={"message": generic_message, "error": None, **user_context(request), **csrf_context(request)},
+    )
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(request: Request, token: str = ""):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.password_reset_token == token).first() if token else None
+        valid = bool(user and token_age_seconds(user.password_reset_sent_at) <= PASSWORD_RESET_MAX_AGE_SECONDS)
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="reset_password.html",
+        context={
+            "token": token if valid else "",
+            "valid": valid,
+            "error": None if valid else "That reset link is invalid or expired.",
+            **user_context(request),
+            **csrf_context(request),
+        },
+        status_code=200 if valid else 400,
+    )
+
+
+@app.post("/reset-password", response_class=HTMLResponse)
+def reset_password(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str = Form(""),
+):
+    if not check_csrf(request, csrf_token):
+        return templates.TemplateResponse(
+            request=request,
+            name="reset_password.html",
+            context={
+                "token": token,
+                "valid": True,
+                "error": "Your session expired. Please try again.",
+                **user_context(request),
+                **csrf_context(request),
+            },
+        )
+
+    password_error = validate_password_strength(password)
+    if password_error:
+        return templates.TemplateResponse(
+            request=request,
+            name="reset_password.html",
+            context={
+                "token": token,
+                "valid": True,
+                "error": password_error,
+                **user_context(request),
+                **csrf_context(request),
+            },
         )
 
     db: Session = SessionLocal()
     try:
-        existing_user = db.query(User).filter(User.email == email).first()
-
-        if existing_user:
+        user = db.query(User).filter(User.password_reset_token == token).first() if token else None
+        if (
+            not user
+            or token_age_seconds(user.password_reset_sent_at) > PASSWORD_RESET_MAX_AGE_SECONDS
+        ):
             return templates.TemplateResponse(
                 request=request,
-                name="register.html",
-                context={"error": "Email already registered. Please login instead.", **csrf_context(request)},
+                name="reset_password.html",
+                context={
+                    "token": "",
+                    "valid": False,
+                    "error": "That reset link is invalid or expired.",
+                    **user_context(request),
+                    **csrf_context(request),
+                },
+                status_code=400,
             )
 
-        user = User(
-            name=name,
-            email=email,
-            password_hash=hash_password(password),
-            plan="free",
-        )
-
-        db.add(user)
+        user.password_hash = hash_password(password)
+        user.password_reset_token = None
+        user.password_reset_sent_at = None
+        user.email_verified = True
         db.commit()
     finally:
         db.close()
 
-    return RedirectResponse(url="/login?registered=true", status_code=303)
+    return RedirectResponse(url="/login?reset=true", status_code=303)
 
 
 @app.get("/admin/analytics", response_class=HTMLResponse)
@@ -471,6 +868,46 @@ def analytics_dashboard(request: Request):
         request=request,
         name="analytics.html",
         context={**summary, **user_context(request, current_user), **csrf_context(request)},
+    )
+
+
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users(request: Request):
+    current_user = get_current_user(request)
+    if not is_admin(current_user):
+        return RedirectResponse(url="/login", status_code=303)
+
+    db: Session = SessionLocal()
+    try:
+        users = db.query(User).order_by(User.created_at.desc()).limit(50).all()
+        total_users = db.query(User).count()
+        verified_users = db.query(User).filter(User.email_verified.is_(True)).count()
+        marketing_users = db.query(User).filter(User.marketing_opt_in.is_(True)).count()
+        free_users = db.query(User).filter(User.plan == "free").count()
+        pro_users = db.query(User).filter(User.plan == "pro").count()
+        recent_signups = (
+            db.query(User)
+            .order_by(User.created_at.desc())
+            .limit(5)
+            .all()
+        )
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_users.html",
+        context={
+            "users": users,
+            "recent_signups": recent_signups,
+            "total_users": total_users,
+            "verified_users": verified_users,
+            "unverified_users": total_users - verified_users,
+            "marketing_users": marketing_users,
+            "free_users": free_users,
+            "pro_users": pro_users,
+            **user_context(request, current_user),
+        },
     )
 
 
@@ -670,11 +1107,22 @@ def dashboard(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
     summary = analytics_summary(user_id=current_user.id)
+    analyses_used_today = daily_analysis_count(user_id=current_user.id)
+    analyses_remaining = None
+    if current_user.plan == "free":
+        analyses_remaining = max(FREE_ANALYSIS_LIMIT - analyses_used_today, 0)
 
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
-        context={**summary, **user_context(request, current_user), **csrf_context(request)},
+        context={
+            **summary,
+            "free_analysis_limit": FREE_ANALYSIS_LIMIT,
+            "analyses_used_today": analyses_used_today,
+            "analyses_remaining": analyses_remaining,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
     )
 
 
@@ -789,6 +1237,18 @@ def billing_success(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="billing_success.html",
+        context={**user_context(request, current_user), "site_url": config.SITE_URL},
+    )
+
+
+@app.get("/billing/manage", response_class=HTMLResponse)
+def billing_manage(request: Request):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="billing_manage.html",
         context={**user_context(request, current_user), "site_url": config.SITE_URL},
     )
 

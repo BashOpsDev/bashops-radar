@@ -48,9 +48,21 @@
                 <input type="text" name="name" placeholder="Your name" required>
                 <input type="email" name="email" placeholder="Email address" required>
                 <input type="password" name="password" placeholder="Password" required>
+                <label class="checkbox-row">
+                    <input type="checkbox" name="marketing_opt_in" value="true">
+                    <span>Send me product updates, launch notes, and BashOps Radar offers.</span>
+                </label>
 
                 <button type="submit">Create Account</button>
             </form>
+
+            {% if github_oauth_configured %}
+            <div class="auth-oauth">
+                <a class="nav-outline" href="/auth/github/login">Continue with GitHub</a>
+            </div>
+            {% else %}
+            <p class="auth-note">GitHub login is not configured yet.</p>
+            {% endif %}
 
             <p class="auth-switch">
                 Already have an account?

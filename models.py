@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -13,6 +13,17 @@ class User(Base):
     email = Column(String(255), unique=True, index=True)
     password_hash = Column(String(255))
     plan = Column(String(50), default="free")
+
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verification_token = Column(String(255), nullable=True, index=True)
+    email_verification_sent_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_token = Column(String(255), nullable=True, index=True)
+    password_reset_sent_at = Column(DateTime(timezone=True), nullable=True)
+    marketing_opt_in = Column(Boolean, default=False, nullable=False)
+    marketing_opt_in_at = Column(DateTime(timezone=True), nullable=True)
+    github_id = Column(String(255), nullable=True, index=True)
+    github_username = Column(String(255), nullable=True)
+    auth_provider = Column(String(50), default="email")
 
     paddle_customer_id = Column(String(255), nullable=True, index=True)
     paddle_subscription_id = Column(String(255), nullable=True, index=True)

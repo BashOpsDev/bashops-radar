@@ -30,7 +30,22 @@ _TEST_DB_URL = f"sqlite:///{_TEST_DB_PATH}"
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ["PADDLE_WEBHOOK_SECRET"] = "paddle_test_secret"
-for _var in ("PADDLE_API_KEY", "PADDLE_CLIENT_TOKEN", "PADDLE_PRICE_ID", "ADMIN_EMAILS", "ADMIN_EMAIL", "GEMINI_API_KEY", "GITHUB_TOKEN"):
+for _var in (
+    "PADDLE_API_KEY",
+    "PADDLE_CLIENT_TOKEN",
+    "PADDLE_PRICE_ID",
+    "ADMIN_EMAILS",
+    "ADMIN_EMAIL",
+    "GEMINI_API_KEY",
+    "GITHUB_TOKEN",
+    "SMTP_HOST",
+    "SMTP_USERNAME",
+    "SMTP_PASSWORD",
+    "SMTP_FROM_EMAIL",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_CLIENT_SECRET",
+    "GITHUB_OAUTH_REDIRECT_URI",
+):
     os.environ.pop(_var, None)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

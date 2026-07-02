@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Verify Email - BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block content %}
+<main>
+    <section class="card">
+        <span class="section-label">Verify Email</span>
+        <h1>Please check your email to verify your account.</h1>
+        <p class="angle">We sent a verification link to {{ email }}. You need to verify your email before logging in.</p>
+
+        {% if message %}
+        <div class="success-card">{{ message }}</div>
+        {% endif %}
+
+        <form method="post" action="/resend-verification" class="auth-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="email" value="{{ email }}">
+            <button type="submit">Resend Verification Email</button>
+        </form>
+    </section>
+</main>
+{% endblock %}

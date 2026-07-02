@@ -24,7 +24,7 @@ def _csrf_token(html: str) -> str:
     return match.group(1)
 
 
-def _register_and_login(client, email="user@example.com", password="pass1234", name="Test User"):
+def _register_and_login(client, email="user@example.com", password="StrongPass1", name="Test User"):
     r = client.get("/register")
     token = _csrf_token(r.text)
     r = client.post(
@@ -32,6 +32,17 @@ def _register_and_login(client, email="user@example.com", password="pass1234", n
         data={"name": name, "email": email, "password": password, "csrf_token": token},
         follow_redirects=False,
     )
+    assert r.status_code == 200
+
+    from database import SessionLocal
+    from models import User
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    verify_token = user.email_verification_token
+    db.close()
+
+    r = client.get(f"/verify-email?token={verify_token}", follow_redirects=False)
     assert r.status_code == 303
 
     r = client.get("/login")
@@ -50,7 +61,7 @@ def _register_and_login(client, email="user@example.com", password="pass1234", n
 def test_register_requires_valid_csrf(client):
     r = client.post(
         "/register",
-        data={"name": "X", "email": "x@example.com", "password": "pass1234", "csrf_token": "forged"},
+        data={"name": "X", "email": "x@example.com", "password": "StrongPass1", "csrf_token": "forged"},
         follow_redirects=False,
     )
     assert r.status_code == 200  # re-renders the form with an error, no redirect
@@ -68,7 +79,7 @@ def test_login_wrong_password_rejected(client):
     token = _csrf_token(r.text)
     client.post(
         "/register",
-        data={"name": "T", "email": "t@example.com", "password": "correct-password", "csrf_token": token},
+        data={"name": "T", "email": "t@example.com", "password": "CorrectPass1", "csrf_token": token},
     )
 
     r = client.get("/login")
@@ -85,12 +96,119 @@ def test_login_wrong_password_rejected(client):
 def test_duplicate_email_registration_rejected(client):
     r = client.get("/register")
     token = _csrf_token(r.text)
-    client.post("/register", data={"name": "A", "email": "dupe@example.com", "password": "pass1234", "csrf_token": token})
+    client.post("/register", data={"name": "A", "email": "dupe@example.com", "password": "StrongPass1", "csrf_token": token})
 
     r = client.get("/register")
     token = _csrf_token(r.text)
-    r = client.post("/register", data={"name": "B", "email": "dupe@example.com", "password": "pass1234", "csrf_token": token})
+    r = client.post("/register", data={"name": "B", "email": "dupe@example.com", "password": "StrongPass1", "csrf_token": token})
     assert "already registered" in r.text.lower()
+
+
+def test_weak_password_rejected(client):
+    r = client.get("/register")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/register",
+        data={"name": "Weak", "email": "weak@example.com", "password": "password", "csrf_token": token},
+    )
+    assert r.status_code == 200
+    assert "uppercase" in r.text.lower() or "number" in r.text.lower()
+
+
+def test_unverified_user_cannot_login(client):
+    r = client.get("/register")
+    token = _csrf_token(r.text)
+    client.post(
+        "/register",
+        data={"name": "Unverified", "email": "unverified@example.com", "password": "StrongPass1", "csrf_token": token},
+    )
+
+    r = client.get("/login")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/login",
+        data={"email": "unverified@example.com", "password": "StrongPass1", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200
+    assert "verify your email" in r.text.lower()
+
+
+def test_verification_token_verifies_user(client):
+    from database import SessionLocal
+    from models import User
+
+    r = client.get("/register")
+    token = _csrf_token(r.text)
+    client.post(
+        "/register",
+        data={"name": "Verify", "email": "verify@example.com", "password": "StrongPass1", "csrf_token": token},
+    )
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "verify@example.com").first()
+    verify_token = user.email_verification_token
+    assert user.email_verified is False
+    db.close()
+
+    r = client.get(f"/verify-email?token={verify_token}", follow_redirects=False)
+    assert r.status_code == 303
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "verify@example.com").first()
+    assert user.email_verified is True
+    assert user.email_verification_token is None
+    db.close()
+
+
+def test_forgot_password_generic_response(client):
+    r = client.get("/forgot-password")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/forgot-password",
+        data={"email": "nobody@example.com", "csrf_token": token},
+    )
+    assert r.status_code == 200
+    assert "if an account exists" in r.text.lower()
+
+
+def test_reset_password_works_with_valid_token(client):
+    from database import SessionLocal
+    from models import User
+
+    _register_and_login(client, email="reset@example.com", password="OldPass1")
+    client.get("/logout")
+
+    r = client.get("/forgot-password")
+    token = _csrf_token(r.text)
+    client.post(
+        "/forgot-password",
+        data={"email": "reset@example.com", "csrf_token": token},
+    )
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "reset@example.com").first()
+    reset_token = user.password_reset_token
+    db.close()
+
+    r = client.get(f"/reset-password?token={reset_token}")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/reset-password",
+        data={"token": reset_token, "password": "NewPass1", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers["location"] == "/login?reset=true"
+
+    r = client.get("/login")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/login",
+        data={"email": "reset@example.com", "password": "NewPass1", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
 
 
 # --- Protected routes ---------------------------------------------------
@@ -138,6 +256,37 @@ def test_admin_analytics_allowed_for_admin(client, monkeypatch):
     _register_and_login(client, email="admin@example.com", name="Admin")
     r = client.get("/admin/analytics")
     assert r.status_code == 200
+
+
+def test_admin_users_blocked_for_non_admin(client):
+    _register_and_login(client)
+    r = client.get("/admin/users", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/login"
+
+
+def test_admin_users_allowed_for_admin(client, monkeypatch):
+    import config
+
+    monkeypatch.setenv("ADMIN_EMAILS", "admin@example.com")
+    monkeypatch.setattr(config, "ADMIN_EMAILS", ["admin@example.com"])
+    _register_and_login(client, email="admin@example.com", name="Admin")
+    r = client.get("/admin/users")
+    assert r.status_code == 200
+    assert "Total Users" in r.text
+
+
+def test_github_callback_rejects_invalid_state(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "GITHUB_CLIENT_ID", "client")
+    monkeypatch.setattr(config, "GITHUB_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(config, "GITHUB_OAUTH_REDIRECT_URI", "https://example.com/auth/github/callback")
+    monkeypatch.setattr(config, "github_oauth_configured", True)
+
+    r = client.get("/auth/github/callback?code=abc&state=bad")
+    assert r.status_code == 200
+    assert "session expired" in r.text.lower()
 
 
 def test_analyze_requires_valid_csrf(client):

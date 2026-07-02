@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Email Verification - BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block content %}
+<main>
+    <section class="card">
+        <span class="section-label">Email Verification</span>
+        <h1>{% if success %}Email verified{% else %}Verification failed{% endif %}</h1>
+        <p class="angle">{{ message }}</p>
+        <div class="quick-actions">
+            <a class="nav-cta" href="/login">Login</a>
+            <a class="nav-outline" href="/contact">Contact Support</a>
+        </div>
+    </section>
+</main>
+{% endblock %}

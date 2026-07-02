@@ -50,6 +50,7 @@
                 </ul>
                 {% if current_user and current_user.plan == "pro" %}
                 <a class="nav-cta" href="/dashboard">Open Dashboard</a>
+                <a class="nav-outline" href="/billing/manage">Manage Billing</a>
                 {% else %}
                 <a class="nav-cta" href="/billing/upgrade">Upgrade to Pro</a>
                 {% endif %}
