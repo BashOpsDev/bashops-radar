@@ -2,275 +2,87 @@
 {% block title %}BashOps Radar - Turn Open Source Into Paid Work{% endblock %}
 {% block extra_head %}
     <meta name="description" content="BashOps Radar analyzes GitHub repositories, scores proof-of-work opportunities, ranks issues, and helps developers convert open-source contributions into paid contracts.">
-    <meta property="og:title" content="BashOps Radar — Turn Open Source Into Paid Work">
+    <meta property="og:title" content="BashOps Radar - Turn Open Source Into Paid Work">
     <meta property="og:description" content="AI-scored GitHub opportunities, best-first-issue picks, and founder outreach pitches for developers building proof-of-work into paid contracts.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ site_url }}/">
 {% endblock %}
 {% block content %}
-    <main>
-        <section class="hero">
-            <div class="hero-copy">
-                <div class="badge">AI Opportunity Intelligence for Developers</div>
-                <h1>Turn Open Source Into <span>Paid Work.</span></h1>
-                <p>
-                    BashOps Radar analyzes GitHub repositories, scores opportunities, ranks issues,
-                    and helps developers convert proof-of-work into contracts.
-                </p>
+<main>
+    <section class="hero">
+        <div class="hero-copy">
+            <div class="badge">AI Opportunity Intelligence for Developers</div>
+            <h1>Turn Open Source Into <span>Paid Work.</span></h1>
+            <p>
+                BashOps Radar analyzes GitHub repositories, scores opportunities, ranks issues,
+                and helps developers convert proof-of-work into contracts.
+            </p>
 
-                <div class="checks">
-                    <span>✓ GitHub Analysis</span>
-                    <span>✓ Opportunity Score</span>
-                    <span>✓ Best First Issue</span>
-                    <span>✓ Contract Planner</span>
-                </div>
-
-                <form id="analyze" method="post" action="/analyze">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input name="repo_url" placeholder="Paste GitHub repo URL..." required>
-                    <button type="submit">Find My Next Opportunity</button>
-                </form>
+            <div class="checks">
+                <span>GitHub Analysis</span>
+                <span>Opportunity Score</span>
+                <span>Best First Issue</span>
+                <span>Contract Planner</span>
             </div>
 
-            <div class="radar-visual">
-                <div class="radar-ring">
-                    <div class="radar-core">›_<span>BashOps</span></div>
-                </div>
-            </div>
-        </section>
-
-        <section class="workflow">
-            <h2>How BashOps Radar Works</h2>
-            <div class="workflow-grid">
-                <div>GitHub Repo</div>
-                <div>Radar Analysis</div>
-                <div>Best Issue</div>
-                <div>Submit PR</div>
-                <div>Pitch Sprint</div>
-            </div>
-        </section>
-
-        <section class="demo">
-            <div>
-                <span class="section-label">Example Analysis</span>
-                <h2>sourcebot-dev/sourcebot</h2>
-                <p>Opportunity Score: <strong>100/100</strong></p>
-                <p>Best Issue: <strong>#1277</strong></p>
-                <p>Angle: Backend/API reliability and authenticated GitHub integration.</p>
-            </div>
-            <div class="demo-score">100<small>/100</small></div>
-        </section>
-
-        <section id="features" class="features">
-            <h2>Built for developers who want better opportunities</h2>
-            <div class="feature-grid">
-                <div><strong>GitHub Analysis</strong><span>Detect active repositories worth your time.</span></div>
-                <div><strong>Issue Ranking</strong><span>Prioritize issues with better merge potential.</span></div>
-                <div><strong>Founder Intelligence</strong><span>Know when to build trust before pitching.</span></div>
-                <div><strong>Contract Planner</strong><span>Generate a focused 48-hour sprint offer.</span></div>
-                <div><strong>Pipeline Manager</strong><span>Track targets from backlog to pitch-ready.</span></div>
-                <div><strong>Daily Briefing</strong><span>Know what to work on every morning.</span></div>
-            </div>
-        </section>
-
-        {% if error %}
-        <div class="error">{{ error }}</div>
-        {% endif %}
-        {% if limit_reached %}
-<div class="upgrade-card">
-    <span class="section-label">Free Limit Reached</span>
-    <h2>You used your 5 free analyses today</h2>
-    <p>
-        BashOps Radar Free is limited to 5 repository analyses per day.
-        Upgrade to Pro for unlimited analyses, founder intelligence, daily briefing,
-        and contract engine.
-    </p>
-
-    <div class="upgrade-features">
-        <span>Unlimited analyses</span>
-        <span>Founder Intelligence</span>
-        <span>AI outreach messages</span>
-        <span>Daily briefing</span>
-        <span>Contract engine</span>
-    </div>
-
-    <div class="upgrade-actions">
-        <a href="/pricing" class="nav-cta">View Pricing</a>
-        <a href="/login" class="secondary-link">Join Beta</a>
-    </div>
-</div>
-{% endif %}
-
-        {% if result %}
-        <section class="card">
-            <div class="top">
-                <div>
-                    <div class="repo-label">Opportunity Report</div>
-                    <h2>{{ result.repo }}</h2>
-                    <p>{{ result.description }}</p>
-                </div>
-               <div class="score-panel">
-    <div class="score-number">{{ result.score }}<small>/100</small></div>
-    <div class="score-label">{{ result.score_label }}</div>
-    <div class="score-action">{{ result.score_action }}</div>
-
-    <div class="score-meter">
-        <div class="score-fill" style="width: {{ result.score }}%;"></div>
-    </div>
-
-    <div class="score-meta">
-        <div><strong>{{ result.merge_probability }}</strong><span>Merge Probability</span></div>
-        <div><strong>{{ result.estimated_time }}</strong><span>Estimated Time</span></div>
-        <div><strong>{{ result.difficulty }}</strong><span>Difficulty</span></div>
-    </div>
-</div>
-
-            <div class="grid">
-                <div><strong>★ {{ result.stars }}</strong><span>Stars</span></div>
-                <div><strong>⑂ {{ result.forks }}</strong><span>Forks</span></div>
-                <div><strong>! {{ result.open_issues }}</strong><span>Open Issues</span></div>
-                <div><strong>🌐</strong><span>{{ result.website }}</span></div>
-            </div>
-
-            {% if not current_user or current_user.plan == "free" %}
-                {% if result.score >= 70 %}
-                <div class="upgrade-card inline-upgrade">
-                    <span class="section-label">Pro Opportunity</span>
-                    <h2>This repository scored {{ result.score }}.</h2>
-                    <p>Unlock AI founder outreach and paid sprint strategy for this opportunity.</p>
-                    <div class="upgrade-actions">
-                        <a href="/billing/upgrade" class="nav-cta compact">Upgrade to Pro</a>
-                        <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="locked-preview-grid">
-                    <div class="locked-preview-card">
-                        <span class="section-label">Pro</span>
-                        <h3>AI Founder Outreach Pitch</h3>
-                        <p>Generate a concise message for maintainers and founders after your first useful PR.</p>
-                    </div>
-                    <div class="locked-preview-card">
-                        <span class="section-label">Pro</span>
-                        <h3>Paid Sprint Strategy</h3>
-                        <p>Turn repo findings into a focused 48-hour reliability or integration offer.</p>
-                    </div>
-                    <div class="locked-preview-card">
-                        <span class="section-label">Pro</span>
-                        <h3>Follow-up Message</h3>
-                        <p>Prepare the next touchpoint after your contribution gets reviewed or merged.</p>
-                    </div>
-                </div>
-            {% elif current_user.plan == "pro" %}
-                <div class="success-card">
-                    Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.
-                </div>
-            {% endif %}
-
-            <div class="report-grid">
-                <div>
-<div class="next-action-card">
-    <span class="section-label">Recommended Next Action</span>
-<div class="ai-summary-header">
-    <span class="section-label">AI Opportunity Summary</span>
-
-    {% if result.ai_status == "available" %}
-    <span class="ai-status available">AI Available</span>
-    {% else %}
-    <span class="ai-status unavailable">AI Temporarily Unavailable</span>
-    {% endif %}
-
-    <span class="pro-badge">Pro Soon</span>
-</div>
-
-<div class="ai-summary-box">
-    <p>{{ result.ai_summary }}</p>
-
-    {% if result.ai_status == "unavailable" %}
-    <form method="post" action="/analyze">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="repo_url" value="{{ result.repo_url }}">
-        <button type="submit" class="retry-btn">Retry AI Summary</button>
-    </form>
-    {% endif %}
-</div>
-    <h3>{{ result.recommended_action }}</h3>
-    <p>{{ result.recommended_outcome }}</p>
-
-    <div class="action-pills">
-        <span>{{ result.merge_probability }} merge probability</span>
-        <span>{{ result.estimated_time }}</span>
-        <span>{{ result.difficulty }} difficulty</span>
-    </div>
-</div>
-                    <h3>Best First Target</h3>
-                    {% if result.best_issue %}
-                    <div class="issue best">
-                        <strong>#{{ result.best_issue.number }} — {{ result.best_issue.title }}</strong>
-                        <p>{{ result.best_issue.type }} · Score {{ result.best_issue.score }}/100</p>
-                        <a href="{{ result.best_issue.url }}" target="_blank">Open Issue →</a>
-                    </div>
-                    {% endif %}
-
-                    <h3>Proof-of-Work Angle</h3>
-                    <p class="angle">{{ result.angle }}</p>
-                </div>
-
-                <div>
-                    <h3>Top Issues</h3>
-                    {% for score, issue_type, issue in result.issues %}
-                    <div class="issue-row">
-                        <div>
-                            <strong>#{{ issue.number }} {{ issue.title }}</strong>
-                            <p>{{ issue_type }}</p>
-                        </div>
-                        <span>{{ score }}/100</span>
-                        <a href="{{ issue.html_url }}" target="_blank">↗</a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </section>
-        {% endif %}
-
-        <section class="section-card">
-    <div class="section-header">
-        <span class="section-label">Daily Briefing</span>
-        <h2>Today's Focus</h2>
-    </div>
-
-    <div class="briefing-grid">
-
-        <div class="brief-card">
-            <h3>🎯 Priority</h3>
-            <p>Analyze 3 repositories with an Opportunity Score above 85.</p>
+            <form id="analyze" method="post" action="/analyze">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input name="repo_url" placeholder="Paste GitHub repo URL..." required>
+                <button type="submit">Find My Next Opportunity</button>
+            </form>
         </div>
 
-        <div class="brief-card">
-            <h3>🚀 Next Action</h3>
-            <p>Submit your highest probability pull request today.</p>
+        <div class="radar-visual">
+            <div class="radar-ring">
+                <div class="radar-core">&gt;_<span>BashOps</span></div>
+            </div>
         </div>
+    </section>
 
-        <div class="brief-card">
-            <h3>💰 Goal</h3>
-            <p>Move one repository to <strong>Founder Contacted</strong>.</p>
+    <section class="demo">
+        <div>
+            <span class="section-label">Sample Output</span>
+            <h2>sourcebot-dev/sourcebot</h2>
+            <p>Opportunity Score: <strong>100/100</strong></p>
+            <p>Best Issue: <strong>#1277</strong></p>
+            <p>Angle: Backend/API reliability and authenticated GitHub integration.</p>
         </div>
+        <div class="demo-score">100<small>/100</small></div>
+    </section>
 
-    </div>
-</section>
+    <section class="workflow">
+        <h2>How BashOps Radar Works</h2>
+        <div class="workflow-grid">
+            <div>GitHub Repo</div>
+            <div>Radar Analysis</div>
+            <div>Best Issue</div>
+            <div>Submit PR</div>
+            <div>Pitch Sprint</div>
+        </div>
+    </section>
 
-        <section id="pricing" class="pricing">
-            <span class="section-label">Pricing</span>
-            <h2>Choose your Proof-of-Work engine</h2>
-            <p>Start free. Upgrade when BashOps Radar becomes part of your daily client acquisition workflow.</p>
-            {% include "components/pricing_cards.html" %}
-        </section>
+    <section id="features" class="features">
+        <h2>Built for developers who want better opportunities</h2>
+        <div class="feature-grid">
+            <div><strong>GitHub Analysis</strong><span>Detect active repositories worth your time.</span></div>
+            <div><strong>Issue Ranking</strong><span>Prioritize issues with better merge potential.</span></div>
+            <div><strong>Founder Intelligence</strong><span>Know when to build trust before pitching.</span></div>
+            <div><strong>Contract Planner</strong><span>Generate a focused 48-hour sprint offer.</span></div>
+            <div><strong>Pipeline Manager</strong><span>Track targets from backlog to pitch-ready.</span></div>
+            <div><strong>Daily Briefing</strong><span>Know what to work on every morning.</span></div>
+        </div>
+    </section>
 
-        <section class="social-proof">
-            <h2>Built from real OSS experience</h2>
-            <p>Sourcebot · Aegra · Sova · Nango · Stagewise</p>
-        </section>
+    <section id="pricing" class="pricing">
+        <span class="section-label">Pricing</span>
+        <h2>Choose your Proof-of-Work engine</h2>
+        <p>Start free. Upgrade when BashOps Radar becomes part of your daily client acquisition workflow.</p>
+        {% include "components/pricing_cards.html" %}
+    </section>
 
-    </main>
+    <section class="social-proof">
+        <h2>Built from real OSS experience</h2>
+        <p>Sourcebot · Aegra · Sova · Nango · Stagewise</p>
+    </section>
+</main>
 {% endblock %}

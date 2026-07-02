@@ -1046,7 +1046,7 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
         if not check_csrf(request, csrf_token):
             return templates.TemplateResponse(
                 request=request,
-                name="index.html",
+                name="analysis_result.html",
                 context={
                     "result": None,
                     "error": "Your session expired. Please try again.",
@@ -1068,7 +1068,7 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
         if over_limit:
             return templates.TemplateResponse(
                 request=request,
-                name="index.html",
+                name="analysis_result.html",
                 context={
                     "result": None,
                     "error": None,
@@ -1178,7 +1178,7 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
 
         return templates.TemplateResponse(
             request=request,
-            name="index.html",
+            name="analysis_result.html",
             context={
                 "result": result,
                 "error": None,
@@ -1204,7 +1204,7 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
 
         return templates.TemplateResponse(
             request=request,
-            name="index.html",
+            name="analysis_result.html",
             context={
                 "result": None,
                 "error": message,

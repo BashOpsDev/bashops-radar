@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Analysis Result - BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block content %}
+<main class="analysis-page">
+    {% if error %}
+    <section class="analysis-shell">
+        <div class="analysis-main-card">
+            <span class="section-label">Analysis Error</span>
+            <h1>We could not analyze that repository.</h1>
+            <p class="angle">{{ error }}</p>
+            <form method="post" action="/analyze" class="analysis-retry-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input name="repo_url" placeholder="Paste GitHub repo URL..." required>
+                <button type="submit">Try Again</button>
+            </form>
+        </div>
+    </section>
+    {% elif limit_reached %}
+    <section class="analysis-shell">
+        <div class="upgrade-card">
+            <span class="section-label">Free Limit Reached</span>
+            <h1>You used your 5 free analyses today</h1>
+            <p>Upgrade to Pro for unlimited analyses, founder intelligence, daily briefing, and contract engine.</p>
+            <div class="upgrade-features">
+                <span>Unlimited analyses</span>
+                <span>Founder Intelligence</span>
+                <span>AI outreach messages</span>
+                <span>Daily briefing</span>
+                <span>Contract engine</span>
+            </div>
+            <div class="upgrade-actions">
+                <a href="/pricing" class="nav-cta compact">View Pricing</a>
+                <a href="/" class="nav-outline compact">Analyze Later</a>
+            </div>
+        </div>
+    </section>
+    {% elif result %}
+    <section class="analysis-shell">
+        <div class="analysis-main-card">
+            <div class="analysis-header">
+                <div>
+                    <span class="repo-label">Opportunity Report</span>
+                    <h1>{{ result.repo }}</h1>
+                    <p>{{ result.description }}</p>
+                </div>
+                <div class="score-panel compact-score-panel">
+                    <div class="score-number">{{ result.score }}<small>/100</small></div>
+                    <div class="score-label">{{ result.score_label }}</div>
+                    <div class="score-action">{{ result.score_action }}</div>
+                    <div class="score-meter">
+                        <div class="score-fill" style="width: {{ result.score }}%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-metrics">
+                <div><strong>{{ result.decision }}</strong><span>Decision</span></div>
+                <div><strong>{{ result.merge_probability }}</strong><span>Merge Probability</span></div>
+                <div><strong>{{ result.estimated_time }}</strong><span>Estimated Time</span></div>
+                <div><strong>{{ result.difficulty }}</strong><span>Difficulty</span></div>
+                <div><strong>{{ result.stars }}</strong><span>Stars</span></div>
+                <div><strong>{{ result.open_issues }}</strong><span>Open Issues</span></div>
+            </div>
+
+            {% if not current_user or current_user.plan == "free" %}
+                {% if result.score >= 70 %}
+                <div class="upgrade-card inline-upgrade">
+                    <span class="section-label">Pro Opportunity</span>
+                    <h2>This repository scored {{ result.score }}.</h2>
+                    <p>Unlock AI founder outreach and paid sprint strategy for this opportunity.</p>
+                    <div class="upgrade-actions">
+                        <a href="/billing/upgrade" class="nav-cta compact">Upgrade to Pro</a>
+                        <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
+                    </div>
+                </div>
+                {% endif %}
+            {% elif current_user.plan == "pro" %}
+            <div class="success-card">Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.</div>
+            {% endif %}
+
+            <div class="analysis-grid">
+                <section class="analysis-section">
+                    <div class="ai-summary-header">
+                        <span class="section-label">AI Opportunity Summary</span>
+                        {% if result.ai_status == "available" %}
+                        <span class="ai-status available">AI Available</span>
+                        {% else %}
+                        <span class="ai-status unavailable">AI Temporarily Unavailable</span>
+                        {% endif %}
+                    </div>
+                    <div class="ai-summary-box">
+                        <p>{{ result.ai_summary }}</p>
+                        {% if result.ai_status == "unavailable" %}
+                        <form method="post" action="/analyze" class="analysis-retry-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="repo_url" value="{{ result.repo_url }}">
+                            <button type="submit" class="retry-btn">Retry AI Summary</button>
+                        </form>
+                        {% endif %}
+                    </div>
+
+                    <h2>Recommended Next Action</h2>
+                    <p class="angle">{{ result.recommended_action }}. {{ result.recommended_outcome }}</p>
+
+                    <h2>Best First Issue</h2>
+                    {% if result.best_issue %}
+                    <div class="issue best">
+                        <strong>#{{ result.best_issue.number }} - {{ result.best_issue.title }}</strong>
+                        <p>{{ result.best_issue.type }} · Score {{ result.best_issue.score }}/100</p>
+                        <a href="{{ result.best_issue.url }}" target="_blank" rel="noopener">Open Issue</a>
+                    </div>
+                    {% else %}
+                    <p class="angle">No ranked issue found. Inspect the repository manually before pitching.</p>
+                    {% endif %}
+
+                    <h2>Proof-of-Work Angle</h2>
+                    <p class="angle">{{ result.angle }}</p>
+                </section>
+
+                <section class="analysis-section">
+                    <h2>Top Issues</h2>
+                    {% for score, issue_type, issue in result.issues %}
+                    <div class="issue-row compact-issue-row">
+                        <div>
+                            <strong>#{{ issue.number }} {{ issue.title }}</strong>
+                            <p>{{ issue_type }}</p>
+                        </div>
+                        <span>{{ score }}/100</span>
+                        <a href="{{ issue.html_url }}" target="_blank" rel="noopener">Open</a>
+                    </div>
+                    {% endfor %}
+                </section>
+            </div>
+
+            {% if not current_user or current_user.plan == "free" %}
+            <div class="locked-preview-grid">
+                <div class="locked-preview-card">
+                    <span class="section-label">Pro</span>
+                    <h3>AI Founder Outreach Pitch</h3>
+                    <p>Generate a concise message for maintainers and founders after your first useful PR.</p>
+                </div>
+                <div class="locked-preview-card">
+                    <span class="section-label">Pro</span>
+                    <h3>Paid Sprint Strategy</h3>
+                    <p>Turn repo findings into a focused 48-hour reliability or integration offer.</p>
+                </div>
+                <div class="locked-preview-card">
+                    <span class="section-label">Pro</span>
+                    <h3>Follow-up Message</h3>
+                    <p>Prepare the next touchpoint after your contribution gets reviewed or merged.</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <aside class="analysis-side-card">
+            <span class="section-label">Today&apos;s Focus</span>
+            <h2>Move this toward proof-of-work</h2>
+            <div class="briefing-list">
+                <div><strong>Priority</strong><span>Analyze 3 repositories with a score above 85.</span></div>
+                <div><strong>Next Action</strong><span>Submit your highest probability pull request.</span></div>
+                <div><strong>Goal</strong><span>Move one repository to Founder Contacted.</span></div>
+            </div>
+            <div class="quick-actions">
+                <a href="/" class="nav-outline compact">Analyze Another</a>
+                <a href="/pipeline" class="nav-cta compact">Open Pipeline</a>
+            </div>
+        </aside>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

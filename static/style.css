@@ -2669,3 +2669,228 @@ footer,
         padding: 20px;
     }
 }
+
+/* Compact analysis result experience */
+.analysis-page {
+    max-width: 1240px;
+    padding: 18px;
+}
+
+.analysis-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 16px;
+    align-items: start;
+}
+
+.analysis-main-card,
+.analysis-side-card,
+.analysis-section {
+    background: rgba(23,28,36,.78);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.analysis-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    gap: 16px;
+    align-items: start;
+    margin-bottom: 14px;
+}
+
+.analysis-header h1 {
+    font-size: 28px;
+    line-height: 1.18;
+    margin-bottom: 8px;
+    overflow-wrap: anywhere;
+}
+
+.analysis-header p {
+    margin: 0;
+}
+
+.compact-score-panel {
+    min-width: 0;
+    padding: 16px;
+}
+
+.analysis-metrics {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.analysis-metrics div {
+    background: #10141b;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.analysis-metrics strong {
+    display: block;
+    color: var(--primary);
+    font-size: 16px;
+    margin-bottom: 4px;
+    overflow-wrap: anywhere;
+}
+
+.analysis-metrics span,
+.briefing-list span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.analysis-section h2 {
+    font-size: 20px;
+    margin: 18px 0 10px;
+}
+
+.analysis-section h2:first-child {
+    margin-top: 0;
+}
+
+.compact-issue-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.analysis-retry-form {
+    max-width: none;
+    margin-top: 14px;
+}
+
+.briefing-list {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.briefing-list div {
+    background: #10141b;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.briefing-list strong {
+    display: block;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+@media (max-width: 1080px) {
+    .analysis-shell,
+    .analysis-header,
+    .analysis-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analysis-metrics {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .analysis-page {
+        padding: 14px;
+    }
+
+    .analysis-main-card,
+    .analysis-side-card,
+    .analysis-section {
+        padding: 14px;
+    }
+
+    .analysis-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .compact-issue-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Final compact SaaS typography refinement */
+.nav-brand strong {
+    font-size: 20px;
+}
+
+.nav-center a,
+.nav-outline,
+.nav-primary {
+    font-size: 14px;
+}
+
+.hero h1,
+h1 {
+    font-size: clamp(38px, 4vw, 46px);
+}
+
+.dashboard-hero h1 {
+    font-size: clamp(32px, 3.5vw, 38px);
+}
+
+h2,
+.workflow h2,
+.features h2,
+.demo h2,
+.pricing h2,
+.social-proof h2,
+.card-flat h2 {
+    font-size: clamp(26px, 2.6vw, 32px);
+}
+
+.auth-card h2,
+.dashboard-plan-card h2,
+.checkout-status-card h2,
+.pricing-grid h2,
+.opportunity-card h3,
+.locked-preview-card h3 {
+    font-size: 21px;
+}
+
+p,
+li,
+input,
+select,
+textarea,
+footer p {
+    font-size: 15px;
+}
+
+.metric-card strong,
+.dashboard-box h2 {
+    font-size: clamp(32px, 3vw, 38px);
+}
+
+.nav-cta,
+button,
+.nav-primary,
+.nav-outline {
+    min-height: 42px;
+    padding: 9px 13px;
+}
+
+.workflow,
+.demo,
+.features,
+.card,
+.pricing,
+.social-proof,
+footer,
+.dashboard-hero,
+.card-flat {
+    padding: 22px;
+}
