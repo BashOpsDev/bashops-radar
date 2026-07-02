@@ -1,0 +1,47 @@
+<div class="pricing-grid">
+    <div>
+        <h2>Community</h2>
+        <p class="price">$0/month</p>
+        <p>For testing repositories and validating your workflow.</p>
+        <ul>
+            <li>5 analyses/day</li>
+            <li>Repository analysis</li>
+            <li>Opportunity score</li>
+            <li>Issue ranking</li>
+            <li>Basic pipeline</li>
+        </ul>
+        <a class="nav-cta compact" href="/">Start Free</a>
+    </div>
+
+    <div class="pro">
+        <h2>Pro</h2>
+        <p class="price">${{ pro_price }}/month</p>
+        <p>For developers actively turning GitHub work into paid sprints.</p>
+        <ul>
+            <li>Unlimited analyses</li>
+            <li>AI founder outreach</li>
+            <li>Unlimited pipeline &amp; history</li>
+            <li>CSV export</li>
+            <li>Daily briefing and contract engine</li>
+        </ul>
+        {% if current_user and current_user.plan == "pro" %}
+        <a class="nav-cta compact" href="/dashboard">Open Dashboard</a>
+        <a class="nav-outline compact" href="/billing/manage">Manage Billing</a>
+        {% else %}
+        <a class="nav-cta compact" href="/billing/upgrade">Upgrade to Pro</a>
+        {% endif %}
+    </div>
+
+    <div>
+        <h2>Team</h2>
+        <p class="price">Coming Soon</p>
+        <p>For small teams and agencies using proof-of-work sales.</p>
+        <ul>
+            <li>Shared workspace</li>
+            <li>Team dashboard</li>
+            <li>API access</li>
+            <li>Priority support</li>
+        </ul>
+        <a class="nav-cta compact" href="/contact">Contact</a>
+    </div>
+</div>

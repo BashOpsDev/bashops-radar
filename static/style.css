@@ -2025,6 +2025,102 @@ footer {
     padding: 22px;
 }
 
+.pricing-grid {
+    align-items: stretch;
+}
+
+.pricing-grid > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-grid ul {
+    margin: 0 0 20px;
+    padding-left: 18px;
+    color: #cbd5e1;
+    line-height: 1.7;
+}
+
+.pricing-grid .nav-cta {
+    margin-top: auto;
+    width: fit-content;
+}
+
+.pricing-grid .nav-outline {
+    margin-top: 10px;
+    width: fit-content;
+}
+
+.pricing > p {
+    max-width: 760px;
+}
+
+.hero h1 {
+    font-size: clamp(40px, 5vw, 52px);
+    letter-spacing: 0;
+}
+
+.hero p,
+.pricing p,
+.auth-side p,
+.legal-card p,
+.checkout-brand-panel p,
+.checkout-status-card p {
+    font-size: 16px;
+}
+
+.workflow h2,
+.features h2,
+.demo h2,
+.pricing h2,
+.social-proof h2 {
+    font-size: clamp(26px, 3vw, 34px);
+    letter-spacing: 0;
+}
+
+.checkout-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(320px, .8fr);
+    gap: 22px;
+    align-items: stretch;
+    margin: 24px 0;
+}
+
+.checkout-brand-panel,
+.checkout-status-card {
+    background: rgba(23,28,36,.78);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px;
+}
+
+.checkout-brand-panel {
+    border-color: rgba(245,158,11,.28);
+}
+
+.checkout-brand-panel .nav-logo {
+    margin-bottom: 20px;
+}
+
+.checkout-brand-panel h1 {
+    font-size: clamp(32px, 4vw, 46px);
+    line-height: 1.12;
+    letter-spacing: 0;
+    margin-bottom: 14px;
+}
+
+.checkout-brand-panel ul {
+    color: #cbd5e1;
+    line-height: 1.8;
+    padding-left: 18px;
+    margin: 20px 0 0;
+}
+
+.checkout-status-card h2 {
+    font-size: 28px;
+    margin-bottom: 12px;
+}
+
 .pricing-grid .nav-cta,
 .pricing-grid .nav-outline,
 .quick-actions .nav-cta,
@@ -2058,7 +2154,8 @@ footer {
 
 @media (max-width: 980px) {
     .dashboard-hero,
-    .dashboard-actions {
+    .dashboard-actions,
+    .checkout-shell {
         grid-template-columns: 1fr;
     }
 
@@ -2130,6 +2227,16 @@ footer {
 
     footer {
         padding: 20px 16px;
+    }
+
+    .checkout-brand-panel,
+    .checkout-status-card {
+        padding: 22px;
+    }
+
+    .pricing-grid .nav-cta,
+    .pricing-grid .nav-outline {
+        width: 100%;
     }
 }
 

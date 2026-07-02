@@ -5,13 +5,27 @@
 {% endblock %}
 {% block content %}
 <main>
-    <section class="card">
-        <span class="section-label">Checkout</span>
-        <h1>Starting Paddle checkout</h1>
-        <p class="angle">Complete checkout to start BashOps Radar Pro. Your plan activates after Paddle confirms payment.</p>
-        <div class="quick-actions">
-            <a class="nav-cta" href="/pricing">Back to Pricing</a>
-            <a class="nav-outline" href="/dashboard">Dashboard</a>
+    <section class="checkout-shell">
+        <div class="checkout-brand-panel">
+            <div class="nav-logo">&gt;_</div>
+            <span class="section-label">BashOps Radar Pro</span>
+            <h1>Turn GitHub contributions into paid contracts.</h1>
+            <p>Upgrade to unlock unlimited repository analysis, founder outreach, and a focused proof-of-work pipeline.</p>
+            <ul>
+                <li>Unlimited repository analysis</li>
+                <li>AI founder outreach</li>
+                <li>Pipeline history and CSV export</li>
+            </ul>
+        </div>
+
+        <div class="checkout-status-card">
+            <span class="section-label">Checkout</span>
+            <h2>Starting Paddle checkout</h2>
+            <p>Complete checkout to start BashOps Radar Pro. Your plan activates after Paddle confirms payment.</p>
+            <div class="quick-actions">
+                <a class="nav-cta compact" href="/pricing">Back to Pricing</a>
+                <a class="nav-outline compact" href="/dashboard">Dashboard</a>
+            </div>
         </div>
     </section>
 </main>
