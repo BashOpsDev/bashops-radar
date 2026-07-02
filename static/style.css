@@ -2716,6 +2716,61 @@ footer,
     padding: 16px;
 }
 
+.opportunity-signals {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.score-trust-label {
+    display: block;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+
+.signal-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.signal-row strong {
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.signal-list {
+    margin-top: 8px;
+}
+
+.signal-list > span {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.signal-list ul {
+    display: grid;
+    gap: 5px;
+    margin: 0;
+    padding-left: 18px;
+}
+
+.signal-list li {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
 .analysis-metrics {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));

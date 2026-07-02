@@ -40,6 +40,17 @@
     {% elif result %}
     <section class="analysis-shell">
         <div class="analysis-main-card">
+            {% set stars = result.stars|default(0, true) %}
+            {% set forks = result.forks|default(0, true) %}
+            {% set open_issues = result.open_issues|default(0, true) %}
+            {% set contract_potential = "High" if result.score >= 85 else "Medium" if result.score >= 60 else "Low" %}
+            {% set issue_signals = namespace(starter=false) %}
+            {% for issue_score, issue_type, issue in result.issues %}
+                {% set issue_label = issue_type|lower %}
+                {% if "good first" in issue_label or "help wanted" in issue_label or "starter" in issue_label %}
+                    {% set issue_signals.starter = true %}
+                {% endif %}
+            {% endfor %}
             <div class="analysis-header">
                 <div>
                     <span class="repo-label">Opportunity Report</span>
@@ -52,6 +63,43 @@
                     <div class="score-action">{{ result.score_action }}</div>
                     <div class="score-meter">
                         <div class="score-fill" style="width: {{ result.score }}%;"></div>
+                    </div>
+                    <div class="opportunity-signals">
+                        <span class="score-trust-label">Opportunity signals</span>
+                        <div class="signal-row">
+                            <span>Chance of getting noticed</span>
+                            <strong>{{ result.score }}%</strong>
+                        </div>
+                        <div class="signal-row">
+                            <span>Estimated contract potential</span>
+                            <strong>{{ contract_potential }}</strong>
+                        </div>
+                        <div class="signal-list">
+                            <span>Why this repo may be worth your time</span>
+                            <ul>
+                                {% if result.last_push %}
+                                <li>Repository update data available: last push {{ result.last_push[:10] }}</li>
+                                {% endif %}
+                                {% if open_issues >= 20 %}
+                                <li>Many open issues to triage and prioritize</li>
+                                {% elif open_issues > 0 %}
+                                <li>Open issue signal available</li>
+                                {% else %}
+                                <li>Open issue signal unavailable</li>
+                                {% endif %}
+                                {% if issue_signals.starter %}
+                                <li>Good first issue / help wanted signal detected</li>
+                                {% elif result.best_issue %}
+                                <li>Ranked first issue available for focused proof-of-work</li>
+                                {% endif %}
+                                {% if stars >= 1000 or forks >= 100 %}
+                                <li>Strong ecosystem visibility from stars/forks</li>
+                                {% elif stars >= 100 or forks >= 25 %}
+                                <li>Some ecosystem visibility from stars/forks</li>
+                                {% endif %}
+                                <li>Review speed signal unavailable</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
