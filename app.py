@@ -153,7 +153,18 @@ def get_current_user(request: Request):
 
 
 def is_admin(user) -> bool:
-    return bool(user and user.email and user.email.lower() in config.ADMIN_EMAILS)
+    return bool(user and user.email and user.email.strip().lower() in config.ADMIN_EMAILS)
+
+
+def require_admin_or_redirect(request: Request, current_user):
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not is_admin(current_user):
+        return HTMLResponse(
+            "Admin access required. Confirm this account email is listed in ADMIN_EMAILS.",
+            status_code=403,
+        )
+    return None
 
 
 def user_context(request: Request, current_user=None) -> dict:
@@ -1002,10 +1013,11 @@ def analytics_dashboard(request: Request):
 
     # Previously this route had no auth at all and showed every user's data
     # to any visitor. It's now restricted to a single admin account
-    # (set ADMIN_EMAIL in the environment) since it's a global view across
+    # (set ADMIN_EMAILS in the environment) since it's a global view across
     # all accounts, not a per-user page.
-    if not is_admin(current_user):
-        return RedirectResponse(url="/login", status_code=303)
+    admin_response = require_admin_or_redirect(request, current_user)
+    if admin_response:
+        return admin_response
 
     summary = admin_event_summary()
     return templates.TemplateResponse(
@@ -1018,8 +1030,9 @@ def analytics_dashboard(request: Request):
 @app.get("/admin/users", response_class=HTMLResponse)
 def admin_users(request: Request):
     current_user = get_current_user(request)
-    if not is_admin(current_user):
-        return RedirectResponse(url="/login", status_code=303)
+    admin_response = require_admin_or_redirect(request, current_user)
+    if admin_response:
+        return admin_response
 
     db: Session = SessionLocal()
     try:
