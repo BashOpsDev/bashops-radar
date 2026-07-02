@@ -1,4 +1,5 @@
 import os
+import json
 import secrets
 from pathlib import Path
 from datetime import datetime, timezone
@@ -12,11 +13,12 @@ from fastapi.templating import Jinja2Templates
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import requests
 
 from database import SessionLocal
-from models import User
+from models import Event, Target, User
 from auth import (
     hash_password,
     verify_password,
@@ -250,6 +252,26 @@ def render_register(request: Request, error: Optional[str] = None):
     )
 
 
+def track_event(request: Request, event_name: str, user=None, metadata=None) -> None:
+    try:
+        db: Session = SessionLocal()
+        try:
+            event = Event(
+                user_id=user.id if user else None,
+                event_name=event_name,
+                page=str(request.url.path)[:500],
+                referrer=(request.headers.get("referer") or "")[:500],
+                user_agent=(request.headers.get("user-agent") or "")[:500],
+                metadata_json=json.dumps(metadata or {}, default=str),
+            )
+            db.add(event)
+            db.commit()
+        finally:
+            db.close()
+    except Exception as exc:
+        print(f"[event tracking failed] {event_name}: {exc!r}")
+
+
 @app.exception_handler(StarletteHTTPException)
 async def not_found_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 404:
@@ -309,6 +331,8 @@ def sitemap_xml():
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
+    current_user = get_current_user(request)
+    track_event(request, "landing_view", user=current_user)
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -318,7 +342,7 @@ def home(request: Request):
             "limit_reached": False,
             "site_url": config.SITE_URL,
             "pro_price": config.PRO_PRICE_USD,
-            **user_context(request),
+            **user_context(request, current_user),
             **csrf_context(request),
         },
     )
@@ -354,6 +378,8 @@ def export_pipeline(request: Request):
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
+    current_user = get_current_user(request)
+    track_event(request, "pricing_view", user=current_user)
     return templates.TemplateResponse(
         request=request,
         name="pricing.html",
@@ -364,7 +390,7 @@ def pricing(request: Request):
             "pro_price": config.PRO_PRICE_USD,
             "billing_error": None,
             "site_url": config.SITE_URL,
-            **user_context(request),
+            **user_context(request, current_user),
         },
     )
 
@@ -444,6 +470,7 @@ def login_user(
             return render_login(request, error="Please verify your email before logging in.")
 
         request.session["user_id"] = user.id
+        track_event(request, "login_success", user=user)
     finally:
         db.close()
 
@@ -606,6 +633,7 @@ def register_user(
         return render_register(request, error=password_error)
 
     normalized_email = email.strip().lower()
+    track_event(request, "register_submitted", metadata={"email_domain": normalized_email.split("@")[-1] if "@" in normalized_email else ""})
 
     db: Session = SessionLocal()
     try:
@@ -667,10 +695,19 @@ def verify_email(request: Request, token: str = ""):
         user.email_verification_token = None
         user.email_verification_sent_at = None
         db.commit()
+        track_event(request, "email_verified", user=user)
     finally:
         db.close()
 
-    return RedirectResponse(url="/login?verified=true", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="verify_email_result.html",
+        context={
+            "success": True,
+            "message": "Email verified. You can now log in to BashOps Radar.",
+            **user_context(request),
+        },
+    )
 
 
 @app.post("/resend-verification", response_class=HTMLResponse)
@@ -745,6 +782,7 @@ def forgot_password(
         )
 
     normalized_email = email.strip().lower()
+    track_event(request, "forgot_password_requested")
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(User.email == normalized_email).first()
@@ -852,6 +890,79 @@ def reset_password(
     return RedirectResponse(url="/login?reset=true", status_code=303)
 
 
+def admin_event_summary() -> dict:
+    today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
+    funnel_names = [
+        "landing_view",
+        "register_submitted",
+        "analysis_completed",
+        "upgrade_clicked",
+        "checkout_started",
+        "checkout_completed",
+    ]
+
+    db: Session = SessionLocal()
+    try:
+        events_today = db.query(Event).filter(Event.created_at >= today).all()
+        all_events = db.query(Event).order_by(Event.created_at.desc()).limit(50).all()
+
+        def count_today(name: str) -> int:
+            return sum(1 for event in events_today if event.event_name == name)
+
+        top_event_rows = (
+            db.query(Event.event_name, func.count(Event.id))
+            .group_by(Event.event_name)
+            .order_by(func.count(Event.id).desc())
+            .limit(10)
+            .all()
+        )
+        top_referrer_rows = (
+            db.query(Event.referrer, func.count(Event.id))
+            .filter(Event.referrer != "")
+            .group_by(Event.referrer)
+            .order_by(func.count(Event.id).desc())
+            .limit(10)
+            .all()
+        )
+        top_repo_rows = (
+            db.query(Target.repo, func.count(Target.id))
+            .filter(Target.repo != "")
+            .group_by(Target.repo)
+            .order_by(func.count(Target.id).desc())
+            .limit(10)
+            .all()
+        )
+
+        return {
+            "cards": [
+                {"label": "Events Today", "value": len(events_today)},
+                {"label": "Registrations Today", "value": count_today("register_submitted")},
+                {"label": "Verified Users", "value": db.query(User).filter(User.email_verified.is_(True)).count()},
+                {"label": "Analyses Today", "value": count_today("analysis_completed")},
+                {"label": "Upgrade Clicks Today", "value": count_today("upgrade_clicked")},
+                {"label": "Checkout Starts Today", "value": count_today("checkout_started")},
+                {"label": "Checkout Completions Today", "value": count_today("checkout_completed")},
+                {"label": "Free Users", "value": db.query(User).filter(User.plan == "free").count()},
+                {"label": "Pro Users", "value": db.query(User).filter(User.plan == "pro").count()},
+            ],
+            "recent_events": [
+                {
+                    "event_name": event.event_name,
+                    "page": event.page or "",
+                    "referrer": event.referrer or "",
+                    "created_at": event.created_at,
+                }
+                for event in all_events
+            ],
+            "top_events": [{"name": name, "count": count} for name, count in top_event_rows],
+            "top_referrers": [{"referrer": referrer, "count": count} for referrer, count in top_referrer_rows],
+            "top_repositories": [{"repo": repo, "count": count} for repo, count in top_repo_rows],
+            "funnel": [{"name": name, "count": db.query(Event).filter(Event.event_name == name).count()} for name in funnel_names],
+        }
+    finally:
+        db.close()
+
+
 @app.get("/admin/analytics", response_class=HTMLResponse)
 def analytics_dashboard(request: Request):
     current_user = get_current_user(request)
@@ -863,11 +974,11 @@ def analytics_dashboard(request: Request):
     if not is_admin(current_user):
         return RedirectResponse(url="/login", status_code=303)
 
-    summary = analytics_summary(user_id=None)
+    summary = admin_event_summary()
     return templates.TemplateResponse(
         request=request,
         name="analytics.html",
-        context={**summary, **user_context(request, current_user), **csrf_context(request)},
+        context={**summary, **user_context(request, current_user)},
     )
 
 
@@ -969,6 +1080,7 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
                 },
             )
 
+        track_event(request, "analysis_started", user=current_user, metadata={"repo_url": repo_url})
         owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
 
         best_issue = None
@@ -1056,6 +1168,12 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
             stars=result.get("stars", 0),
             forks=result.get("forks", 0),
             open_issues=result.get("open_issues", 0),
+        )
+        track_event(
+            request,
+            "analysis_completed",
+            user=current_user,
+            metadata={"repo": result["repo"], "score": result["score"]},
         )
 
         return templates.TemplateResponse(
@@ -1196,6 +1314,8 @@ def billing_upgrade(request: Request):
     if not current_user:
         return RedirectResponse(url="/register", status_code=303)
 
+    track_event(request, "upgrade_clicked", user=current_user)
+
     if current_user.plan == "pro":
         return RedirectResponse(url="/dashboard", status_code=303)
 
@@ -1211,6 +1331,7 @@ def billing_upgrade(request: Request):
             },
         )
 
+    track_event(request, "checkout_started", user=current_user)
     return templates.TemplateResponse(
         request=request,
         name="checkout.html",
@@ -1274,5 +1395,16 @@ async def paddle_webhook(request: Request):
     except Exception as e:
         print(f"[/billing/webhook handler error] {e!r}")
         return JSONResponse({"error": "webhook handling failed"}, status_code=500)
+
+    if event.get("event_type") in {"transaction.completed", "subscription.created", "subscription.updated"}:
+        track_event(
+            request,
+            "checkout_completed",
+            metadata={
+                "event_type": event.get("event_type"),
+                "customer_id": (event.get("data") or {}).get("customer_id"),
+                "subscription_id": (event.get("data") or {}).get("subscription_id") or (event.get("data") or {}).get("id"),
+            },
+        )
 
     return {"received": True}

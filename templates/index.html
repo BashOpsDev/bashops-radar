@@ -132,6 +132,42 @@
                 <div><strong>🌐</strong><span>{{ result.website }}</span></div>
             </div>
 
+            {% if not current_user or current_user.plan == "free" %}
+                {% if result.score >= 70 %}
+                <div class="upgrade-card inline-upgrade">
+                    <span class="section-label">Pro Opportunity</span>
+                    <h2>This repository scored {{ result.score }}.</h2>
+                    <p>Unlock AI founder outreach and paid sprint strategy for this opportunity.</p>
+                    <div class="upgrade-actions">
+                        <a href="/billing/upgrade" class="nav-cta compact">Upgrade to Pro</a>
+                        <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="locked-preview-grid">
+                    <div class="locked-preview-card">
+                        <span class="section-label">Pro</span>
+                        <h3>AI Founder Outreach Pitch</h3>
+                        <p>Generate a concise message for maintainers and founders after your first useful PR.</p>
+                    </div>
+                    <div class="locked-preview-card">
+                        <span class="section-label">Pro</span>
+                        <h3>Paid Sprint Strategy</h3>
+                        <p>Turn repo findings into a focused 48-hour reliability or integration offer.</p>
+                    </div>
+                    <div class="locked-preview-card">
+                        <span class="section-label">Pro</span>
+                        <h3>Follow-up Message</h3>
+                        <p>Prepare the next touchpoint after your contribution gets reviewed or merged.</p>
+                    </div>
+                </div>
+            {% elif current_user.plan == "pro" %}
+                <div class="success-card">
+                    Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.
+                </div>
+            {% endif %}
+
             <div class="report-grid">
                 <div>
 <div class="next-action-card">

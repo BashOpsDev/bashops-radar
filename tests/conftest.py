@@ -69,9 +69,10 @@ def client():
     (no users, no targets) at the start of every test."""
     from starlette.testclient import TestClient
     from database import SessionLocal
-    from models import Target, User
+    from models import Event, Target, User
 
     db = SessionLocal()
+    db.query(Event).delete()
     db.query(Target).delete()
     db.query(User).delete()
     db.commit()

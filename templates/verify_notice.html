@@ -5,20 +5,55 @@
 {% endblock %}
 {% block content %}
 <main>
-    <section class="card">
-        <span class="section-label">Verify Email</span>
-        <h1>Please check your email to verify your account.</h1>
-        <p class="angle">We sent a verification link to {{ email }}. You need to verify your email before logging in.</p>
+    <section class="verify-shell">
+        <div class="verify-main">
+            <span class="section-label">Email Verification</span>
+            <h1>You're almost in</h1>
+            <p class="angle">We sent a verification email to <strong>{{ email }}</strong>. It usually arrives in 30-60 seconds.</p>
 
-        {% if message %}
-        <div class="success-card">{{ message }}</div>
-        {% endif %}
+            {% if message %}
+            <div class="success-card">{{ message }}</div>
+            {% endif %}
 
-        <form method="post" action="/resend-verification" class="auth-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="email" value="{{ email }}">
-            <button type="submit">Resend Verification Email</button>
-        </form>
+            <div class="verify-steps">
+                <div><strong>1</strong><span>Account created</span></div>
+                <div><strong>2</strong><span>Email sent</span></div>
+                <div><strong>3</strong><span>Verify email</span></div>
+                <div><strong>4</strong><span>Analyze first repository</span></div>
+            </div>
+
+            <div class="quick-actions">
+                <a class="nav-cta compact" href="https://mail.google.com/" target="_blank" rel="noopener">Open Gmail</a>
+                <form method="post" action="/resend-verification" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="email" value="{{ email }}">
+                    <button type="submit" class="compact">Resend verification email</button>
+                </form>
+                <a class="nav-outline compact" href="/login">Back to login</a>
+            </div>
+
+            <div class="troubleshooting-card">
+                <h2>Troubleshooting</h2>
+                <ul>
+                    <li>Check spam or junk folders.</li>
+                    <li>Check Gmail Promotions or Updates tabs.</li>
+                    <li>Wait up to 2 minutes for delivery.</li>
+                    <li>Confirm the email address above is correct.</li>
+                </ul>
+            </div>
+        </div>
+
+        <aside class="verify-preview">
+            <span class="section-label">What you'll unlock</span>
+            <h2>Your first opportunity workflow</h2>
+            <ul>
+                <li>Repository analysis</li>
+                <li>Opportunity Score</li>
+                <li>Best First Issue</li>
+                <li>Proof-of-Work Pipeline</li>
+                <li>Pro founder outreach later</li>
+            </ul>
+        </aside>
     </section>
 </main>
 {% endblock %}

@@ -2,17 +2,28 @@
 {% block title %}Email Verification - BashOps Radar{% endblock %}
 {% block extra_head %}
 <meta name="robots" content="noindex">
+{% if success %}
+<meta http-equiv="refresh" content="3;url=/login?verified=true">
+{% endif %}
 {% endblock %}
 {% block content %}
 <main>
-    <section class="card">
+    <section class="card verification-result">
         <span class="section-label">Email Verification</span>
         <h1>{% if success %}Email verified{% else %}Verification failed{% endif %}</h1>
         <p class="angle">{{ message }}</p>
+        {% if success %}
+        <p>You can now log in and analyze your first GitHub repository. Redirecting to login in 3 seconds.</p>
         <div class="quick-actions">
-            <a class="nav-cta" href="/login">Login</a>
-            <a class="nav-outline" href="/contact">Contact Support</a>
+            <a class="nav-cta compact" href="/login?verified=true">Login now</a>
+            <a class="nav-outline compact" href="/">Analyze Repository</a>
         </div>
+        {% else %}
+        <div class="quick-actions">
+            <a class="nav-cta compact" href="/register">Create Account</a>
+            <a class="nav-outline compact" href="/login">Back to Login</a>
+        </div>
+        {% endif %}
     </section>
 </main>
 {% endblock %}

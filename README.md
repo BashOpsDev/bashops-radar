@@ -99,12 +99,25 @@ one uppercase letter, one lowercase letter, and one number. New email/password
 accounts must verify email before login. Password reset links expire after 1
 hour.
 
+Verification and password reset emails are sent through Resend when
+`RESEND_API_KEY` and `EMAIL_FROM` are configured. If email is not configured,
+the app logs the verification/reset link server-side for local testing and
+does not block registration or password reset.
+
 ## Admin
 
 Set `ADMIN_EMAILS` to a comma-separated list of admin account emails.
 
-- `/admin/analytics` shows global analytics.
+- `/admin/analytics` shows event tracking, funnel, referrer, and usage metrics.
 - `/admin/users` shows account, plan, verification, and opt-in totals.
+
+## Event Tracking
+
+BashOps Radar records lightweight first-party events in the database for
+conversion and product analytics, including landing views, pricing views,
+registrations, email verification, analyses, upgrade clicks, checkout starts,
+and checkout completions. Event tracking is best-effort and never blocks core
+application flows.
 
 ## Goal
 

@@ -75,3 +75,16 @@ class Target(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     user = relationship("User", back_populates="targets")
+
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    event_name = Column(String(100), nullable=False, index=True)
+    page = Column(String(500), nullable=True)
+    referrer = Column(String(500), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    metadata_json = Column("metadata", Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

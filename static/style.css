@@ -2366,6 +2366,127 @@ footer {
   text-decoration: none;
 }
 
+.verify-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+    gap: 22px;
+    align-items: stretch;
+}
+
+.verify-main,
+.verify-preview,
+.troubleshooting-card,
+.locked-preview-card {
+    background: rgba(23,28,36,.78);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.verify-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 22px 0;
+}
+
+.verify-steps div {
+    background: #0b1118;
+    border: 1px solid rgba(245,158,11,.25);
+    border-radius: 14px;
+    padding: 14px;
+}
+
+.verify-steps strong {
+    display: block;
+    color: var(--primary);
+    font-size: 22px;
+}
+
+.verify-preview ul,
+.troubleshooting-card ul {
+    color: #cbd5e1;
+    line-height: 1.8;
+    padding-left: 18px;
+}
+
+.inline-form {
+    display: inline-flex;
+    max-width: none;
+}
+
+.inline-upgrade {
+    margin: 24px 0;
+}
+
+.locked-preview-grid,
+.trust-grid,
+.faq-grid,
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+}
+
+.locked-preview-card h3,
+.faq-grid strong,
+.trust-grid strong {
+    display: block;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.locked-preview-card p,
+.faq-grid p,
+.trust-grid span {
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.pricing-trust,
+.pricing-faq {
+    margin-top: 22px;
+}
+
+.analytics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analytics-table-wrap {
+    overflow-x: auto;
+}
+
+.verification-result {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (max-width: 900px) {
+    .verify-shell,
+    .locked-preview-grid,
+    .trust-grid,
+    .faq-grid,
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .verify-steps {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .verify-steps {
+        grid-template-columns: 1fr;
+    }
+
+    .inline-form {
+        width: 100%;
+    }
+}
+
 /* Modern SaaS typography scale */
 body {
     font-size: 16px;
