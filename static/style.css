@@ -2365,3 +2365,186 @@ footer {
   color: #ff8a00;
   text-decoration: none;
 }
+
+/* Modern SaaS typography scale */
+body {
+    font-size: 16px;
+    line-height: 1.55;
+}
+
+main {
+    padding: 22px;
+}
+
+h1,
+h2,
+h3 {
+    letter-spacing: 0;
+}
+
+h1,
+.hero h1,
+.checkout-brand-panel h1 {
+    font-size: clamp(40px, 4.8vw, 48px);
+    line-height: 1.08;
+    margin-bottom: 16px;
+}
+
+.dashboard-hero h1,
+.auth-side h1,
+.pricing h1,
+.card h1,
+.legal-card h1 {
+    font-size: clamp(34px, 4vw, 42px);
+    line-height: 1.12;
+}
+
+h2,
+.workflow h2,
+.features h2,
+.demo h2,
+.pricing h2,
+.social-proof h2,
+.card-flat h2,
+.section-heading-row h2 {
+    font-size: clamp(28px, 3vw, 34px);
+    line-height: 1.18;
+}
+
+.dashboard-plan-card h2,
+.auth-card h2,
+.checkout-status-card h2,
+.opportunity-card h3,
+.next-action-card h3,
+.pipeline-card h3,
+.legal-card h2,
+.pricing-grid h2 {
+    font-size: clamp(22px, 2vw, 24px);
+    line-height: 1.25;
+}
+
+p,
+li,
+input,
+select,
+textarea,
+.hero p,
+.demo p,
+.pricing p,
+.auth-side p,
+.legal-card p,
+.checkout-brand-panel p,
+.checkout-status-card p,
+footer p {
+    font-size: 16px;
+}
+
+.nav-primary,
+.nav-outline,
+.nav-cta,
+button,
+.compact {
+    font-size: 14px !important;
+    padding: 10px 14px;
+    border-radius: 10px;
+}
+
+.nav-inner {
+    padding: 14px 24px;
+}
+
+.nav-menu {
+    gap: 18px;
+}
+
+.nav-center,
+.nav-right {
+    gap: 10px;
+}
+
+.section-label,
+.badge,
+.repo-label,
+.status-badge,
+.plan-chip {
+    font-size: 12px;
+    padding: 7px 11px;
+}
+
+.workflow,
+.demo,
+.features,
+.card,
+.roadmap,
+.pricing,
+.social-proof,
+footer,
+.dashboard-hero,
+.card-flat,
+.checkout-brand-panel,
+.checkout-status-card {
+    padding: 26px;
+    border-radius: 16px;
+}
+
+.metric-card strong,
+.dashboard-box h2,
+.score-number {
+    font-size: clamp(28px, 3vw, 34px);
+}
+
+.demo-score,
+.score {
+    font-size: 38px;
+}
+
+.price {
+    font-size: 24px !important;
+}
+
+@media (max-width: 760px) {
+    main,
+    .dashboard-page {
+        padding: 16px;
+    }
+
+    h1,
+    .hero h1,
+    .checkout-brand-panel h1 {
+        font-size: 38px;
+    }
+
+    .dashboard-hero h1,
+    .auth-side h1,
+    .pricing h1,
+    .card h1,
+    .legal-card h1 {
+        font-size: 32px;
+    }
+
+    h2,
+    .workflow h2,
+    .features h2,
+    .demo h2,
+    .pricing h2,
+    .social-proof h2,
+    .card-flat h2,
+    .section-heading-row h2 {
+        font-size: 28px;
+    }
+
+    .workflow,
+    .demo,
+    .features,
+    .card,
+    .roadmap,
+    .pricing,
+    .social-proof,
+    footer,
+    .dashboard-hero,
+    .card-flat,
+    .checkout-brand-panel,
+    .checkout-status-card {
+        padding: 20px;
+    }
+}
