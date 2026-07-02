@@ -14,6 +14,7 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 import requests
 
@@ -901,10 +902,42 @@ def admin_event_summary() -> dict:
         "checkout_completed",
     ]
 
+    def empty_summary(db: Session) -> dict:
+        def safe_count(query) -> int:
+            try:
+                return query.count()
+            except SQLAlchemyError:
+                db.rollback()
+                return 0
+
+        return {
+            "cards": [
+                {"label": "Visitors / Events Today", "value": 0},
+                {"label": "Registrations Today", "value": 0},
+                {"label": "Verified Users", "value": safe_count(db.query(User).filter(User.email_verified.is_(True)))},
+                {"label": "Analyses Today", "value": 0},
+                {"label": "Upgrade Clicks Today", "value": 0},
+                {"label": "Checkout Starts Today", "value": 0},
+                {"label": "Checkout Completions Today", "value": 0},
+                {"label": "Free Users", "value": safe_count(db.query(User).filter(User.plan == "free"))},
+                {"label": "Pro Users", "value": safe_count(db.query(User).filter(User.plan == "pro"))},
+            ],
+            "recent_events": [],
+            "top_events": [],
+            "top_referrers": [],
+            "top_repositories": [],
+            "funnel": [{"name": name, "count": 0} for name in funnel_names],
+        }
+
     db: Session = SessionLocal()
     try:
-        events_today = db.query(Event).filter(Event.created_at >= today).all()
-        all_events = db.query(Event).order_by(Event.created_at.desc()).limit(50).all()
+        try:
+            events_today = db.query(Event).filter(Event.created_at >= today).all()
+            all_events = db.query(Event).order_by(Event.created_at.desc()).limit(50).all()
+        except SQLAlchemyError as e:
+            db.rollback()
+            print(f"[/admin/analytics event query unavailable] {e.__class__.__name__}")
+            return empty_summary(db)
 
         def count_today(name: str) -> int:
             return sum(1 for event in events_today if event.event_name == name)
@@ -935,7 +968,7 @@ def admin_event_summary() -> dict:
 
         return {
             "cards": [
-                {"label": "Events Today", "value": len(events_today)},
+                {"label": "Visitors / Events Today", "value": len(events_today)},
                 {"label": "Registrations Today", "value": count_today("register_submitted")},
                 {"label": "Verified Users", "value": db.query(User).filter(User.email_verified.is_(True)).count()},
                 {"label": "Analyses Today", "value": count_today("analysis_completed")},
