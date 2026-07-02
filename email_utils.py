@@ -1,31 +1,41 @@
-import smtplib
-from email.message import EmailMessage
+import requests
 
 import config
 
 
+RESEND_EMAILS_URL = "https://api.resend.com/emails"
+
+
 def _sender() -> str:
-    if config.SMTP_FROM_NAME:
-        return f"{config.SMTP_FROM_NAME} <{config.SMTP_FROM_EMAIL}>"
-    return config.SMTP_FROM_EMAIL
+    if config.EMAIL_FROM_NAME:
+        return f"{config.EMAIL_FROM_NAME} <{config.EMAIL_FROM}>"
+    return config.EMAIL_FROM
 
 
 def send_email(to_email: str, subject: str, body: str) -> bool:
-    if not config.smtp_configured:
+    if not config.email_configured:
         print(f"[email disabled] {subject} for {to_email}: {body}")
         return False
 
-    message = EmailMessage()
-    message["From"] = _sender()
-    message["To"] = to_email
-    message["Subject"] = subject
-    message.set_content(body)
+    payload = {
+        "from": _sender(),
+        "to": [to_email],
+        "subject": subject,
+        "text": body,
+    }
+    headers = {
+        "Authorization": f"Bearer {config.RESEND_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
     try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=10) as smtp:
-            smtp.starttls()
-            smtp.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
-            smtp.send_message(message)
+        response = requests.post(RESEND_EMAILS_URL, json=payload, headers=headers, timeout=10)
+        if response.status_code >= 400:
+            print(
+                f"[email send failed] {subject} for {to_email}: "
+                f"resend_status={response.status_code} body={response.text[:500]!r}"
+            )
+            return False
         return True
     except Exception as exc:
         print(f"[email send failed] {subject} for {to_email}: {exc!r}")

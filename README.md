@@ -84,11 +84,10 @@ directory — they never touch your real `DATABASE_URL`.
   `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENV`) enables the Pro upgrade flow.
   Until `PADDLE_CLIENT_TOKEN` and `PADDLE_PRICE_ID` are set, the upgrade
   button shows a clear "not configured" message rather than a broken checkout.
-- **SMTP email** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
-  `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`) enables email
-  verification and password reset delivery. If SMTP is missing, registration
-  and reset requests do not crash; the verification/reset link is logged
-  server-side for local testing.
+- **Resend email** (`RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`)
+  enables email verification and password reset delivery. If Resend is
+  missing, registration and reset requests do not crash; the verification/reset
+  link is logged server-side for local testing.
 - **GitHub OAuth** (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
   `GITHUB_OAUTH_REDIRECT_URI`) enables "Continue with GitHub". Use
   `https://bashops.site/auth/github/callback` as the production callback.

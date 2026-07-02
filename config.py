@@ -21,14 +21,11 @@ PADDLE_ENV = os.getenv("PADDLE_ENV", "production")
 
 paddle_configured = bool(PADDLE_CLIENT_TOKEN and PADDLE_PRICE_ID)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT") or "587")
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "")
-SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "BashOps Radar")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "BashOps Radar")
 
-smtp_configured = bool(SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD and SMTP_FROM_EMAIL)
+email_configured = bool(RESEND_API_KEY and EMAIL_FROM)
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
