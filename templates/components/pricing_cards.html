@@ -24,7 +24,7 @@
             <li>CSV export</li>
             <li>Daily briefing and paid sprint planning</li>
         </ul>
-        {% if current_user and current_user.plan == "pro" %}
+        {% if has_pro_access %}
         <a class="nav-cta compact" href="/dashboard">Open Dashboard</a>
         <a class="nav-outline compact" href="/billing/manage">Manage Billing</a>
         {% else %}

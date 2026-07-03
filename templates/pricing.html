@@ -18,7 +18,7 @@
         <div class="error">{{ billing_error }}</div>
         {% endif %}
 
-        {% if current_user and current_user.plan == "pro" %}
+        {% if has_pro_access %}
         <div class="success-card">
             You're on Pro.
         </div>

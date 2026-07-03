@@ -156,6 +156,17 @@ def is_admin(user) -> bool:
     return bool(user and user.email and user.email.strip().lower() in config.ADMIN_EMAILS)
 
 
+def has_owner_pro_override(user) -> bool:
+    if not user or not user.email:
+        return False
+    email = user.email.strip().lower()
+    return email == "bashops1@gmail.com" or email in config.ADMIN_EMAILS
+
+
+def has_pro_access(user) -> bool:
+    return bool(user and (user.plan == "pro" or has_owner_pro_override(user)))
+
+
 def require_admin_or_redirect(request: Request, current_user):
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
@@ -172,7 +183,13 @@ def user_context(request: Request, current_user=None) -> dict:
     navbar to render the right links."""
     if current_user is None:
         current_user = get_current_user(request)
-    return {"current_user": current_user, "is_admin": is_admin(current_user)}
+    pro_access = has_pro_access(current_user)
+    return {
+        "current_user": current_user,
+        "is_admin": is_admin(current_user),
+        "has_pro_access": pro_access,
+        "effective_plan": "pro" if pro_access else "free",
+    }
 
 
 def csrf_context(request: Request) -> dict:
@@ -1106,7 +1123,7 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
 
         if current_user:
             count = daily_analysis_count(user_id=current_user.id)
-            over_limit = current_user.plan == "free" and count >= FREE_ANALYSIS_LIMIT
+            over_limit = not has_pro_access(current_user) and count >= FREE_ANALYSIS_LIMIT
         else:
             count = daily_analysis_count(ip=ip)
             over_limit = count >= FREE_ANALYSIS_LIMIT
@@ -1273,7 +1290,7 @@ def dashboard(request: Request):
     summary = analytics_summary(user_id=current_user.id)
     analyses_used_today = daily_analysis_count(user_id=current_user.id)
     analyses_remaining = None
-    if current_user.plan == "free":
+    if not has_pro_access(current_user):
         analyses_remaining = max(FREE_ANALYSIS_LIMIT - analyses_used_today, 0)
 
     return templates.TemplateResponse(
@@ -1327,7 +1344,7 @@ def pitch_preview(
             context={**summary, **user_context(request, current_user), **csrf_context(request)},
         )
 
-    is_pro = current_user.plan == "pro"
+    is_pro = has_pro_access(current_user)
     pitch = generate_pitch(repo, best_issue) if is_pro else fallback_pitch(repo, best_issue)
 
     # Only persist (and only "spend" a Gemini call on) pitches for Pro

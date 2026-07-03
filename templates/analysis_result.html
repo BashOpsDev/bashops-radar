@@ -113,7 +113,7 @@
                 <div><strong>{{ result.open_issues }}</strong><span>Open Issues</span></div>
             </div>
 
-            {% if not current_user or current_user.plan == "free" %}
+            {% if not has_pro_access %}
                 {% if result.score >= 70 %}
                 <div class="upgrade-card inline-upgrade">
                     <span class="section-label">Pro Opportunity</span>
@@ -125,7 +125,7 @@
                     </div>
                 </div>
                 {% endif %}
-            {% elif current_user.plan == "pro" %}
+            {% elif has_pro_access %}
             <div class="success-card">Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.</div>
             {% endif %}
 
@@ -183,7 +183,7 @@
                 </section>
             </div>
 
-            {% if not current_user or current_user.plan == "free" %}
+            {% if not has_pro_access %}
             <div class="locked-preview-grid">
                 <div class="locked-preview-card">
                     <span class="section-label">Pro</span>

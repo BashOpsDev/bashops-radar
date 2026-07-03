@@ -11,10 +11,10 @@
             <h1>Good morning, {{ current_user.name or current_user.email }}</h1>
             <p>Your Proof-of-Work command center.</p>
             <div class="dashboard-hero-meta">
-                <span class="plan-chip {% if current_user.plan == 'pro' %}pro{% endif %}">
-                    {{ "Pro Plan" if current_user.plan == "pro" else "Free Plan" }}
+                <span class="plan-chip {% if has_pro_access %}pro{% endif %}">
+                    {{ "Pro Plan" if has_pro_access else "Free Plan" }}
                 </span>
-                {% if current_user.plan == "pro" %}
+                {% if has_pro_access %}
                 <span>Unlimited analyses available.</span>
                 {% else %}
                 <span>{{ analyses_remaining }} analyses remaining today.</span>
@@ -23,7 +23,7 @@
         </div>
 
         <div class="dashboard-plan-card">
-            {% if current_user.plan == "pro" %}
+            {% if has_pro_access %}
             <span class="section-label">Pro Plan Active</span>
             <h2>Unlimited opportunity intelligence</h2>
             <ul>
@@ -83,7 +83,7 @@
                 <span>📂 My Pipeline</span>
                 <strong>Review targets</strong>
             </a>
-            {% if current_user.plan == "pro" %}
+            {% if has_pro_access %}
             <a href="/billing/manage" class="action-card">
                 <span>⭐ Manage Billing</span>
                 <strong>Subscription help</strong>
