@@ -1,0 +1,53 @@
+name: BashOps Radar
+description: Find GitHub issues with the highest potential to become paid proof-of-work opportunities.
+author: BashOps Radar
+
+branding:
+  icon: target
+  color: orange
+
+inputs:
+  repo_url:
+    description: GitHub repository URL to analyze.
+    required: true
+  issue_number:
+    description: Optional issue number to prioritize in the analysis.
+    required: false
+    default: ""
+  bashops_api_url:
+    description: BashOps Radar API endpoint.
+    required: false
+    default: https://bashops.site/api/v1/analyze
+  github_token:
+    description: Optional GitHub token used only when posting an issue comment.
+    required: false
+    default: ""
+  comment:
+    description: Post a BashOps Radar summary comment on the issue when issue_number and github_token are provided.
+    required: false
+    default: "false"
+
+outputs:
+  opportunity_score:
+    description: BashOps Radar opportunity score from 0 to 100.
+    value: ${{ steps.radar.outputs.opportunity_score }}
+  contract_potential:
+    description: Estimated paid sprint or contract potential.
+    value: ${{ steps.radar.outputs.contract_potential }}
+  recommended_next_action:
+    description: Recommended proof-of-work next action.
+    value: ${{ steps.radar.outputs.recommended_next_action }}
+
+runs:
+  using: composite
+  steps:
+    - id: radar
+      name: Run BashOps Radar
+      shell: bash
+      env:
+        INPUT_REPO_URL: ${{ inputs.repo_url }}
+        INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
+        INPUT_BASHOPS_API_URL: ${{ inputs.bashops_api_url }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+      run: python "$GITHUB_ACTION_PATH/src/main.py"

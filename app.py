@@ -37,7 +37,7 @@ from analytics import (
 )
 import paddle_billing
 import email_utils
-from radar import get_analysis, decision, recommend_angle
+from analysis_service import build_analysis_result, to_public_api_payload
 import config
 
 try:
@@ -1144,80 +1144,19 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
             )
 
         track_event(request, "analysis_started", user=current_user, metadata={"repo_url": repo_url})
-        owner, repo_name, repo, languages, issue_rankings, repo_score, language_badge = get_analysis(repo_url)
-
-        best_issue = None
-        if issue_rankings:
-            score, issue_type, issue = issue_rankings[0]
-            best_issue = {
-                "number": issue.get("number"),
-                "title": issue.get("title"),
-                "url": issue.get("html_url"),
-                "score": score,
-                "type": issue_type,
-            }
-
-        recommended_action = "Analyze another repository"
-        if best_issue:
-            recommended_action = f"Start with #{best_issue['number']} - {best_issue['title']}"
-
-        angle = recommend_angle(languages)
+        result = build_analysis_result(repo_url)
+        best_issue = result.get("best_issue")
 
         ai_summary = generate_ai_summary(
-            repo_full_name=f"{owner}/{repo_name}",
-            repo=repo,
+            repo_full_name=result["repo"],
+            repo=result["repo_data"],
             best_issue=best_issue,
-            repo_score=repo_score,
-            angle=angle,
+            repo_score=result["score"],
+            angle=result["angle"],
         )
 
-        result = {
-            "repo": f"{owner}/{repo_name}",
-            "repo_url": repo_url,
-            "language": language_badge,
-            "website": repo.get("homepage") or "Not found",
-            "github": repo.get("html_url"),
-            "description": repo.get("description"),
-            "stars": repo.get("stargazers_count"),
-            "forks": repo.get("forks_count"),
-            "open_issues": repo.get("open_issues_count"),
-            "last_push": repo.get("pushed_at"),
-            "score": repo_score,
-            "score_label": (
-                "Excellent"
-                if repo_score >= 90
-                else "Strong"
-                if repo_score >= 80
-                else "Moderate"
-                if repo_score >= 60
-                else "Weak"
-            ),
-            "score_action": (
-                "CONTRIBUTE NOW"
-                if repo_score >= 85
-                else "INSPECT MANUALLY"
-                if repo_score >= 60
-                else "SKIP FOR NOW"
-            ),
-            "merge_probability": (
-                "High"
-                if repo_score >= 85
-                else "Medium"
-                if repo_score >= 60
-                else "Low"
-            ),
-            "estimated_time": "2-4 hours" if repo_score >= 85 else "4-8 hours",
-            "difficulty": "Medium",
-            "decision": decision(repo_score),
-            "angle": angle,
-            "ai_summary": ai_summary["text"],
-            "ai_status": ai_summary["status"],
-            "best_issue": best_issue,
-            "recommended_action": recommended_action,
-            "recommended_outcome": "Submit one focused PR, build trust, then pitch a 48-hour sprint.",
-            "issues": issue_rankings[:8],
-            "languages": languages,
-        }
+        result["ai_summary"] = ai_summary["text"]
+        result["ai_status"] = ai_summary["status"]
 
         track_analysis(
             repo=result["repo"],
@@ -1278,6 +1217,94 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
                 **csrf_context(request),
             },
         )
+
+
+@app.post("/api/v1/analyze")
+async def api_analyze(request: Request):
+    current_user = get_current_user(request)
+    ip = request.client.host if request.client else "unknown"
+    site_url = config.SITE_URL.rstrip("/")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON payload."}, status_code=400)
+
+    repo_url = (payload.get("repo_url") or "").strip()
+    issue_number = payload.get("issue_number")
+    if not repo_url:
+        return JSONResponse({"error": "repo_url is required."}, status_code=400)
+
+    if current_user:
+        count = daily_analysis_count(user_id=current_user.id)
+        over_limit = not has_pro_access(current_user) and count >= FREE_ANALYSIS_LIMIT
+    else:
+        count = daily_analysis_count(ip=ip)
+        over_limit = count >= FREE_ANALYSIS_LIMIT
+
+    if over_limit:
+        return JSONResponse(
+            {
+                "error": "Free analysis limit reached.",
+                "upgrade_url": f"{site_url}/pricing",
+            },
+            status_code=429,
+        )
+
+    client_name = request.headers.get("X-BashOps-Client", "").strip().lower()
+    event_prefix = "github_action" if client_name == "github-action" else "api"
+    track_event(
+        request,
+        f"{event_prefix}_analysis_started",
+        user=current_user,
+        metadata={"repo_url": repo_url},
+    )
+
+    try:
+        result = build_analysis_result(repo_url, issue_number=issue_number)
+        response_payload = to_public_api_payload(result, site_url)
+
+        try:
+            best_issue = result.get("best_issue")
+            track_analysis(
+                repo=result["repo"],
+                repo_url=result["repo_url"],
+                score=result["score"],
+                best_issue=f"#{best_issue['number']}" if best_issue else "",
+                best_issue_url=best_issue["url"] if best_issue else "",
+                request=request,
+                user_id=current_user.id if current_user else None,
+                language=result.get("language", "Unknown"),
+                stars=result.get("stars", 0),
+                forks=result.get("forks", 0),
+                open_issues=result.get("open_issues", 0),
+            )
+        except Exception as e:
+            print(f"[/api/v1/analyze tracking error] {e!r}")
+
+        track_event(
+            request,
+            f"{event_prefix}_analysis_completed",
+            user=current_user,
+            metadata={"repo": result["repo"], "score": result["score"]},
+        )
+        return response_payload
+    except Exception as e:
+        print(f"[/api/v1/analyze error] {e!r}")
+        error_text = str(e)
+        safe_prefixes = (
+            "Please provide a valid",
+            "GitHub API rate limit",
+            "GitHub API timed out",
+            "Could not connect to GitHub API",
+        )
+        message = (
+            error_text
+            if error_text.startswith(safe_prefixes)
+            else "Something went wrong analyzing that repository. Please check the URL and try again."
+        )
+        status_code = 429 if "rate limit" in error_text.lower() else 400
+        return JSONResponse({"error": message}, status_code=status_code)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)

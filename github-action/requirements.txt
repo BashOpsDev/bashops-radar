@@ -1,0 +1,1 @@
+# BashOps Radar GitHub Action v1 uses only the Python standard library.
