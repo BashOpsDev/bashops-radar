@@ -8,9 +8,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - id: radar
-        name: Run BashOps Radar
-        uses: BashOpsDev/bashops-radar/github-action@main
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run BashOps Radar
+        id: radar
+        uses: ./github-action
         with:
           repo_url: https://github.com/sourcebot-dev/sourcebot
           comment: false
