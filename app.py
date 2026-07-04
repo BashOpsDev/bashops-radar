@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import secrets
 from pathlib import Path
 from datetime import datetime, timezone
@@ -79,6 +80,22 @@ if GEMINI_API_KEY and genai:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
+def clean_ai_summary_text(text: str) -> str:
+    """Keep model output readable in the HTML card without touching GitHub data."""
+    if not text:
+        return "AI summary temporarily unavailable."
+
+    cleaned = text.strip()
+    cleaned = re.sub(r"^\s*#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*[-*]\s+", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"__(.*?)__", r"\1", cleaned)
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+    cleaned = cleaned.replace("**", "").replace("__", "")
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip() or "AI summary temporarily unavailable."
+
+
 def generate_ai_summary(repo_full_name, repo, best_issue, repo_score, angle):
     if not GEMINI_API_KEY or not genai:
         return {
@@ -107,13 +124,14 @@ Opportunity Score: {repo_score}/100
 Best Issue: {issue_text}
 Proof-of-Work Angle: {angle}
 
-Write a concise analysis with:
-1. Why this repo is worth or not worth contributing to
-2. Why the best issue is a good first target
-3. How the developer should approach the PR
-4. Whether this could lead to a paid sprint
+Write a concise plain-text analysis that covers:
+Why this repo is worth or not worth contributing to.
+Why the best issue is a good first target.
+How the developer should approach the PR.
+Whether this could lead to a paid sprint.
 
 Keep it practical, direct, and under 180 words.
+Do not use Markdown, headings, bold markers, bullets, numbered lists, or code formatting.
 """
 
     try:
@@ -121,7 +139,7 @@ Keep it practical, direct, and under 180 words.
         response = model.generate_content(prompt)
 
         return {
-            "text": response.text.strip() if response.text else "AI summary temporarily unavailable.",
+            "text": clean_ai_summary_text(response.text) if response.text else "AI summary temporarily unavailable.",
             "status": "available",
         }
 
@@ -1199,6 +1217,7 @@ def analyze(
                     "result": None,
                     "error": "Your session expired. Please try again.",
                     "limit_reached": False,
+                    "from_discover": source == "discover",
                     "site_url": config.SITE_URL,
                     "pro_price": config.PRO_PRICE_USD,
                     **user_context(request, current_user),
@@ -1229,6 +1248,7 @@ def analyze(
                     "result": None,
                     "error": None,
                     "limit_reached": True,
+                    "from_discover": source == "discover",
                     "site_url": config.SITE_URL,
                     "pro_price": config.PRO_PRICE_USD,
                     **user_context(request, current_user),
@@ -1278,6 +1298,7 @@ def analyze(
                 "result": result,
                 "error": None,
                 "limit_reached": False,
+                "from_discover": source == "discover",
                 "site_url": config.SITE_URL,
                 "pro_price": config.PRO_PRICE_USD,
                 **user_context(request, current_user),
@@ -1304,6 +1325,7 @@ def analyze(
                 "result": None,
                 "error": message,
                 "limit_reached": False,
+                "from_discover": source == "discover",
                 "site_url": config.SITE_URL,
                 "pro_price": config.PRO_PRICE_USD,
                 **user_context(request, current_user),

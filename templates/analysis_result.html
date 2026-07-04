@@ -113,6 +113,18 @@
                 <div><strong>{{ result.open_issues }}</strong><span>Open Issues</span></div>
             </div>
 
+            {% if from_discover %}
+            <div class="discover-return-bar">
+                <div>
+                    <strong>Not the right target?</strong>
+                    <span>Return to the Opportunity Finder results and analyze another candidate.</span>
+                </div>
+                <a href="/discover" class="nav-outline compact" onclick="if (window.history.length > 1) { window.history.back(); return false; }">
+                    Back to Opportunity Finder
+                </a>
+            </div>
+            {% endif %}
+
             {% if not has_pro_access %}
                 {% if result.score >= 70 %}
                 <div class="upgrade-card inline-upgrade">
@@ -145,6 +157,9 @@
                         <form method="post" action="/analyze" class="analysis-retry-form">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input type="hidden" name="repo_url" value="{{ result.repo_url }}">
+                            {% if from_discover %}
+                            <input type="hidden" name="source" value="discover">
+                            {% endif %}
                             <button type="submit" class="retry-btn">Retry AI Summary</button>
                         </form>
                         {% endif %}
@@ -200,6 +215,11 @@
                     <h3>Follow-up Message</h3>
                     <p>Prepare the next touchpoint after your contribution gets reviewed or merged.</p>
                 </div>
+                <div class="locked-preview-card">
+                    <span class="section-label">Pro</span>
+                    <h3>Opportunity Finder</h3>
+                    <p>Discover promising repositories and issues without manual GitHub searching.</p>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -213,6 +233,11 @@
                 <div><strong>Goal</strong><span>Move one repository to Founder Contacted.</span></div>
             </div>
             <div class="quick-actions">
+                {% if from_discover %}
+                <a href="/discover" class="nav-outline compact" onclick="if (window.history.length > 1) { window.history.back(); return false; }">
+                    Back to Finder
+                </a>
+                {% endif %}
                 <a href="/" class="nav-outline compact">Analyze Another</a>
                 <a href="/pipeline" class="nav-cta compact">Open Pipeline</a>
             </div>
