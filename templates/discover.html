@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Pro Opportunity Finder - BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block content %}
+<main class="discover-page">
+    <section class="discover-hero card-flat">
+        <div>
+            <span class="section-label">Pro Opportunity Finder</span>
+            <h1>Discover promising repositories before you analyze.</h1>
+            <p>
+                Free lets you analyze repos you already know. Pro helps you discover
+                the best opportunities before anyone else.
+            </p>
+        </div>
+        <div class="discover-hero-card">
+            <strong>Built for Pro</strong>
+            <span>Category presets, GitHub issue signals, quick metadata scoring, and one-click analysis.</span>
+        </div>
+    </section>
+
+    <section class="finder-shell card-flat">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">Search Presets</span>
+                <h2>Find narrow proof-of-work targets</h2>
+                <p>Opportunity Finder uses recent GitHub issue and repository signals. Full analysis runs only when you choose a repo.</p>
+            </div>
+            {% if not can_run_discovery %}
+            <a class="nav-cta compact" href="/billing/upgrade">Upgrade to Pro</a>
+            {% endif %}
+        </div>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if can_run_discovery %}
+        <form method="post" action="/discover" class="finder-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label for="category">Category</label>
+            <select id="category" name="category">
+                {% for option in categories %}
+                <option value="{{ option.value }}" {% if option.value == selected_category %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Find Opportunities</button>
+        </form>
+        {% else %}
+        <div class="finder-locked">
+            <div>
+                <strong>Free plan</strong>
+                <span>Analyze repositories you already know.</span>
+            </div>
+            <div>
+                <strong>Pro plan</strong>
+                <span>Discover promising repositories and issues without manual GitHub searching.</span>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if results %}
+    <section class="finder-results">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">Results</span>
+                <h2>Recommended opportunities</h2>
+            </div>
+            <span class="result-count">{{ results|length }} matches</span>
+        </div>
+
+        <div class="finder-grid">
+            {% for result in results %}
+            <article class="finder-card">
+                <div class="finder-card-top">
+                    <div>
+                        <span class="repo-label">Repository</span>
+                        <h3><a href="{{ result.repo_url }}" target="_blank" rel="noopener">{{ result.repo }}</a></h3>
+                    </div>
+                    <div class="score-pill">{{ result.score }}<small>/100</small></div>
+                </div>
+
+                <div class="finder-meta">
+                    <span>{{ result.stars }} stars</span>
+                    <span>{{ result.open_issues }} open issues</span>
+                    <span>Updated {{ result.last_pushed_display or "unavailable" }}</span>
+                    <span>{{ result.contract_potential }} potential</span>
+                </div>
+
+                <div class="finder-issue">
+                    <strong>{{ result.issue_title }}</strong>
+                    {% if result.issue_url %}
+                    <a href="{{ result.issue_url }}" target="_blank" rel="noopener">Open issue</a>
+                    {% endif %}
+                </div>
+
+                <div class="why-list">
+                    <span>Why it matched</span>
+                    <ul>
+                        {% for reason in result.why_matched %}
+                        <li>{{ reason }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <form method="post" action="/analyze" class="finder-analyze-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="repo_url" value="{{ result.repo_url }}">
+                    <input type="hidden" name="source" value="discover">
+                    <button type="submit" class="nav-cta compact">Analyze This Repo</button>
+                </form>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

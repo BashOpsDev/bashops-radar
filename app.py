@@ -38,6 +38,7 @@ from analytics import (
 import paddle_billing
 import email_utils
 from analysis_service import build_analysis_result, to_public_api_payload
+from discovery_service import DiscoveryError, category_options, discover_opportunities
 import config
 
 try:
@@ -420,6 +421,85 @@ def pricing(request: Request):
             "billing_error": None,
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
+        },
+    )
+
+
+@app.get("/discover", response_class=HTMLResponse)
+def discover(request: Request):
+    current_user = get_current_user(request)
+    can_run_discovery = has_pro_access(current_user)
+    track_event(
+        request,
+        "discover_view",
+        user=current_user,
+        metadata={"access": "pro" if can_run_discovery else "free"},
+    )
+    categories = category_options()
+    return templates.TemplateResponse(
+        request=request,
+        name="discover.html",
+        context={
+            "categories": categories,
+            "selected_category": categories[0]["value"],
+            "results": [],
+            "error": None,
+            "can_run_discovery": can_run_discovery,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.post("/discover", response_class=HTMLResponse)
+def discover_submit(
+    request: Request,
+    category: str = Form("python-fastapi"),
+    csrf_token: str = Form(""),
+):
+    current_user = get_current_user(request)
+    can_run_discovery = has_pro_access(current_user)
+    categories = category_options()
+    category_values = {item["value"] for item in categories}
+    selected_category = category if category in category_values else categories[0]["value"]
+    results = []
+    error = None
+
+    if not check_csrf(request, csrf_token):
+        error = "Your session expired. Please try again."
+    elif not can_run_discovery:
+        error = "Upgrade to Pro to run Opportunity Finder."
+    else:
+        try:
+            payload = discover_opportunities(selected_category, limit=8)
+            results = payload["results"]
+            track_event(
+                request,
+                "discover_run",
+                user=current_user,
+                metadata={"category": selected_category, "result_count": len(results)},
+            )
+            if not results:
+                error = "No strong matches found for that category yet. Try another category."
+        except DiscoveryError as exc:
+            error = str(exc)
+        except Exception as exc:
+            print(f"[/discover error] {exc!r}")
+            error = "Opportunity Finder is temporarily unavailable. Please try again."
+
+    return templates.TemplateResponse(
+        request=request,
+        name="discover.html",
+        context={
+            "categories": categories,
+            "selected_category": selected_category,
+            "results": results,
+            "error": error,
+            "can_run_discovery": can_run_discovery,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+            **csrf_context(request),
         },
     )
 
@@ -1101,7 +1181,12 @@ def pipeline(request: Request):
 
 
 @app.post("/analyze", response_class=HTMLResponse)
-def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form("")):
+def analyze(
+    request: Request,
+    repo_url: str = Form(...),
+    csrf_token: str = Form(""),
+    source: str = Form(""),
+):
     current_user = get_current_user(request)
     ip = request.client.host if request.client else "unknown"
 
@@ -1119,6 +1204,14 @@ def analyze(request: Request, repo_url: str = Form(...), csrf_token: str = Form(
                     **user_context(request, current_user),
                     **csrf_context(request),
                 },
+            )
+
+        if source == "discover":
+            track_event(
+                request,
+                "discover_result_clicked",
+                user=current_user,
+                metadata={"repo_url": repo_url},
             )
 
         if current_user:
