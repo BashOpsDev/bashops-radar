@@ -1,0 +1,19 @@
+name: BashOps Radar Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run BashOps Radar
+        uses: BashOpsDev/bashops-radar/github-action@main
+        with:
+          repo_url: https://github.com/sourcebot-dev/sourcebot
+          comment: false
+
+      - name: Show Outputs
+        run: |
+          echo "Action completed."
