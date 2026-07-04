@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Run BashOps Radar
+      - id: radar
+        name: Run BashOps Radar
         uses: BashOpsDev/bashops-radar/github-action@main
         with:
           repo_url: https://github.com/sourcebot-dev/sourcebot
@@ -16,4 +17,6 @@ jobs:
 
       - name: Show Outputs
         run: |
-          echo "Action completed."
+          echo "Opportunity Score: ${{ steps.radar.outputs.opportunity_score }}"
+          echo "Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
+          echo "Recommended Next Action: ${{ steps.radar.outputs.recommended_next_action }}"
