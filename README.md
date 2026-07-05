@@ -1,10 +1,38 @@
 # BashOps Radar
 
-Turn GitHub contributions into paid developer opportunities with AI-powered repository analysis.
+Stop contributing to the wrong repositories.
 
-BashOps Radar helps developers, freelancers, and technical founders find open-source repositories where a focused proof-of-work contribution can become founder outreach, a paid sprint conversation, or a repeatable client acquisition workflow.
+BashOps Radar helps developers identify GitHub repositories where a well-chosen contribution has the highest chance of leading to founder conversations, paid sprint work, or long-term contracts.
+
+Instead of guessing where to contribute, BashOps Radar helps you choose opportunities with intention.
 
 Website: [https://bashops.site](https://bashops.site)
+
+## The Problem
+
+Thousands of developers contribute to open source every day.
+
+Most choose repositories randomly.
+
+Many spend days on pull requests that never receive attention.
+
+BashOps Radar helps answer one question before you write code:
+
+```text
+Is this repository worth my time?
+```
+
+## The Workflow
+
+```text
+Choose Repository
+-> Analyze Opportunity
+-> Find Best First Issue
+-> Submit Proof-of-Work
+-> Start Founder Conversation
+-> Paid Sprint
+-> Retainer
+```
 
 ## What It Does
 
@@ -17,21 +45,24 @@ BashOps Radar analyzes a GitHub repository and returns:
 - Founder outreach direction
 - Pipeline tracking from repository analysis to paid sprint
 
-Free users can analyze repositories they already know. Pro users can also use the Pro Opportunity Finder to discover promising repositories and issues without manual GitHub searching.
+**Free:** analyze repositories you already know.
 
-## Why It Exists
-
-Most open-source contribution is random.
-
-Developers often pick a repository, choose an issue, submit a pull request, and hope the work leads somewhere. Sometimes it helps their portfolio. Sometimes it is ignored. Sometimes it turns into nothing.
-
-BashOps Radar makes that workflow more intentional:
-
-```text
-Repository Analysis -> Opportunity Score -> Best Issue -> Pipeline -> Founder Pitch -> Paid Sprint
-```
+**Pro:** discover repositories worth contributing to before anyone else.
 
 The goal is not to guarantee paid work. The goal is to help developers spend time on better repositories, build trust through useful contributions, and create stronger context for paid follow-up.
+
+## Works Everywhere
+
+- Website
+- Public API
+- GitHub Action
+
+Future surfaces:
+
+- CLI
+- MCP
+- VS Code extension
+- Browser extension
 
 ## Product Surfaces
 
@@ -89,7 +120,7 @@ Action documentation: [github-action/README.md](github-action/README.md)
 - Issue ranking
 - Pro Opportunity Finder
 - User-scoped dashboard and pipeline
-- AI opportunity summary
+- Opportunity summary
 - Pro-gated founder outreach generation
 - Public API
 - GitHub Action
@@ -208,7 +239,7 @@ Use Railway environment variables for all secrets. Do not commit `.env`.
 Suggested public repository description:
 
 ```text
-Turn GitHub contributions into paid developer opportunities with AI-powered repository analysis.
+Turn GitHub contributions into paid developer opportunities with proof-of-work intelligence.
 ```
 
 Suggested GitHub topics:
