@@ -1,125 +1,229 @@
 # BashOps Radar
 
-A startup opportunity intelligence tool that analyzes GitHub repositories
-and identifies Proof-of-Work opportunities: open issues, activity, tech
-stack, an opportunity score, the best first issue, and an AI-generated
-founder outreach pitch.
+Turn GitHub contributions into paid developer opportunities with AI-powered repository analysis.
 
-## Setup
+BashOps Radar helps developers, freelancers, and technical founders find open-source repositories where a focused proof-of-work contribution can become founder outreach, a paid sprint conversation, or a repeatable client acquisition workflow.
+
+Website: [https://bashops.site](https://bashops.site)
+
+## What It Does
+
+BashOps Radar analyzes a GitHub repository and returns:
+
+- Opportunity score from 0-100
+- Best issue to start with
+- Merge and contract potential signals
+- Proof-of-work angle
+- Founder outreach direction
+- Pipeline tracking from repository analysis to paid sprint
+
+Free users can analyze repositories they already know. Pro users can also use the Pro Opportunity Finder to discover promising repositories and issues without manual GitHub searching.
+
+## Why It Exists
+
+Most open-source contribution is random.
+
+Developers often pick a repository, choose an issue, submit a pull request, and hope the work leads somewhere. Sometimes it helps their portfolio. Sometimes it is ignored. Sometimes it turns into nothing.
+
+BashOps Radar makes that workflow more intentional:
+
+```text
+Repository Analysis -> Opportunity Score -> Best Issue -> Pipeline -> Founder Pitch -> Paid Sprint
+```
+
+The goal is not to guarantee paid work. The goal is to help developers spend time on better repositories, build trust through useful contributions, and create stronger context for paid follow-up.
+
+## Product Surfaces
+
+### Website
+
+Use the hosted web app to analyze repositories, manage a pipeline, and discover Pro opportunities:
+
+[https://bashops.site](https://bashops.site)
+
+### Public API
+
+Analyze a repository from scripts, tools, or workflows:
+
+```http
+POST https://bashops.site/api/v1/analyze
+Content-Type: application/json
+
+{
+  "repo_url": "https://github.com/sourcebot-dev/sourcebot"
+}
+```
+
+### GitHub Action
+
+Use BashOps Radar inside GitHub Actions:
+
+```yaml
+name: BashOps Radar
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - id: radar
+        uses: BashOpsDev/bashops-radar/github-action@main
+        with:
+          repo_url: https://github.com/sourcebot-dev/sourcebot
+
+      - name: Show BashOps outputs
+        run: |
+          echo "Opportunity Score: ${{ steps.radar.outputs.opportunity_score }}"
+          echo "Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
+          echo "Recommended Next Action: ${{ steps.radar.outputs.recommended_next_action }}"
+```
+
+Action documentation: [github-action/README.md](github-action/README.md)
+
+## Core Features
+
+- GitHub repository analysis
+- Lightweight opportunity scoring
+- Issue ranking
+- Pro Opportunity Finder
+- User-scoped dashboard and pipeline
+- AI opportunity summary
+- Pro-gated founder outreach generation
+- Public API
+- GitHub Action
+- Paddle billing
+- Resend transactional email
+- Admin analytics
+
+## Tech Stack
+
+- FastAPI
+- Python
+- Jinja2
+- SQLAlchemy
+- PostgreSQL
+- Alembic
+- Paddle
+- Resend
+- Gemini
+- GitHub API
+- Railway
+
+## Local Setup
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt        # or requirements-dev.txt if running tests
-cp .env.example .env                   # then fill in SECRET_KEY and DATABASE_URL
+pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Generate a `SECRET_KEY`:
+Generate a secure `SECRET_KEY`:
 
 ```bash
 openssl rand -hex 32
 ```
 
-The app **will not start** without `SECRET_KEY` and `DATABASE_URL` set. This is
-intentional: PostgreSQL is the source of truth for accounts, analyses,
-pipeline status, and analytics.
+Required environment variables:
 
-### Database
+```text
+SECRET_KEY=
+DATABASE_URL=
+GITHUB_TOKEN=
+GEMINI_API_KEY=
+PADDLE_API_KEY=
+PADDLE_CLIENT_TOKEN=
+PADDLE_PRICE_ID=
+PADDLE_WEBHOOK_SECRET=
+PADDLE_ENV=production
+RESEND_API_KEY=
+EMAIL_FROM=
+EMAIL_FROM_NAME=BashOps Radar
+SITE_URL=https://bashops.site
+ADMIN_EMAILS=
+```
 
-Schema is managed with Alembic, not `Base.metadata.create_all()`. Run
-migrations before starting the app:
+The app will not start without `SECRET_KEY` and `DATABASE_URL`. PostgreSQL is the source of truth for accounts, analyses, pipeline status, and analytics.
+
+## Database
+
+Schema is managed with Alembic:
 
 ```bash
 alembic upgrade head
 ```
 
-For this update, the production migration command is:
-
-```bash
-alembic upgrade head
-```
-
-`DATABASE_URL` is required. For local development, use a disposable database
-URL such as `sqlite:///./bashops.db` only if you intentionally want a local
-SQLite sandbox. Railway/private beta should use PostgreSQL.
-
-When you change `models.py`, generate a new migration instead of hand-editing
-the database:
+When changing models:
 
 ```bash
 alembic revision --autogenerate -m "describe the change"
 alembic upgrade head
 ```
 
-Always read the autogenerated migration file before running it — autogenerate
-is a good first draft, not guaranteed correct, especially for column
-renames (it will see those as a drop + add unless you edit the migration
-by hand).
+Always review autogenerated migrations before running them in production.
 
-### Running locally
+## Run Locally
 
 ```bash
 uvicorn app:app --reload
 ```
 
-### Tests
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
+
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-Tests run against a disposable SQLite database created fresh in a temp
-directory — they never touch your real `DATABASE_URL`.
+Tests run against a disposable SQLite database created in a temporary directory. They do not touch the production `DATABASE_URL`.
 
-## Optional integrations
+## Deployment Notes
 
-- **`GITHUB_TOKEN`** — without this, GitHub API calls are capped at 60
-  requests/hour shared across every visitor to the deployed app. Strongly
-  recommended even for a small beta.
-- **`GEMINI_API_KEY`** — enables real AI-generated repo summaries and
-  founder outreach pitches (Pro-only). Without it, both fall back to
-  static templates.
-- **Paddle** (`PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`, `PADDLE_PRICE_ID`,
-  `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENV`) enables the Pro upgrade flow.
-  Until `PADDLE_CLIENT_TOKEN` and `PADDLE_PRICE_ID` are set, the upgrade
-  button shows a clear "not configured" message rather than a broken checkout.
-- **Resend email** (`RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_FROM_NAME`)
-  enables email verification and password reset delivery. If Resend is
-  missing, registration and reset requests do not crash; the verification/reset
-  link is logged server-side for local testing.
-- **GitHub OAuth** (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
-  `GITHUB_OAUTH_REDIRECT_URI`) enables "Continue with GitHub". Use
-  `https://bashops.site/auth/github/callback` as the production callback.
+BashOps Radar is designed to run on Railway with PostgreSQL.
 
-## Account security
+Typical deploy steps:
 
-Email/password registration requires a strong password: at least 8 characters,
-one uppercase letter, one lowercase letter, and one number. New email/password
-accounts must verify email before login. Password reset links expire after 1
-hour.
+```bash
+alembic upgrade head
+```
 
-Verification and password reset emails are sent through Resend when
-`RESEND_API_KEY` and `EMAIL_FROM` are configured. If email is not configured,
-the app logs the verification/reset link server-side for local testing and
-does not block registration or password reset.
+Then start the app with:
 
-## Admin
+```bash
+uvicorn app:app --host 0.0.0.0 --port $PORT
+```
 
-Set `ADMIN_EMAILS` to a comma-separated list of admin account emails.
+Use Railway environment variables for all secrets. Do not commit `.env`.
 
-- `/admin/analytics` shows event tracking, funnel, referrer, and usage metrics.
-- `/admin/users` shows account, plan, verification, and opt-in totals.
+## GitHub Repository Metadata
 
-## Event Tracking
+Suggested public repository description:
 
-BashOps Radar records lightweight first-party events in the database for
-conversion and product analytics, including landing views, pricing views,
-registrations, email verification, analyses, upgrade clicks, checkout starts,
-and checkout completions. Event tracking is best-effort and never blocks core
-application flows.
+```text
+Turn GitHub contributions into paid developer opportunities with AI-powered repository analysis.
+```
 
-## Goal
+Suggested GitHub topics:
 
-Turn manual startup/repo inspection from 60-90 minutes into 5-10 minutes,
-and turn open-source proof-of-work into paid contracts.
+```text
+fastapi
+github
+github-actions
+developer-tools
+ai
+opensource
+python
+saas
+```
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
