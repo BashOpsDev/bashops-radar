@@ -160,6 +160,44 @@ input {
 .feature-grid strong, .developer-grid strong { display: block; margin-bottom: 8px; }
 .feature-grid span, .developer-grid span, .grid span, .issue p, .issue-row p, .angle, .roadmap p, .pricing p { color: var(--muted); }
 
+.tool-grid .tool-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+    background: #10141b;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+.tool-grid a.tool-card {
+    border-color: rgba(245,158,11,.28);
+}
+
+.tool-grid a.tool-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.tool-grid .tool-card span {
+    display: block;
+    margin-bottom: 18px;
+}
+
+.tool-grid .tool-card em {
+    margin-top: auto;
+    color: var(--primary);
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.tool-grid .tool-card.muted em {
+    color: var(--muted);
+}
+
 .developer-platform .section-heading-row {
     align-items: end;
     margin-bottom: 18px;
