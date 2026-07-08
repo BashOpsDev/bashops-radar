@@ -373,6 +373,7 @@ def sitemap_xml():
         "/",
         "/pricing",
         "/tools/github-opportunity-score",
+        "/tools/best-first-issue-finder",
         "/login",
         "/register",
         "/terms",
@@ -462,6 +463,24 @@ def github_opportunity_score_tool(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="tool_github_opportunity_score.html",
+        context={
+            "site_url": config.SITE_URL,
+            "pro_price": config.PRO_PRICE_USD,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.get("/tools/best-first-issue-finder", response_class=HTMLResponse)
+def best_first_issue_finder_tool(request: Request):
+    current_user = get_current_user(request)
+    # Thin SEO/tool wrapper: the form posts to /analyze so the existing
+    # analysis engine remains the single source for best issue selection.
+    track_event(request, "tool_view", user=current_user, metadata={"tool": "best_first_issue_finder"})
+    return templates.TemplateResponse(
+        request=request,
+        name="tool_best_first_issue_finder.html",
         context={
             "site_url": config.SITE_URL,
             "pro_price": config.PRO_PRICE_USD,

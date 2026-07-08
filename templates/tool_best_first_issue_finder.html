@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Best First Issue Finder - BashOps Radar{% endblock %}
+{% block extra_head %}
+    <meta name="description" content="Free Best First Issue Finder for developers. Analyze a GitHub repository and find the strongest issue to start with before writing code.">
+    <link rel="canonical" href="{{ site_url }}/tools/best-first-issue-finder">
+    <meta property="og:title" content="Best First Issue Finder - BashOps Radar">
+    <meta property="og:description" content="Find the best issue to start with in a GitHub repository before spending time on the wrong pull request.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ site_url }}/tools/best-first-issue-finder">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Best First Issue Finder - BashOps Radar">
+    <meta name="twitter:description" content="Find the best issue to start with in a GitHub repository before spending time on the wrong pull request.">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Best First Issue Finder",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web",
+      "url": "{{ site_url }}/tools/best-first-issue-finder",
+      "description": "A free tool that analyzes a GitHub repository and identifies the best issue to start with for a focused proof-of-work contribution.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+{% endblock %}
+{% block content %}
+<main>
+    <section class="hero">
+        <div class="hero-copy">
+            <div class="badge">Free Developer Tool</div>
+            <h1>Best First Issue <span>Finder.</span></h1>
+            <p>
+                Answer one question before opening your editor:
+                what is the best issue to start with in this repository?
+            </p>
+
+            <div class="checks">
+                <span>Issue Ranking</span>
+                <span>Repository Signal</span>
+                <span>Proof-of-Work Fit</span>
+                <span>Next Action</span>
+            </div>
+
+            <form method="post" action="/analyze">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label for="repo_url">GitHub repository URL</label>
+                <input id="repo_url" name="repo_url" placeholder="Paste GitHub repo URL..." required>
+                <button type="submit">Find Best Issue</button>
+            </form>
+        </div>
+
+        <div class="score-panel">
+            <div class="score-number">Issue</div>
+            <div class="score-label">Best Starting Point</div>
+            <p class="angle">
+                The best first issue is not always the easiest issue. BashOps Radar
+                looks for work that is useful, visible, scoped, and strong enough
+                to become proof of work.
+            </p>
+        </div>
+    </section>
+
+    <section class="features">
+        <span class="section-label">How To Use It</span>
+        <h2>Choose the issue that gives your contribution a better chance</h2>
+        <div class="feature-grid">
+            <div>
+                <strong>What the result means</strong>
+                <span>A ranked starting issue selected from the repository signals BashOps already analyzes.</span>
+            </div>
+            <div>
+                <strong>Why it matters</strong>
+                <span>The wrong issue can disappear into backlog noise. A focused issue can create a useful maintainer conversation.</span>
+            </div>
+            <div>
+                <strong>How developers should use it</strong>
+                <span>Paste a repository, review the best issue, confirm scope, then ship one useful pull request before outreach.</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="workflow">
+        <h2>From issue choice to proof-of-work signal</h2>
+        <div class="workflow-grid">
+            <div>Paste Repo</div>
+            <div>Find Issue</div>
+            <div>Check Scope</div>
+            <div>Submit PR</div>
+            <div>Start Conversation</div>
+            <div>Pitch Sprint</div>
+        </div>
+    </section>
+
+    <section class="developer-platform">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">BashOps Pro</span>
+                <h2>Free helps when you already know the repository.</h2>
+                <p>
+                    Pro helps with the harder step: discovering repositories and
+                    issues before spending time manually searching GitHub.
+                </p>
+            </div>
+            {% if has_pro_access %}
+            <a class="nav-cta compact" href="/discover">Open Opportunity Finder</a>
+            {% else %}
+            <a class="nav-cta compact" href="/pricing">See Pro</a>
+            {% endif %}
+        </div>
+        <div class="developer-grid">
+            <div><strong>Free</strong><span>Analyze repositories you already know.</span></div>
+            <div><strong>Pro</strong><span>Discover repositories worth contributing to before anyone else.</span></div>
+            <div><strong>Same engine</strong><span>This page reuses the same BashOps Radar analysis flow as the SaaS, API, and GitHub Action.</span></div>
+        </div>
+    </section>
+</main>
+{% endblock %}
