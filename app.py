@@ -369,7 +369,17 @@ def sitemap_xml():
     # Only the public, indexable marketing pages — the app pages behind
     # login are excluded via robots.txt above and noindex tags on the
     # pages themselves.
-    urls = ["/", "/pricing", "/login", "/register", "/terms", "/privacy", "/refund", "/contact"]
+    urls = [
+        "/",
+        "/pricing",
+        "/tools/github-opportunity-score",
+        "/login",
+        "/register",
+        "/terms",
+        "/privacy",
+        "/refund",
+        "/contact",
+    ]
     body = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for path in urls:
         body.append(f"<url><loc>{config.SITE_URL}{path}</loc></url>")
@@ -439,6 +449,24 @@ def pricing(request: Request):
             "billing_error": None,
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
+        },
+    )
+
+
+@app.get("/tools/github-opportunity-score", response_class=HTMLResponse)
+def github_opportunity_score_tool(request: Request):
+    current_user = get_current_user(request)
+    # Thin SEO/tool wrapper: the form posts to /analyze so all scoring,
+    # limits, tracking writes, and result rendering stay in one place.
+    track_event(request, "tool_view", user=current_user, metadata={"tool": "github_opportunity_score"})
+    return templates.TemplateResponse(
+        request=request,
+        name="tool_github_opportunity_score.html",
+        context={
+            "site_url": config.SITE_URL,
+            "pro_price": config.PRO_PRICE_USD,
+            **user_context(request, current_user),
+            **csrf_context(request),
         },
     )
 

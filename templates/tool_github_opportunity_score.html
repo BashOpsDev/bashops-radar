@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}GitHub Opportunity Score - BashOps Radar{% endblock %}
+{% block extra_head %}
+    <meta name="description" content="Free GitHub Opportunity Score tool for developers. Check whether a repository is worth contributing to before spending time on a pull request.">
+    <link rel="canonical" href="{{ site_url }}/tools/github-opportunity-score">
+    <meta property="og:title" content="GitHub Opportunity Score - BashOps Radar">
+    <meta property="og:description" content="Check whether a GitHub repository is worth contributing to before you write code.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ site_url }}/tools/github-opportunity-score">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="GitHub Opportunity Score - BashOps Radar">
+    <meta name="twitter:description" content="Check whether a GitHub repository is worth contributing to before you write code.">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "GitHub Opportunity Score",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web",
+      "url": "{{ site_url }}/tools/github-opportunity-score",
+      "description": "A free tool that scores whether a GitHub repository is worth contributing to before a developer spends time on a pull request.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+{% endblock %}
+{% block content %}
+<main>
+    <section class="hero">
+        <div class="hero-copy">
+            <div class="badge">Free Developer Tool</div>
+            <h1>GitHub Opportunity <span>Score.</span></h1>
+            <p>
+                Answer one question before you write code:
+                is this repository worth contributing to?
+            </p>
+
+            <div class="checks">
+                <span>Repository Signal</span>
+                <span>Best First Issue</span>
+                <span>Proof-of-Work Fit</span>
+                <span>Contract Potential</span>
+            </div>
+
+            <form method="post" action="/analyze">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label for="repo_url">GitHub repository URL</label>
+                <input id="repo_url" name="repo_url" placeholder="Paste GitHub repo URL..." required>
+                <button type="submit">Score This Repository</button>
+            </form>
+        </div>
+
+        <div class="score-panel">
+            <div class="score-number">0-100</div>
+            <div class="score-label">Opportunity Score</div>
+            <p class="angle">
+                Higher scores suggest stronger proof-of-work potential:
+                active repositories, useful issues, visible maintainers,
+                and better follow-up context.
+            </p>
+        </div>
+    </section>
+
+    <section class="features">
+        <span class="section-label">How To Use It</span>
+        <h2>Use the score before choosing your next pull request</h2>
+        <div class="feature-grid">
+            <div>
+                <strong>What the score means</strong>
+                <span>A quick read on whether a repository has enough activity, issues, and visibility to be worth your time.</span>
+            </div>
+            <div>
+                <strong>Why it matters</strong>
+                <span>A useful contribution can create trust. The wrong repository can turn several hours of work into silence.</span>
+            </div>
+            <div>
+                <strong>How developers should use it</strong>
+                <span>Score the repo first, inspect the best issue, submit one focused PR, then decide whether founder outreach makes sense.</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="workflow">
+        <h2>From repository choice to paid sprint signal</h2>
+        <div class="workflow-grid">
+            <div>Paste Repo</div>
+            <div>Get Score</div>
+            <div>Find Issue</div>
+            <div>Submit PR</div>
+            <div>Open Conversation</div>
+            <div>Pitch Sprint</div>
+        </div>
+    </section>
+
+    <section class="developer-platform">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">BashOps Pro</span>
+                <h2>Already know the repo? Free is enough to start.</h2>
+                <p>
+                    Pro is for the next problem: discovering promising repositories
+                    and issues before spending time manually searching GitHub.
+                </p>
+            </div>
+            {% if has_pro_access %}
+            <a class="nav-cta compact" href="/discover">Open Opportunity Finder</a>
+            {% else %}
+            <a class="nav-cta compact" href="/pricing">See Pro</a>
+            {% endif %}
+        </div>
+        <div class="developer-grid">
+            <div><strong>Free</strong><span>Analyze repositories you already know.</span></div>
+            <div><strong>Pro</strong><span>Discover repositories worth contributing to before anyone else.</span></div>
+            <div><strong>Same engine</strong><span>This page reuses the same BashOps Radar analysis flow as the SaaS, API, and GitHub Action.</span></div>
+        </div>
+    </section>
+</main>
+{% endblock %}

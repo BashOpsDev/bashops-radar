@@ -424,3 +424,12 @@ def test_sitemap_contains_public_pages(client):
     r = client.get("/sitemap.xml")
     assert r.status_code == 200
     assert "<loc>" in r.text
+    assert "/tools/github-opportunity-score" in r.text
+
+
+def test_github_opportunity_score_tool_loads(client):
+    r = client.get("/tools/github-opportunity-score")
+    assert r.status_code == 200
+    assert "GitHub Opportunity Score" in r.text
+    assert 'action="/analyze"' in r.text
+    assert 'name="csrf_token"' in r.text
