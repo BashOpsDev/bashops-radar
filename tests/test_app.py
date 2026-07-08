@@ -18,6 +18,16 @@ import time
 import pytest
 
 
+def test_homepage_links_to_free_developer_tools(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "Free Developer Tools" in r.text
+    assert 'href="/tools/github-opportunity-score"' in r.text
+    assert 'href="/tools/best-first-issue-finder"' in r.text
+    assert "Repository Health Checker" in r.text
+    assert "Should I Contribute Here?" in r.text
+
+
 def _csrf_token(html: str) -> str:
     match = re.search(r'name="csrf_token" value="([^"]+)"', html)
     assert match, "csrf_token not found in response HTML"
