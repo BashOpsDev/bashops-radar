@@ -85,12 +85,14 @@ def main() -> int:
 
     score = result.get("opportunity_score", "")
     contract_potential = result.get("contract_potential", "")
+    difficulty = result.get("difficulty", "")
     next_action = result.get("recommended_next_action", "")
     repository = result.get("repository", repo_url)
     best_issue = result.get("best_issue") or "No ranked issue returned"
 
     write_output("opportunity_score", score)
     write_output("contract_potential", contract_potential)
+    write_output("difficulty", difficulty)
     write_output("recommended_next_action", next_action)
 
     print("")
@@ -98,6 +100,8 @@ def main() -> int:
     print(f"Repository: {repository}")
     print(f"Opportunity Score: {score}/100")
     print(f"Contract Potential: {contract_potential}")
+    if difficulty:
+        print(f"Difficulty: {difficulty}")
     print(f"Best Issue: {best_issue}")
     print(f"Recommended Next Action: {next_action}")
     print("Full analysis: https://bashops.site")
@@ -109,6 +113,7 @@ def main() -> int:
             comment = (
                 f"**BashOps Radar Opportunity Score:** {score}/100\n\n"
                 f"**Contract Potential:** {contract_potential}\n\n"
+                f"**Difficulty:** {difficulty or 'Estimate unavailable'}\n\n"
                 f"**Recommended Next Action:** {next_action}\n\n"
                 "Full analysis: https://bashops.site"
             )

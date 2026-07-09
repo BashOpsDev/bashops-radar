@@ -34,6 +34,9 @@ outputs:
   contract_potential:
     description: Estimated paid sprint or contract potential.
     value: ${{ steps.radar.outputs.contract_potential }}
+  difficulty:
+    description: Estimated difficulty for the selected first issue.
+    value: ${{ steps.radar.outputs.difficulty }}
   recommended_next_action:
     description: Recommended proof-of-work next action.
     value: ${{ steps.radar.outputs.recommended_next_action }}

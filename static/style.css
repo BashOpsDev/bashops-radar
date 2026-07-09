@@ -3258,3 +3258,108 @@ footer,
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+@media (max-width: 640px) {
+    main,
+    .dashboard-page,
+    .discover-page {
+        padding: 12px;
+    }
+
+    .nav-inner {
+        padding: 10px 14px;
+    }
+
+    .nav-brand strong {
+        font-size: 18px;
+    }
+
+    .nav-brand small {
+        font-size: 11px;
+    }
+
+    .hero {
+        gap: 18px;
+        margin-bottom: 18px;
+    }
+
+    .hero h1,
+    h1 {
+        font-size: 34px;
+        line-height: 1.08;
+    }
+
+    .hero p,
+    .demo p {
+        font-size: 15px;
+        line-height: 1.55;
+    }
+
+    h2,
+    .workflow h2,
+    .features h2,
+    .demo h2,
+    .pricing h2,
+    .social-proof h2,
+    .card-flat h2 {
+        font-size: 24px;
+        line-height: 1.18;
+    }
+
+    .workflow,
+    .demo,
+    .features,
+    .developer-platform,
+    .card,
+    .pricing,
+    .social-proof,
+    footer {
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    .workflow-grid,
+    .feature-grid,
+    .developer-grid,
+    .pricing-grid {
+        gap: 10px;
+    }
+
+    .workflow-grid div,
+    .feature-grid div,
+    .developer-grid div,
+    .pricing-grid div,
+    .tool-grid .tool-card {
+        min-height: auto;
+        padding: 14px;
+        border-radius: 12px;
+    }
+
+    .workflow-grid div {
+        font-size: 14px;
+    }
+
+    .demo {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .demo-score,
+    .score {
+        font-size: 32px;
+    }
+
+    .checks {
+        gap: 8px;
+    }
+
+    .checks span,
+    .section-label,
+    .badge,
+    .repo-label,
+    .status-badge,
+    .plan-chip {
+        font-size: 11px;
+        padding: 6px 9px;
+    }
+}

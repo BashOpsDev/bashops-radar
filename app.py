@@ -1330,6 +1330,9 @@ def analyze(
             stars=result.get("stars", 0),
             forks=result.get("forks", 0),
             open_issues=result.get("open_issues", 0),
+            merge_probability=result.get("merge_probability"),
+            difficulty=result.get("difficulty"),
+            estimated_time=result.get("estimated_time"),
         )
         track_event(
             request,
@@ -1440,6 +1443,9 @@ async def api_analyze(request: Request):
                 stars=result.get("stars", 0),
                 forks=result.get("forks", 0),
                 open_issues=result.get("open_issues", 0),
+                merge_probability=result.get("merge_probability"),
+                difficulty=result.get("difficulty"),
+                estimated_time=result.get("estimated_time"),
             )
         except Exception as e:
             print(f"[/api/v1/analyze tracking error] {e!r}")

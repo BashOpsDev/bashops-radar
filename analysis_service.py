@@ -1,4 +1,11 @@
-from radar import decision, get_analysis, recommend_angle
+from radar import (
+    decision,
+    estimate_difficulty as estimate_issue_difficulty,
+    estimate_time as estimate_issue_time,
+    get_analysis,
+    merge_probability as estimate_issue_merge_probability,
+    recommend_angle,
+)
 
 
 def contract_potential(score: int) -> str:
@@ -32,6 +39,9 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
 
     selected_issue = _select_issue(issue_rankings, issue_number)
     best_issue = None
+    difficulty = "Medium"
+    estimated_time = "2-4 hours" if repo_score >= 85 else "4-8 hours"
+    merge_probability = contract_potential(repo_score)
     if selected_issue:
         score, issue_type, issue = selected_issue
         best_issue = {
@@ -41,6 +51,9 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
             "score": score,
             "type": issue_type,
         }
+        difficulty = estimate_issue_difficulty(issue_type, score)
+        estimated_time = estimate_issue_time(issue_type)
+        merge_probability = estimate_issue_merge_probability(score, repo_score)
 
     recommended_action = "Analyze another repository"
     if best_issue:
@@ -79,9 +92,9 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
             if repo_score >= 60
             else "SKIP FOR NOW"
         ),
-        "merge_probability": contract_potential(repo_score),
-        "estimated_time": "2-4 hours" if repo_score >= 85 else "4-8 hours",
-        "difficulty": "Medium",
+        "merge_probability": merge_probability,
+        "estimated_time": estimated_time,
+        "difficulty": difficulty,
         "decision": decision(repo_score),
         "angle": angle,
         "best_issue": best_issue,
@@ -104,6 +117,9 @@ def to_public_api_payload(result: dict, site_url: str) -> dict:
         "decision": result.get("decision", ""),
         "chance_of_getting_noticed": f"{result.get('score', 0)}%",
         "contract_potential": contract_potential(int(result.get("score") or 0)),
+        "merge_probability": result.get("merge_probability", ""),
+        "estimated_time": result.get("estimated_time", ""),
+        "difficulty": result.get("difficulty", ""),
         "best_issue": best_issue_text,
         "best_issue_url": best_issue.get("url") if best_issue else None,
         "proof_of_work_angle": result.get("angle", ""),

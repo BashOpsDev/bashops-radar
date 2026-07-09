@@ -18,6 +18,49 @@ import time
 import pytest
 
 
+def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
+    import analysis_service
+
+    issue = {
+        "number": 7,
+        "title": "Improve setup docs",
+        "html_url": "https://github.com/example/repo/issues/7",
+    }
+
+    def fake_get_analysis(repo_url):
+        return (
+            "example",
+            "repo",
+            {
+                "homepage": "",
+                "html_url": "https://github.com/example/repo",
+                "description": "Example repo",
+                "stargazers_count": 10,
+                "forks_count": 2,
+                "open_issues_count": 4,
+                "pushed_at": "2026-07-09T00:00:00Z",
+            },
+            {"Python": 100},
+            [(92, "Docs", issue)],
+            80,
+            "Python",
+        )
+
+    monkeypatch.setattr(analysis_service, "get_analysis", fake_get_analysis)
+
+    result = analysis_service.build_analysis_result("https://github.com/example/repo")
+
+    assert result["difficulty"] == "Low"
+    assert result["estimated_time"].startswith("30")
+    assert result["estimated_time"].endswith("60 minutes")
+    assert result["merge_probability"] == "High"
+
+    payload = analysis_service.to_public_api_payload(result, "https://bashops.site")
+    assert payload["difficulty"] == result["difficulty"]
+    assert payload["estimated_time"] == result["estimated_time"]
+    assert payload["merge_probability"] == result["merge_probability"]
+
+
 def test_homepage_links_to_free_developer_tools(client):
     r = client.get("/")
     assert r.status_code == 200

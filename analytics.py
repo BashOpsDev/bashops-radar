@@ -166,6 +166,9 @@ def track_analysis(
     stars=0,
     forks=0,
     open_issues=0,
+    merge_probability=None,
+    difficulty=None,
+    estimated_time=None,
 ):
     """
     Single source of truth write: every analysis becomes one Target row.
@@ -191,9 +194,9 @@ def track_analysis(
             status=status,
             best_issue=best_issue or "",
             best_issue_url=best_issue_url or "",
-            merge_probability=estimate_merge_probability(score),
-            difficulty=estimate_difficulty(score),
-            estimated_time=estimate_completion_time(score),
+            merge_probability=merge_probability or estimate_merge_probability(score),
+            difficulty=difficulty or estimate_difficulty(score),
+            estimated_time=estimated_time or estimate_completion_time(score),
             pitch="",
             stars=_int(stars),
             forks=_int(forks),
