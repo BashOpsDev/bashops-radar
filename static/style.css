@@ -2826,6 +2826,134 @@ footer,
     line-height: 1.4;
 }
 
+.score-card-meta {
+    display: grid;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.score-card-meta div,
+.decision-pill,
+.signals-used,
+.confidence-card {
+    background: #10141b;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.score-card-meta span,
+.decision-pill span,
+.confidence-card span {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.score-card-meta strong,
+.decision-pill strong,
+.confidence-card > strong {
+    color: var(--primary);
+    font-size: 14px;
+}
+
+.score-explainer {
+    background: #0b1118;
+    border: 1px solid rgba(245,158,11,.24);
+    border-radius: 14px;
+    padding: 16px;
+    margin: 14px 0;
+}
+
+.score-explainer-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.score-explainer h2,
+.score-explainer h3 {
+    margin: 0;
+}
+
+.score-reasons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.score-reasons div {
+    background: #10141b;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.score-reasons .warning {
+    border-color: rgba(245,158,11,.35);
+}
+
+.score-reasons strong {
+    display: block;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.score-reasons strong::before {
+    content: "✓ ";
+    color: var(--primary);
+}
+
+.score-reasons .warning strong::before {
+    content: "!";
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+    margin-right: 5px;
+    border: 1px solid var(--primary);
+    border-radius: 50%;
+    color: var(--primary);
+    font-size: 11px;
+}
+
+.score-reasons span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.signals-confidence-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.signals-used h3,
+.confidence-card h3 {
+    color: var(--text);
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.confidence-card ul {
+    display: grid;
+    gap: 5px;
+    margin: 8px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+}
+
+.confidence-card li {
+    font-size: 13px;
+}
+
 .analysis-metrics {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -3361,5 +3489,19 @@ footer,
     .plan-chip {
         font-size: 11px;
         padding: 6px 9px;
+    }
+
+    .score-explainer {
+        padding: 14px;
+    }
+
+    .score-explainer-header,
+    .signals-confidence-grid,
+    .score-reasons {
+        grid-template-columns: 1fr;
+    }
+
+    .score-explainer-header {
+        display: grid;
     }
 }

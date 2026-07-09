@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Analysis Result - BashOps Radar{% endblock %}
 {% block extra_head %}
 <meta name="robots" content="noindex">
@@ -40,17 +40,7 @@
     {% elif result %}
     <section class="analysis-shell">
         <div class="analysis-main-card">
-            {% set stars = result.stars|default(0, true) %}
-            {% set forks = result.forks|default(0, true) %}
-            {% set open_issues = result.open_issues|default(0, true) %}
             {% set contract_potential = "High" if result.score >= 85 else "Medium" if result.score >= 60 else "Low" %}
-            {% set issue_signals = namespace(starter=false) %}
-            {% for issue_score, issue_type, issue in result.issues %}
-                {% set issue_label = issue_type|lower %}
-                {% if "good first" in issue_label or "help wanted" in issue_label or "starter" in issue_label %}
-                    {% set issue_signals.starter = true %}
-                {% endif %}
-            {% endfor %}
             <div class="analysis-header">
                 <div>
                     <span class="repo-label">Opportunity Report</span>
@@ -64,41 +54,14 @@
                     <div class="score-meter">
                         <div class="score-fill" style="width: {{ result.score }}%;"></div>
                     </div>
-                    <div class="opportunity-signals">
-                        <span class="score-trust-label">Opportunity signals</span>
-                        <div class="signal-row">
-                            <span>Chance of getting noticed</span>
-                            <strong>{{ result.score }}%</strong>
-                        </div>
-                        <div class="signal-row">
-                            <span>Estimated contract potential</span>
+                    <div class="score-card-meta">
+                        <div>
+                            <span>Contract potential</span>
                             <strong>{{ contract_potential }}</strong>
                         </div>
-                        <div class="signal-list">
-                            <span>Why this repo may be worth your time</span>
-                            <ul>
-                                {% if result.last_push %}
-                                <li>Repository update data available: last push {{ result.last_push[:10] }}</li>
-                                {% endif %}
-                                {% if open_issues >= 20 %}
-                                <li>Many open issues to triage and prioritize</li>
-                                {% elif open_issues > 0 %}
-                                <li>Open issue signal available</li>
-                                {% else %}
-                                <li>Open issue signal unavailable</li>
-                                {% endif %}
-                                {% if issue_signals.starter %}
-                                <li>Good first issue / help wanted signal detected</li>
-                                {% elif result.best_issue %}
-                                <li>Ranked first issue available for focused proof-of-work</li>
-                                {% endif %}
-                                {% if stars >= 1000 or forks >= 100 %}
-                                <li>Strong ecosystem visibility from stars/forks</li>
-                                {% elif stars >= 100 or forks >= 25 %}
-                                <li>Some ecosystem visibility from stars/forks</li>
-                                {% endif %}
-                                <li>Review speed signal unavailable</li>
-                            </ul>
+                        <div>
+                            <span>Recommendation</span>
+                            <strong>{{ result.score_action }}</strong>
                         </div>
                     </div>
                 </div>
@@ -112,6 +75,57 @@
                 <div><strong>{{ result.stars }}</strong><span>Stars</span></div>
                 <div><strong>{{ result.open_issues }}</strong><span>Open Issues</span></div>
             </div>
+
+            <section class="score-explainer">
+                <div class="score-explainer-header">
+                    <div>
+                        <span class="section-label">Score Transparency</span>
+                        <h2>Why this repository scored well</h2>
+                    </div>
+                    <div class="decision-pill">
+                        <span>Recommendation</span>
+                        <strong>{{ result.score_action }}</strong>
+                    </div>
+                </div>
+
+                <div class="score-reasons">
+                    {% for item in result.score_transparency.reasons %}
+                    <div>
+                        <strong>{{ item.label }}</strong>
+                        <span>{{ item.detail }}</span>
+                    </div>
+                    {% endfor %}
+                    {% for item in result.score_transparency.warnings %}
+                    <div class="warning">
+                        <strong>{{ item.label }}</strong>
+                        <span>{{ item.detail }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="signals-confidence-grid">
+                    <div class="signals-used">
+                        <h3>Signals Used</h3>
+                        {% for signal in result.score_transparency.signals_used %}
+                        <div class="signal-row">
+                            <span>{{ signal.label }}</span>
+                            <strong>{{ signal.detail }}</strong>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="confidence-card">
+                        <h3>Confidence</h3>
+                        <strong>{{ result.score_transparency.confidence }}</strong>
+                        <span>Based on:</span>
+                        <ul>
+                            {% for reason in result.score_transparency.confidence_reasons %}
+                            <li>{{ reason }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </section>
 
             {% if from_discover %}
             <div class="discover-return-bar">
@@ -143,6 +157,17 @@
 
             <div class="analysis-grid">
                 <section class="analysis-section">
+                    <h2>Best First Issue</h2>
+                    {% if result.best_issue %}
+                    <div class="issue best">
+                        <strong>#{{ result.best_issue.number }} - {{ result.best_issue.title }}</strong>
+                        <p>{{ result.best_issue.type }} Â· Score {{ result.best_issue.score }}/100</p>
+                        <a href="{{ result.best_issue.url }}" target="_blank" rel="noopener">Open Issue</a>
+                    </div>
+                    {% else %}
+                    <p class="angle">No ranked issue found. Inspect the repository manually before pitching.</p>
+                    {% endif %}
+
                     <div class="ai-summary-header">
                         <span class="section-label">AI Opportunity Summary</span>
                         {% if result.ai_status == "available" %}
@@ -168,16 +193,6 @@
                     <h2>Recommended Next Action</h2>
                     <p class="angle">{{ result.recommended_action }}. {{ result.recommended_outcome }}</p>
 
-                    <h2>Best First Issue</h2>
-                    {% if result.best_issue %}
-                    <div class="issue best">
-                        <strong>#{{ result.best_issue.number }} - {{ result.best_issue.title }}</strong>
-                        <p>{{ result.best_issue.type }} · Score {{ result.best_issue.score }}/100</p>
-                        <a href="{{ result.best_issue.url }}" target="_blank" rel="noopener">Open Issue</a>
-                    </div>
-                    {% else %}
-                    <p class="angle">No ranked issue found. Inspect the repository manually before pitching.</p>
-                    {% endif %}
 
                     <h2>Proof-of-Work Angle</h2>
                     <p class="angle">{{ result.angle }}</p>

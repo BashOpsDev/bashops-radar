@@ -54,6 +54,9 @@ def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
     assert result["estimated_time"].startswith("30")
     assert result["estimated_time"].endswith("60 minutes")
     assert result["merge_probability"] == "High"
+    assert result["score_transparency"]["confidence"] in {"Medium", "High"}
+    assert any(item["label"] == "Recently maintained" for item in result["score_transparency"]["reasons"])
+    assert any(signal["label"] == "Repository Activity" for signal in result["score_transparency"]["signals_used"])
 
     payload = analysis_service.to_public_api_payload(result, "https://bashops.site")
     assert payload["difficulty"] == result["difficulty"]
