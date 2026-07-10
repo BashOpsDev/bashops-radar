@@ -15,7 +15,7 @@
                     {{ "Pro Plan" if has_pro_access else "Free Plan" }}
                 </span>
                 {% if has_pro_access %}
-                <span>Unlimited analyses available.</span>
+                <span>Unlimited analyses and Pro discovery available.</span>
                 {% else %}
                 <span>{{ analyses_remaining }} analyses remaining today.</span>
                 {% endif %}
@@ -25,9 +25,10 @@
         <div class="dashboard-plan-card">
             {% if has_pro_access %}
             <span class="section-label">Pro Plan Active</span>
-            <h2>Unlimited opportunity intelligence</h2>
+            <h2>Full proof-of-work workflow</h2>
             <ul>
                 <li>Unlimited analyses</li>
+                <li>Pro Opportunity Finder</li>
                 <li>AI Founder Intelligence</li>
                 <li>AI Outreach Generator</li>
                 <li>Unlimited pipeline</li>
@@ -41,7 +42,7 @@
             <span class="section-label">Free Plan</span>
             <h2>Build your first pipeline</h2>
             <ul>
-                <li>5 analyses/day</li>
+                <li>2 analyses/day</li>
                 <li>Basic opportunity scoring</li>
                 <li>Basic pipeline tracking</li>
             </ul>
@@ -91,7 +92,7 @@
             {% else %}
             <a href="/billing/upgrade" class="action-card">
                 <span>⭐ Upgrade to Pro</span>
-                <strong>Unlock unlimited</strong>
+                <strong>Discover better repositories</strong>
             </a>
             {% endif %}
         </div>

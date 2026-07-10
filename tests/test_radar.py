@@ -14,11 +14,13 @@ from radar import (
     classify_issue,
     days_since,
     decision,
+    estimate_difficulty,
     parse_github_url,
     primary_language,
     recommend_angle,
     score_issue,
     score_repo,
+    score_repo_signal_report,
 )
 
 
@@ -167,6 +169,31 @@ def test_score_repo_no_languages_scores_lower():
     with_lang = score_repo(repo, issues=[], languages={"Python": 1000})
     without_lang = score_repo(repo, issues=[], languages={})
     assert with_lang > without_lang
+
+
+def test_score_repo_signal_report_matches_numeric_score():
+    issue = {
+        "title": "bug: fix API failure",
+        "labels": [{"name": "bug"}],
+        "comments": 2,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    repo = _repo(open_issues=20, stars=500, forks=50, pushed_days_ago=1)
+    languages = {"Python": 1000}
+
+    report = score_repo_signal_report(repo, [issue], languages)
+
+    assert report["score"] == score_repo(repo, [issue], languages)
+    assert any(item["label"] == "Recently maintained" for item in report["reasons"])
+    assert any(item["label"] == "Good contributor fit" for item in report["reasons"])
+    assert any(signal["label"] == "Repository Activity" for signal in report["signals_used"])
+
+
+def test_issue_difficulty_estimator_varies_by_issue_type():
+    assert estimate_difficulty("Docs", 95) == "Low"
+    assert estimate_difficulty("Bug Fix", 90) == "Medium"
+    assert estimate_difficulty("Bug Fix", 50) == "Medium/High"
 
 
 # --- decision -------------------------------------------------------------

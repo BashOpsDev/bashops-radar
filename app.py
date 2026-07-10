@@ -72,7 +72,7 @@ templates = Jinja2Templates(directory="templates")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BETA_FILE = Path("beta_signups.csv")
-FREE_ANALYSIS_LIMIT = 5
+FREE_ANALYSIS_LIMIT = 2
 EMAIL_VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
 PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 60
 

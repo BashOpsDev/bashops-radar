@@ -93,54 +93,145 @@ def score_issue(issue):
     return min(max(score, 0), 100), issue_type
 
 
-def score_repo(repo, issues, languages):
+def _quality_label(value: str, detail: str) -> dict:
+    return {"label": value, "detail": detail}
+
+
+def _days_label(days: int) -> str:
+    if days == 0:
+        return "today"
+    if days == 1:
+        return "1 day ago"
+    if days >= 999:
+        return "unavailable"
+    return f"{days} days ago"
+
+
+def score_repo_signal_report(repo, issues, languages):
     score = 0
+    reasons = []
+    warnings = []
     open_issues = repo.get("open_issues_count", 0)
     stars = repo.get("stargazers_count", 0)
     forks = repo.get("forks_count", 0)
     last_push_days = days_since(repo.get("pushed_at"))
 
+    def add_signal(points: int, label: str, detail: str):
+        nonlocal score
+        score += points
+        reasons.append(_quality_label(label, detail))
+
     if 5 <= open_issues <= 80:
-        score += 25
+        add_signal(25, "Healthy issue backlog", f"{open_issues} open issues")
     elif open_issues > 80:
-        score += 10
+        add_signal(10, "Large issue backlog", f"{open_issues} open issues")
+        warnings.append(_quality_label("Issue volume may require filtering", "Large backlogs can contain stale or noisy work"))
     elif open_issues > 0:
-        score += 12
+        add_signal(12, "Some issue activity", f"{open_issues} open issues")
+    else:
+        warnings.append(_quality_label("No open issue signal", "GitHub reports no open issues"))
 
     if last_push_days <= 3:
-        score += 25
+        add_signal(25, "Recently maintained", f"Last push: {_days_label(last_push_days)}")
     elif last_push_days <= 14:
-        score += 18
+        add_signal(18, "Active maintenance", f"Last push: {_days_label(last_push_days)}")
     elif last_push_days <= 30:
-        score += 10
+        add_signal(10, "Maintenance signal available", f"Last push: {_days_label(last_push_days)}")
+    else:
+        warnings.append(_quality_label("Maintenance recency is limited", f"Last push: {_days_label(last_push_days)}"))
 
     if 20 <= stars <= 5000:
-        score += 20
+        add_signal(20, "Healthy repository visibility", f"{stars} stars")
     elif stars > 5000:
-        score += 10
+        add_signal(10, "Strong ecosystem visibility", f"{stars} stars")
+        warnings.append(_quality_label("Popular repository", "Higher visibility can mean more contributor competition"))
     elif stars > 0:
-        score += 8
+        add_signal(8, "Early visibility signal", f"{stars} stars")
 
     if 2 <= forks <= 500:
-        score += 10
+        add_signal(10, "Community activity present", f"{forks} forks")
     elif forks > 500:
-        score += 5
+        add_signal(5, "Broad ecosystem activity", f"{forks} forks")
+        warnings.append(_quality_label("Large contributor surface", "Many forks can indicate a crowded project"))
 
     if languages:
-        score += 10
+        add_signal(10, "Language profile available", ", ".join(list(languages.keys())[:3]))
+    else:
+        warnings.append(_quality_label("Language signal unavailable", "GitHub did not return language data"))
 
-    if any(lang in languages for lang in ["Python", "TypeScript", "JavaScript"]):
-        score += 10
+    target_languages = [lang for lang in ("Python", "TypeScript", "JavaScript") if lang in languages]
+    if target_languages:
+        add_signal(10, "Good contributor fit", ", ".join(target_languages) + " detected")
 
     issue_scores = [score_issue(issue)[0] for issue in issues]
+    average_issue_score = 0
     if issue_scores:
-        avg = sum(issue_scores) / len(issue_scores)
-        if avg >= 75:
-            score += 15
-        elif avg >= 60:
-            score += 8
+        average_issue_score = sum(issue_scores) / len(issue_scores)
+        if average_issue_score >= 75:
+            add_signal(15, "Strong issue quality", "Recent, active issues found")
+        elif average_issue_score >= 60:
+            add_signal(8, "Usable issue quality", "Some issues look suitable for focused work")
+        else:
+            warnings.append(_quality_label("Issue quality needs review", "Inspect the top issues before committing time"))
+    else:
+        warnings.append(_quality_label("No ranked issues found", "Manual inspection is required"))
 
-    return min(score, 100)
+    recent_issue_count = sum(1 for issue in issues if days_since(issue.get("updated_at")) <= 30)
+    discussed_issue_count = sum(1 for issue in issues if int(issue.get("comments") or 0) > 0)
+    if discussed_issue_count:
+        reasons.append(_quality_label("Active issue discussion", f"{discussed_issue_count} ranked issues have comments"))
+
+    warnings.append(_quality_label("Review speed could not be verified", "GitHub issue data does not confirm review speed"))
+
+    signals_used = [
+        _quality_label(
+            "Repository Activity",
+            "Excellent" if last_push_days <= 3 else "Strong" if last_push_days <= 14 else "Moderate" if last_push_days <= 30 else "Limited",
+        ),
+        _quality_label(
+            "Issue Quality",
+            "Excellent" if average_issue_score >= 80 else "Strong" if average_issue_score >= 70 else "Moderate" if average_issue_score >= 60 else "Limited",
+        ),
+        _quality_label(
+            "Community Health",
+            "Strong" if forks >= 2 and open_issues > 0 else "Moderate" if stars > 0 or open_issues > 0 else "Limited",
+        ),
+        _quality_label(
+            "Competition",
+            "High" if stars > 5000 or forks > 500 else "Medium" if stars >= 1000 or forks >= 100 else "Low",
+        ),
+        _quality_label(
+            "Maintenance Activity",
+            "High" if last_push_days <= 14 and (recent_issue_count or discussed_issue_count) else "Medium" if last_push_days <= 30 else "Low",
+        ),
+    ]
+
+    confidence_reasons = []
+    if repo.get("pushed_at") and repo.get("open_issues_count") is not None:
+        confidence_reasons.append("Repository metadata available")
+    if last_push_days <= 30:
+        confidence_reasons.append("Recent repository activity")
+    if languages:
+        confidence_reasons.append("Language profile detected")
+    if issue_scores:
+        confidence_reasons.append("Ranked issue candidates found")
+    if recent_issue_count:
+        confidence_reasons.append("Recent issue updates")
+
+    confidence = "High" if len(confidence_reasons) >= 4 else "Medium" if len(confidence_reasons) >= 2 else "Low"
+
+    return {
+        "score": min(score, 100),
+        "reasons": reasons[:7],
+        "warnings": warnings[:3],
+        "signals_used": signals_used,
+        "confidence": confidence,
+        "confidence_reasons": confidence_reasons[:5],
+    }
+
+
+def score_repo(repo, issues, languages):
+    return score_repo_signal_report(repo, issues, languages)["score"]
 
 
 def decision(score):
@@ -267,6 +358,8 @@ I can take one scoped issue, submit a clean PR, and if useful, we can discuss a 
 
 def save_target(owner, repo_name, repo_score, issue_rankings):
     best_issue = issue_rankings[0][2] if issue_rankings else None
+    best_score = issue_rankings[0][0] if issue_rankings else 0
+    best_type = issue_rankings[0][1] if issue_rankings else ""
     repo = f"{owner}/{repo_name}"
 
     from database import SessionLocal
@@ -282,7 +375,7 @@ def save_target(owner, repo_name, repo_score, issue_rankings):
             best_issue=f"#{best_issue.get('number')}" if best_issue else "",
             best_issue_url=best_issue.get("html_url", "") if best_issue else "",
             merge_probability="High" if repo_score >= 85 else "Medium" if repo_score >= 60 else "Low",
-            difficulty="Medium",
+            difficulty=estimate_difficulty(best_type, best_score) if best_issue else "Medium/High",
             estimated_time="2-4 hours" if repo_score >= 85 else "4-8 hours",
             ip_address="cli",
         )

@@ -47,7 +47,7 @@ jobs:
       - name: Show BashOps outputs
         run: |
           echo "Opportunity Score: ${{ steps.radar.outputs.opportunity_score }}"
-          echo "Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
+          echo "Estimated Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
           echo "Recommended Next Action: ${{ steps.radar.outputs.recommended_next_action }}"
 ```
 
@@ -75,7 +75,7 @@ jobs:
       - name: Print opportunity summary
         run: |
           echo "Opportunity Score: ${{ steps.radar.outputs.opportunity_score }}"
-          echo "Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
+          echo "Estimated Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
           echo "Recommended Next Action: ${{ steps.radar.outputs.recommended_next_action }}"
 ```
 
@@ -112,7 +112,7 @@ Example comment:
 ```text
 BashOps Radar Opportunity Score: 86/100
 
-Contract Potential: High
+Estimated Contract Potential: High
 
 Recommended Next Action: Start with #1277 - Improve GitHub integration reliability
 
@@ -125,7 +125,7 @@ Full analysis: https://bashops.site
 BashOps Radar Opportunity Summary
 Repository: sourcebot-dev/sourcebot
 Opportunity Score: 86/100
-Contract Potential: High
+Estimated Contract Potential: High
 Best Issue: #1277 - Improve GitHub integration reliability
 Recommended Next Action: Start with #1277 - Improve GitHub integration reliability
 Full analysis: https://bashops.site

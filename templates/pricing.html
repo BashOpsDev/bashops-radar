@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Pricing - BashOps Radar{% endblock %}
 {% block extra_head %}
-    <meta name="description" content="BashOps Radar pricing: analyze GitHub repos for free, or go Pro for unlimited AI-scored opportunities and AI-generated founder outreach pitches.">
+    <meta name="description" content="BashOps Radar pricing: analyze known GitHub repos for free, or go Pro to discover better repositories, prepare outreach, and manage your proof-of-work workflow.">
     <meta property="og:title" content="BashOps Radar Pricing">
-    <meta property="og:description" content="Start free. Upgrade to Pro for unlimited AI-scored repo analysis and AI-generated founder outreach.">
+    <meta property="og:description" content="Start free. Upgrade to Pro for repository discovery, founder outreach, and a full proof-of-work workflow.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ site_url }}/pricing">
 {% endblock %}
@@ -12,7 +12,7 @@
     <section class="pricing">
         <span class="section-label">Pricing</span>
         <h1>Choose your Proof-of-Work engine</h1>
-        <p>Start free. Upgrade when BashOps Radar becomes part of your daily client acquisition workflow.</p>
+        <p>Free analyzes repositories you already know. Pro helps you discover better repositories, prepare outreach, and manage the full proof-of-work workflow.</p>
 
         {% if billing_error %}
         <div class="error">{{ billing_error }}</div>
@@ -47,8 +47,8 @@
         <span class="section-label">FAQ</span>
         <h2>Questions before you upgrade</h2>
         <div class="faq-grid">
-            <div><strong>What do I get on Free?</strong><p>Five analyses per day, opportunity scoring, issue ranking, and a basic pipeline.</p></div>
-            <div><strong>What do I get on Pro?</strong><p>Unlimited analyses, AI founder outreach, unlimited pipeline history, and CSV export.</p></div>
+            <div><strong>What do I get on Free?</strong><p>Two analyses per day, opportunity scoring, issue ranking, and a basic pipeline for repositories you already know.</p></div>
+            <div><strong>What do I get on Pro?</strong><p>Repository discovery, unlimited analyses, founder outreach, unlimited pipeline history, and CSV export.</p></div>
             <div><strong>Can I cancel anytime?</strong><p>Yes. Contact support for subscription changes while the billing portal is being configured.</p></div>
             <div><strong>What if I only want to test one repository?</strong><p>Use the Free plan. Upgrade only when the workflow becomes part of your client acquisition process.</p></div>
             <div><strong>Do you guarantee paid work?</strong><p>No. BashOps Radar helps you find better opportunities and prepare stronger outreach, but outcomes depend on execution and market timing.</p></div>

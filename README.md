@@ -107,7 +107,7 @@ jobs:
       - name: Show BashOps outputs
         run: |
           echo "Opportunity Score: ${{ steps.radar.outputs.opportunity_score }}"
-          echo "Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
+          echo "Estimated Contract Potential: ${{ steps.radar.outputs.contract_potential }}"
           echo "Recommended Next Action: ${{ steps.radar.outputs.recommended_next_action }}"
 ```
 

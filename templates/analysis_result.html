@@ -22,14 +22,13 @@
     <section class="analysis-shell">
         <div class="upgrade-card">
             <span class="section-label">Free Limit Reached</span>
-            <h1>You used your 5 free analyses today</h1>
-            <p>Upgrade to Pro for unlimited analyses, founder intelligence, daily briefing, and contract engine.</p>
+            <h1>You used your 2 free analyses today</h1>
+            <p>Free helps you analyze repositories you already know. Pro helps you discover better repositories, prepare outreach, and manage the full proof-of-work workflow.</p>
             <div class="upgrade-features">
                 <span>Unlimited analyses</span>
-                <span>Founder Intelligence</span>
-                <span>AI outreach messages</span>
-                <span>Daily briefing</span>
-                <span>Contract engine</span>
+                <span>Pro Opportunity Finder</span>
+                <span>Founder outreach strategy</span>
+                <span>Advanced pipeline workflow</span>
             </div>
             <div class="upgrade-actions">
                 <a href="/pricing" class="nav-cta compact">View Pricing</a>
@@ -56,7 +55,7 @@
                     </div>
                     <div class="score-card-meta">
                         <div>
-                            <span>Contract potential</span>
+                            <span>Estimated Contract Potential</span>
                             <strong>{{ contract_potential }}</strong>
                         </div>
                         <div>
@@ -69,9 +68,9 @@
 
             <div class="analysis-metrics">
                 <div><strong>{{ result.decision }}</strong><span>Decision</span></div>
-                <div><strong>{{ result.merge_probability }}</strong><span>Merge Probability</span></div>
-                <div><strong>{{ result.estimated_time }}</strong><span>Estimated Time</span></div>
-                <div><strong>{{ result.difficulty }}</strong><span>Difficulty</span></div>
+                <div><strong>{{ result.merge_probability }}</strong><span>Estimated Merge Probability</span></div>
+                <div><strong>{{ result.estimated_time }}</strong><span>Estimated Implementation Time</span></div>
+                <div><strong>{{ result.difficulty }}</strong><span>Estimated Difficulty</span></div>
                 <div><strong>{{ result.stars }}</strong><span>Stars</span></div>
                 <div><strong>{{ result.open_issues }}</strong><span>Open Issues</span></div>
             </div>
@@ -80,7 +79,15 @@
                 <div class="score-explainer-header">
                     <div>
                         <span class="section-label">Score Transparency</span>
-                        <h2>Why this repository scored well</h2>
+                        <h2>
+                            {% if result.score >= 70 %}
+                            Why this repository scored well
+                            {% elif result.score >= 50 %}
+                            Why this repository needs review
+                            {% else %}
+                            Why this repository scored low
+                            {% endif %}
+                        </h2>
                     </div>
                     <div class="decision-pill">
                         <span>Recommendation</span>
@@ -140,17 +147,23 @@
             {% endif %}
 
             {% if not has_pro_access %}
+            <div class="upgrade-card inline-upgrade">
+                <span class="section-label">Pro Opportunity</span>
                 {% if result.score >= 70 %}
-                <div class="upgrade-card inline-upgrade">
-                    <span class="section-label">Pro Opportunity</span>
                     <h2>This repository scored {{ result.score }}.</h2>
-                    <p>Unlock AI founder outreach and paid sprint strategy for this opportunity.</p>
-                    <div class="upgrade-actions">
-                        <a href="/billing/upgrade" class="nav-cta compact">Upgrade to Pro</a>
-                        <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
-                    </div>
-                </div>
+                    <p>Pro helps you discover more repositories with similar signals, prepare founder outreach, save opportunities, and analyze without daily limits.</p>
+                {% elif result.score >= 50 %}
+                    <h2>This repository scored {{ result.score }}.</h2>
+                    <p>This opportunity needs manual review. Pro helps you discover stronger repositories, prepare outreach, save opportunities, and analyze without daily limits.</p>
+                {% else %}
+                    <h2>This repository may not be worth your time.</h2>
+                    <p>This repository scored {{ result.score }}. Pro helps you discover stronger opportunities before spending time on weak targets.</p>
                 {% endif %}
+                <div class="upgrade-actions">
+                    <a href="/billing/upgrade" class="nav-cta compact">Unlock BashOps Pro</a>
+                    <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
+                </div>
+            </div>
             {% elif has_pro_access %}
             <div class="success-card">Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.</div>
             {% endif %}
@@ -215,25 +228,29 @@
 
             {% if not has_pro_access %}
             <div class="locked-preview-grid">
-                <div class="locked-preview-card">
+                <div class="locked-preview-card" aria-label="Locked Pro preview: Founder Outreach Strategy">
                     <span class="section-label">Pro</span>
-                    <h3>AI Founder Outreach Pitch</h3>
-                    <p>Generate a concise message for maintainers and founders after your first useful PR.</p>
+                    <h3>Founder Outreach Strategy</h3>
+                    <p>See the best angle for approaching the project owner after your contribution.</p>
+                    <a class="nav-cta compact" href="/billing/upgrade">Unlock Pro</a>
                 </div>
-                <div class="locked-preview-card">
+                <div class="locked-preview-card" aria-label="Locked Pro preview: AI Founder Pitch">
                     <span class="section-label">Pro</span>
-                    <h3>Paid Sprint Strategy</h3>
-                    <p>Turn repo findings into a focused 48-hour reliability or integration offer.</p>
+                    <h3>AI Founder Pitch</h3>
+                    <p>Prepare a concise, context-aware message after your first useful pull request.</p>
+                    <a class="nav-cta compact" href="/billing/upgrade">Unlock Pro</a>
                 </div>
-                <div class="locked-preview-card">
+                <div class="locked-preview-card" aria-label="Locked Pro preview: Discover More Repositories">
                     <span class="section-label">Pro</span>
-                    <h3>Follow-up Message</h3>
-                    <p>Prepare the next touchpoint after your contribution gets reviewed or merged.</p>
+                    <h3>Discover Better Repositories</h3>
+                    <p>Use Pro Opportunity Finder to find stronger repositories without manual GitHub searching.</p>
+                    <a class="nav-cta compact" href="/billing/upgrade">Unlock Pro</a>
                 </div>
-                <div class="locked-preview-card">
+                <div class="locked-preview-card" aria-label="Locked Pro preview: Advanced Pipeline Workflow">
                     <span class="section-label">Pro</span>
-                    <h3>Opportunity Finder</h3>
-                    <p>Discover promising repositories and issues without manual GitHub searching.</p>
+                    <h3>Advanced Pipeline Workflow</h3>
+                    <p>Save, manage, export, and revisit opportunities as your proof-of-work pipeline grows.</p>
+                    <a class="nav-cta compact" href="/billing/upgrade">Unlock Pro</a>
                 </div>
             </div>
             {% endif %}

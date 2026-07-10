@@ -2498,6 +2498,17 @@ footer {
     line-height: 1.6;
 }
 
+.locked-preview-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.locked-preview-card .nav-cta {
+    width: fit-content;
+    margin-top: auto;
+}
+
 .pricing-trust,
 .pricing-faq {
     margin-top: 22px;
@@ -3503,5 +3514,20 @@ footer,
 
     .score-explainer-header {
         display: grid;
+    }
+
+    .locked-preview-grid {
+        gap: 10px;
+    }
+
+    .locked-preview-card {
+        padding: 14px;
+        border-radius: 12px;
+    }
+
+    .locked-preview-card .nav-cta,
+    .inline-upgrade .nav-cta,
+    .inline-upgrade .nav-outline {
+        width: 100%;
     }
 }

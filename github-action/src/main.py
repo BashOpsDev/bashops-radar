@@ -99,9 +99,9 @@ def main() -> int:
     print("BashOps Radar Opportunity Summary")
     print(f"Repository: {repository}")
     print(f"Opportunity Score: {score}/100")
-    print(f"Contract Potential: {contract_potential}")
+    print(f"Estimated Contract Potential: {contract_potential}")
     if difficulty:
-        print(f"Difficulty: {difficulty}")
+        print(f"Estimated Difficulty: {difficulty}")
     print(f"Best Issue: {best_issue}")
     print(f"Recommended Next Action: {next_action}")
     print("Full analysis: https://bashops.site")
@@ -112,8 +112,8 @@ def main() -> int:
         else:
             comment = (
                 f"**BashOps Radar Opportunity Score:** {score}/100\n\n"
-                f"**Contract Potential:** {contract_potential}\n\n"
-                f"**Difficulty:** {difficulty or 'Estimate unavailable'}\n\n"
+                f"**Estimated Contract Potential:** {contract_potential}\n\n"
+                f"**Estimated Difficulty:** {difficulty or 'Estimate unavailable'}\n\n"
                 f"**Recommended Next Action:** {next_action}\n\n"
                 "Full analysis: https://bashops.site"
             )

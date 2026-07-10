@@ -74,6 +74,203 @@ def test_homepage_links_to_free_developer_tools(client):
     assert "Should I Contribute Here?" in r.text
 
 
+def _fake_analysis_result(score=88):
+    return {
+        "repo": "example/repo",
+        "repo_url": "https://github.com/example/repo",
+        "repo_data": {
+            "description": "Example repo",
+            "homepage": "",
+            "html_url": "https://github.com/example/repo",
+        },
+        "description": "Example repo",
+        "score": score,
+        "score_label": "Strong",
+        "score_action": "CONTRIBUTE NOW",
+        "merge_probability": "High",
+        "estimated_time": "3-6 hours",
+        "difficulty": "Medium",
+        "decision": "YES - strong Proof-of-Work target",
+        "angle": "Backend reliability and API validation.",
+        "best_issue": {
+            "number": 7,
+            "title": "Fix API failure",
+            "url": "https://github.com/example/repo/issues/7",
+            "score": 91,
+            "type": "Bug Fix",
+        },
+        "recommended_action": "Start with #7 - Fix API failure",
+        "recommended_outcome": "Submit one focused PR.",
+        "issues": [
+            (
+                91,
+                "Bug Fix",
+                {
+                    "number": 7,
+                    "title": "Fix API failure",
+                    "html_url": "https://github.com/example/repo/issues/7",
+                },
+            )
+        ],
+        "languages": {"Python": 100},
+        "language": "Python",
+        "stars": 500,
+        "forks": 50,
+        "open_issues": 20,
+        "last_push": "2026-07-10T00:00:00Z",
+        "score_transparency": {
+            "reasons": [{"label": "Recently maintained", "detail": "Last push: today"}],
+            "warnings": [{"label": "Review speed could not be verified", "detail": "GitHub issue data does not confirm review speed"}],
+            "signals_used": [{"label": "Repository Activity", "detail": "Excellent"}],
+            "confidence": "High",
+            "confidence_reasons": ["Repository metadata available", "Ranked issue candidates found"],
+        },
+    }
+
+
+def _stub_analysis(monkeypatch, score=88):
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "build_analysis_result", lambda *args, **kwargs: _fake_analysis_result(score=score))
+    monkeypatch.setattr(app_module, "generate_ai_summary", lambda *args, **kwargs: {"text": "Basic AI summary.", "status": "available"})
+
+
+def _post_analysis(client, repo_url="https://github.com/example/repo"):
+    r = client.get("/")
+    token = _csrf_token(r.text)
+    return client.post(
+        "/analyze",
+        data={"repo_url": repo_url, "csrf_token": token},
+        follow_redirects=False,
+    )
+
+
+def _register_verified_and_login(client, email="user@example.com", password="StrongPass1", name="Test User"):
+    from database import SessionLocal
+    from models import User
+
+    r = client.get("/register")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/register",
+        data={"name": name, "email": email, "password": password, "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    user.email_verified = True
+    db.commit()
+    db.close()
+
+    r = client.get("/login")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/login",
+        data={"email": email, "password": password, "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+
+def test_free_user_limit_is_two_analyses_per_day(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+
+    assert _post_analysis(client).status_code == 200
+    assert _post_analysis(client).status_code == 200
+
+    r = _post_analysis(client)
+    assert r.status_code == 200
+    assert "You used your 2 free analyses today" in r.text
+
+
+def test_pro_user_remains_unlimited(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    user.plan = "pro"
+    db.commit()
+    db.close()
+
+    for _ in range(3):
+        r = _post_analysis(client)
+        assert r.status_code == 200
+        assert "Free Limit Reached" not in r.text
+
+
+def test_free_analysis_shows_core_result_and_safe_pro_preview(client, monkeypatch):
+    _stub_analysis(monkeypatch, score=88)
+    _register_verified_and_login(client)
+
+    r = _post_analysis(client)
+
+    assert "Why this repository scored well" in r.text
+    assert "Signals Used" in r.text
+    assert "Confidence" in r.text
+    assert "Best First Issue" in r.text
+    assert "Basic AI summary." in r.text
+    assert "Estimated Merge Probability" in r.text
+    assert "Estimated Implementation Time" in r.text
+    assert "Estimated Difficulty" in r.text
+    assert "Estimated Contract Potential" in r.text
+    assert ">Merge Probability<" not in r.text
+    assert ">Estimated Time<" not in r.text
+    assert "This repository scored 88." in r.text
+    assert "Founder Outreach Strategy" in r.text
+    assert "Unlock Pro" in r.text
+    assert "Pro founder outreach workflows are active" not in r.text
+
+
+def test_low_score_analysis_uses_discovery_upgrade_copy(client, monkeypatch):
+    _stub_analysis(monkeypatch, score=32)
+    _register_verified_and_login(client)
+
+    r = _post_analysis(client)
+
+    assert "Why this repository scored low" in r.text
+    assert "This repository may not be worth your time." in r.text
+    assert "discover stronger opportunities" in r.text
+    assert "Discover Better Repositories" in r.text
+    assert "similar signals" not in r.text
+
+
+def test_pro_analysis_shows_pro_state_not_locked_preview(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    user.plan = "pro"
+    db.commit()
+    db.close()
+
+    r = _post_analysis(client)
+
+    assert "Pro founder outreach workflows are active" in r.text
+    assert "Founder Outreach Strategy" not in r.text
+
+
+def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+
+    r = client.post("/api/v1/analyze", json={"repo_url": "https://github.com/example/repo"})
+    payload = r.json()
+
+    assert r.status_code == 200
+    assert "opportunity_score" in payload
+    assert "score_transparency" not in payload
+
+
 def _csrf_token(html: str) -> str:
     match = re.search(r'name="csrf_token" value="([^"]+)"', html)
     assert match, "csrf_token not found in response HTML"
@@ -99,7 +296,8 @@ def _register_and_login(client, email="user@example.com", password="StrongPass1"
     db.close()
 
     r = client.get(f"/verify-email?token={verify_token}", follow_redirects=False)
-    assert r.status_code == 303
+    assert r.status_code == 200
+    assert "Email verified" in r.text
 
     r = client.get("/login")
     token = _csrf_token(r.text)
@@ -208,7 +406,8 @@ def test_verification_token_verifies_user(client):
     db.close()
 
     r = client.get(f"/verify-email?token={verify_token}", follow_redirects=False)
-    assert r.status_code == 303
+    assert r.status_code == 200
+    assert "Email verified" in r.text
 
     db = SessionLocal()
     user = db.query(User).filter(User.email == "verify@example.com").first()
@@ -300,8 +499,7 @@ def test_users_do_not_see_each_others_pipeline_data(client):
 def test_admin_analytics_blocked_for_non_admin(client):
     _register_and_login(client)
     r = client.get("/admin/analytics", follow_redirects=False)
-    assert r.status_code == 303
-    assert r.headers["location"] == "/login"
+    assert r.status_code == 403
 
 
 def test_admin_analytics_allowed_for_admin(client, monkeypatch):
@@ -317,8 +515,7 @@ def test_admin_analytics_allowed_for_admin(client, monkeypatch):
 def test_admin_users_blocked_for_non_admin(client):
     _register_and_login(client)
     r = client.get("/admin/users", follow_redirects=False)
-    assert r.status_code == 303
-    assert r.headers["location"] == "/login"
+    assert r.status_code == 403
 
 
 def test_admin_users_allowed_for_admin(client, monkeypatch):
