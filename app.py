@@ -32,7 +32,6 @@ from analytics import (
     track_analysis,
     update_pipeline_status,
     generate_pitch,
-    fallback_pitch,
     save_pitch,
     daily_analysis_count,
 )
@@ -1539,15 +1538,20 @@ def pitch_preview(
             context={**summary, **user_context(request, current_user), **csrf_context(request)},
         )
 
-    is_pro = has_pro_access(current_user)
-    pitch = generate_pitch(repo, best_issue) if is_pro else fallback_pitch(repo, best_issue)
+    if not has_pro_access(current_user):
+        return templates.TemplateResponse(
+            request=request,
+            name="pipeline.html",
+            context={
+                **summary,
+                **user_context(request, current_user),
+                "pitch_upgrade_message": "Founder pitch generation is a Pro feature. Upgrade to prepare focused outreach after your first useful pull request.",
+                **csrf_context(request),
+            },
+        )
 
-    # Only persist (and only "spend" a Gemini call on) pitches for Pro
-    # users. A free user re-clicking the button just regenerates the same
-    # free template — cheap, and doesn't need to be saved since it's
-    # already what /pipeline shows by default for that row.
-    if is_pro:
-        save_pitch(repo, current_user.id, pitch)
+    pitch = generate_pitch(repo, best_issue)
+    save_pitch(repo, current_user.id, pitch)
 
     summary = analytics_summary(user_id=current_user.id)
 
@@ -1559,7 +1563,7 @@ def pitch_preview(
             **user_context(request, current_user),
             "generated_pitch": pitch,
             "pitch_repo": repo,
-            "pitch_is_pro": is_pro,
+            "pitch_is_pro": True,
             **csrf_context(request),
         },
     )

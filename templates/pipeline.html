@@ -11,6 +11,18 @@
         <h1>BashOps Radar Pipeline</h1>
         <p class="angle">Track repositories from discovery to paid sprint.</p>
 
+        {% if pitch_upgrade_message %}
+        <div class="upgrade-card inline-upgrade">
+            <span class="section-label">Pro Feature</span>
+            <h2>Founder pitch generation is locked</h2>
+            <p>{{ pitch_upgrade_message }}</p>
+            <div class="upgrade-actions">
+                <a href="/billing/upgrade" class="nav-cta compact">Unlock BashOps Pro</a>
+                <a href="/pricing" class="nav-outline compact">View Pricing</a>
+            </div>
+        </div>
+        {% endif %}
+
         <h2>Pipeline Stats</h2>
         <div class="pipeline-stats">
             {% for item in pipeline_stats %}
@@ -148,7 +160,7 @@ class="export-btn">
                     </p>
                 </div>
 
-                {% if row.pitch %}
+                {% if has_pro_access and row.pitch %}
                 <details class="pitch-panel mini-pitch">
                     <summary>Founder Pitch</summary>
 
@@ -176,13 +188,17 @@ class="export-btn">
                         <button type="submit">Update Status</button>
                     </form>
 
+                    {% if has_pro_access %}
                     <form method="post" action="/generate-pitch" class="pipeline-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="repo" value="{{ row.repo }}">
                         <input type="hidden" name="best_issue" value="{{ row.best_issue }}">
 
                         <button type="submit">Generate Founder Pitch</button>
                     </form>
+                    {% else %}
+                    <a href="/billing/upgrade" class="nav-cta compact">Unlock Founder Pitch</a>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}

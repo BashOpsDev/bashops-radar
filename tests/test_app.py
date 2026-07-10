@@ -559,7 +559,7 @@ def test_navbar_hides_admin_link_for_regular_users(client):
 
 # --- Pro-gated pitch generation -------------------------------------------
 
-def test_free_user_gets_static_pitch_not_persisted_as_ai(client):
+def test_free_user_cannot_generate_founder_pitch(client):
     from database import SessionLocal
     from models import Target, User
 
@@ -578,7 +578,40 @@ def test_free_user_gets_static_pitch_not_persisted_as_ai(client):
         data={"repo": "octocat/hello", "best_issue": "#1", "csrf_token": token},
     )
     assert r.status_code == 200
-    assert "proof-of-work opportunity" in r.text  # the free fallback template
+    assert "Founder pitch generation is locked" in r.text
+    assert "Founder pitch generation is a Pro feature" in r.text
+    assert "I reviewed octocat/hello" not in r.text
+
+
+def test_pro_user_can_generate_and_persist_founder_pitch(client, monkeypatch):
+    from database import SessionLocal
+    from models import Target, User
+
+    import app
+
+    monkeypatch.setattr(app, "generate_pitch", lambda repo, best_issue: f"Pro pitch for {repo} {best_issue}")
+    _register_and_login(client)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    user.plan = "pro"
+    db.add(Target(user_id=user.id, repo="octocat/hello", repo_url="", language="Python", score=80, pitch=""))
+    db.commit()
+    db.close()
+
+    r = client.get("/pipeline")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/generate-pitch",
+        data={"repo": "octocat/hello", "best_issue": "#1", "csrf_token": token},
+    )
+    assert r.status_code == 200
+    assert "Pro pitch for octocat/hello #1" in r.text
+
+    db = SessionLocal()
+    row = db.query(Target).filter(Target.repo == "octocat/hello").first()
+    assert row.pitch == "Pro pitch for octocat/hello #1"
+    db.close()
 
 
 # --- Paddle webhook -------------------------------------------------------

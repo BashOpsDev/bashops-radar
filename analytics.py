@@ -113,8 +113,8 @@ Bashir"""
 
 def fallback_pitch(repo, best_issue):
     """Public entry point for the free static template (no API call, no
-    plan check). This is what free-plan users get from /generate-pitch —
-    the real AI-generated version below is Pro-only."""
+    plan check). This is used as a safe fallback when Pro pitch generation
+    cannot reach Gemini."""
     return _pitch_fallback(repo, best_issue)
 
 
@@ -247,7 +247,7 @@ def _row_to_dict(row):
         "difficulty": row.difficulty or estimate_difficulty(row.score),
         "merge_probability": row.merge_probability or estimate_merge_probability(row.score),
         "estimated_time": row.estimated_time or estimate_completion_time(row.score),
-        "pitch": row.pitch or _pitch_fallback(row.repo, row.best_issue),
+        "pitch": row.pitch or "",
         "progress": STATUS_PROGRESS.get(row.status or DEFAULT_STATUS, 12),
         "pretty_time": row.created_at.strftime("%d %b %Y - %H:%M UTC") if row.created_at else "",
         "timestamp": row.created_at.isoformat() if row.created_at else "",
