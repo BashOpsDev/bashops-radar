@@ -260,6 +260,45 @@ def test_pro_analysis_shows_pro_state_not_locked_preview(client, monkeypatch):
     assert "Founder Outreach Strategy" not in r.text
 
 
+def test_pipeline_saved_target_reopens_full_analysis_without_duplicate(client, monkeypatch):
+    from database import SessionLocal
+    from models import Target, User
+
+    _stub_analysis(monkeypatch, score=86)
+    _register_verified_and_login(client)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    target = Target(
+        user_id=user.id,
+        repo="example/repo",
+        repo_url="https://github.com/example/repo",
+        language="Python",
+        score=86,
+        best_issue="#7",
+        best_issue_url="https://github.com/example/repo/issues/7",
+    )
+    db.add(target)
+    db.commit()
+    target_id = target.id
+    before_count = db.query(Target).filter(Target.user_id == user.id).count()
+    db.close()
+
+    r = client.get("/pipeline")
+    assert f'href="/analysis/{target_id}"' in r.text
+
+    r = client.get(f"/analysis/{target_id}")
+    assert r.status_code == 200
+    assert "Why this repository scored well" in r.text
+    assert "Best First Issue" in r.text
+    assert "Basic AI summary." in r.text
+
+    db = SessionLocal()
+    after_count = db.query(Target).filter(Target.user_id == user.id).count()
+    db.close()
+    assert after_count == before_count
+
+
 def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
     _stub_analysis(monkeypatch)
 

@@ -1244,6 +1244,68 @@ def pipeline(request: Request):
     )
 
 
+@app.get("/analysis/{target_id}", response_class=HTMLResponse)
+def saved_analysis(request: Request, target_id: int):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    db: Session = SessionLocal()
+    try:
+        target = db.query(Target).filter(Target.id == target_id, Target.user_id == current_user.id).first()
+        if not target:
+            return RedirectResponse(url="/pipeline", status_code=303)
+
+        repo_url = target.repo_url or f"https://github.com/{target.repo}"
+    finally:
+        db.close()
+
+    try:
+        track_event(request, "analysis_reopened", user=current_user, metadata={"target_id": target_id, "repo_url": repo_url})
+        result = build_analysis_result(repo_url)
+        best_issue = result.get("best_issue")
+        ai_summary = generate_ai_summary(
+            repo_full_name=result["repo"],
+            repo=result["repo_data"],
+            best_issue=best_issue,
+            repo_score=result["score"],
+            angle=result["angle"],
+        )
+        result["ai_summary"] = ai_summary["text"]
+        result["ai_status"] = ai_summary["status"]
+
+        return templates.TemplateResponse(
+            request=request,
+            name="analysis_result.html",
+            context={
+                "result": result,
+                "error": None,
+                "limit_reached": False,
+                "from_discover": False,
+                "site_url": config.SITE_URL,
+                "pro_price": config.PRO_PRICE_USD,
+                **user_context(request, current_user),
+                **csrf_context(request),
+            },
+        )
+    except Exception as e:
+        print(f"[/analysis/{target_id} error] {e!r}")
+        return templates.TemplateResponse(
+            request=request,
+            name="analysis_result.html",
+            context={
+                "result": None,
+                "error": "Something went wrong reopening that analysis. Please try again.",
+                "limit_reached": False,
+                "from_discover": False,
+                "site_url": config.SITE_URL,
+                "pro_price": config.PRO_PRICE_USD,
+                **user_context(request, current_user),
+                **csrf_context(request),
+            },
+        )
+
+
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(
     request: Request,
