@@ -8,7 +8,7 @@
     <section class="dashboard-hero">
         <div>
             <span class="section-label">Workspace</span>
-            <h1>Good morning, {{ current_user.name or current_user.email }}</h1>
+            <h1>Welcome back, {{ current_user.name or current_user.email }}</h1>
             <p>Your Proof-of-Work command center.</p>
             <div class="dashboard-hero-meta">
                 <span class="plan-chip {% if has_pro_access %}pro{% endif %}">

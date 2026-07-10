@@ -286,6 +286,7 @@ def test_pipeline_saved_target_reopens_full_analysis_without_duplicate(client, m
 
     r = client.get("/pipeline")
     assert f'href="/analysis/{target_id}"' in r.text
+    assert "View Full Analysis" in r.text
 
     r = client.get(f"/analysis/{target_id}")
     assert r.status_code == 200
@@ -365,6 +366,8 @@ def test_register_then_login_flow(client):
     _register_and_login(client)
     r = client.get("/dashboard")
     assert r.status_code == 200
+    assert "Welcome back," in r.text
+    assert "Good morning" not in r.text
 
 
 def test_login_wrong_password_rejected(client):
