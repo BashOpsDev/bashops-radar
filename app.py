@@ -34,6 +34,7 @@ from analytics import (
     generate_pitch,
     save_pitch,
     daily_analysis_count,
+    lifetime_analysis_count,
 )
 import paddle_billing
 import email_utils
@@ -72,6 +73,7 @@ templates = Jinja2Templates(directory="templates")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BETA_FILE = Path("beta_signups.csv")
 FREE_ANALYSIS_LIMIT = 2
+ANONYMOUS_ANALYSIS_LIMIT = 1
 EMAIL_VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
 PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 60
 
@@ -317,6 +319,24 @@ def track_event(request: Request, event_name: str, user=None, metadata=None) -> 
             db.close()
     except Exception as exc:
         print(f"[event tracking failed] {event_name}: {exc!r}")
+
+
+def anonymous_website_analysis_used(request: Request, ip: str) -> bool:
+    """
+    Website-only anonymous trial guard. The session flag is the primary signal;
+    the existing anonymous Target/IP count remains a soft fallback for the
+    current network without adding fingerprinting or new storage.
+    """
+    if request.session.get("anonymous_analysis_used"):
+        return True
+    return daily_analysis_count(ip=ip) >= ANONYMOUS_ANALYSIS_LIMIT
+
+
+def free_account_analysis_count(user) -> int:
+    """Free account quota is derived from successful Target rows."""
+    if not user:
+        return 0
+    return lifetime_analysis_count(user.id)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -1490,14 +1510,44 @@ def analyze(
                 metadata={"repo_url": repo_url},
             )
 
+        if current_user and not has_pro_access(current_user) and not current_user.email_verified:
+            track_event(
+                request,
+                "free_analysis_blocked",
+                user=current_user,
+                metadata={"reason": "email_unverified"},
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="analysis_result.html",
+                context={
+                    "result": None,
+                    "error": None,
+                    "limit_reached": False,
+                    "verification_required": True,
+                    "from_discover": source == "discover",
+                    "site_url": config.SITE_URL,
+                    "pro_price": config.PRO_PRICE_USD,
+                    **user_context(request, current_user),
+                    **csrf_context(request),
+                },
+            )
+
         if current_user:
-            count = daily_analysis_count(user_id=current_user.id)
+            count = free_account_analysis_count(current_user)
             over_limit = not has_pro_access(current_user) and count >= FREE_ANALYSIS_LIMIT
+            limit_type = "account"
         else:
-            count = daily_analysis_count(ip=ip)
-            over_limit = count >= FREE_ANALYSIS_LIMIT
+            over_limit = anonymous_website_analysis_used(request, ip)
+            limit_type = "anonymous"
 
         if over_limit:
+            track_event(
+                request,
+                "free_analysis_blocked",
+                user=current_user,
+                metadata={"reason": limit_type, "repo_url": repo_url},
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="analysis_result.html",
@@ -1505,6 +1555,7 @@ def analyze(
                     "result": None,
                     "error": None,
                     "limit_reached": True,
+                    "limit_type": limit_type,
                     "from_discover": source == "discover",
                     "site_url": config.SITE_URL,
                     "pro_price": config.PRO_PRICE_USD,
@@ -1544,6 +1595,31 @@ def analyze(
             difficulty=result.get("difficulty"),
             estimated_time=result.get("estimated_time"),
         )
+
+        if current_user and not has_pro_access(current_user):
+            used_count = free_account_analysis_count(current_user)
+            remaining_count = max(FREE_ANALYSIS_LIMIT - used_count, 0)
+            track_event(
+                request,
+                "free_analysis_completed",
+                user=current_user,
+                metadata={"repo": result["repo"], "remaining": remaining_count},
+            )
+            if remaining_count == 0:
+                track_event(
+                    request,
+                    "free_trial_completed",
+                    user=current_user,
+                    metadata={"repo": result["repo"]},
+                )
+        elif not current_user:
+            request.session["anonymous_analysis_used"] = True
+            track_event(
+                request,
+                "free_analysis_completed",
+                metadata={"repo": result["repo"], "anonymous": True},
+            )
+
         track_event(
             request,
             "analysis_completed",
@@ -1693,10 +1769,10 @@ def dashboard(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
     summary = analytics_summary(user_id=current_user.id)
-    analyses_used_today = daily_analysis_count(user_id=current_user.id)
+    analyses_used_total = free_account_analysis_count(current_user)
     analyses_remaining = None
     if not has_pro_access(current_user):
-        analyses_remaining = max(FREE_ANALYSIS_LIMIT - analyses_used_today, 0)
+        analyses_remaining = max(FREE_ANALYSIS_LIMIT - analyses_used_total, 0)
 
     return templates.TemplateResponse(
         request=request,
@@ -1704,7 +1780,7 @@ def dashboard(request: Request):
         context={
             **summary,
             "free_analysis_limit": FREE_ANALYSIS_LIMIT,
-            "analyses_used_today": analyses_used_today,
+            "analyses_used_total": analyses_used_total,
             "analyses_remaining": analyses_remaining,
             **user_context(request, current_user),
             **csrf_context(request),

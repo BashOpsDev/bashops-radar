@@ -17,7 +17,13 @@
                 {% if has_pro_access %}
                 <span>Unlimited analyses and Pro discovery available.</span>
                 {% else %}
-                <span>{{ analyses_remaining }} analyses remaining today.</span>
+                    {% if analyses_remaining == 0 %}
+                    <span>Free analysis trial complete.</span>
+                    {% elif analyses_remaining == 1 %}
+                    <span>1 free analysis remaining.</span>
+                    {% else %}
+                    <span>{{ analyses_remaining }} free analyses remaining.</span>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -42,7 +48,7 @@
             <span class="section-label">Free Plan</span>
             <h2>Build your first pipeline</h2>
             <ul>
-                <li>2 analyses/day</li>
+                <li>2 free analyses included</li>
                 <li>Basic opportunity scoring</li>
                 <li>Basic pipeline tracking</li>
             </ul>

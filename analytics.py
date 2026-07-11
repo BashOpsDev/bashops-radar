@@ -232,6 +232,22 @@ def daily_analysis_count(user_id=None, ip=None):
         db.close()
 
 
+def lifetime_analysis_count(user_id):
+    """
+    Count successful analyses for a user across the lifetime of the account.
+    Target rows are created only after analysis succeeds, so this derived
+    count avoids a separate mutable quota counter.
+    """
+    if user_id is None:
+        return 0
+
+    db = SessionLocal()
+    try:
+        return db.query(Target).filter(Target.user_id == user_id).count()
+    finally:
+        db.close()
+
+
 def _row_to_dict(row):
     return {
         "id": row.id,

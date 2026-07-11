@@ -18,12 +18,39 @@
             </form>
         </div>
     </section>
+    {% elif verification_required %}
+    <section class="analysis-shell">
+        <div class="upgrade-card">
+            <span class="section-label">Email Verification Required</span>
+            <h1>Verify your email to use your two free repository analyses.</h1>
+            <p>Check your inbox for the verification link, or resend it from the verification page you saw after registration.</p>
+            <div class="upgrade-actions">
+                <a href="/login" class="nav-cta compact">Log In</a>
+                <a href="/register" class="nav-outline compact">Create Free Account</a>
+            </div>
+        </div>
+    </section>
     {% elif limit_reached %}
     <section class="analysis-shell">
         <div class="upgrade-card">
+            {% if limit_type == "anonymous" %}
+            <span class="section-label">Free Analysis Complete</span>
+            <h1>Your first free analysis is complete.</h1>
+            <p>Create a free account to analyze another repository, save your research, and create a Proof-of-Work Snapshot.</p>
+            <div class="upgrade-features">
+                <span>2 free account analyses</span>
+                <span>Saved pipeline research</span>
+                <span>One Proof-of-Work Snapshot</span>
+                <span>Upgrade when you need unlimited analysis</span>
+            </div>
+            <div class="upgrade-actions">
+                <a href="/register" class="nav-cta compact">Create Free Account</a>
+                <a href="/login" class="nav-outline compact">Log In</a>
+            </div>
+            {% else %}
             <span class="section-label">Free Limit Reached</span>
-            <h1>You used your 2 free analyses today</h1>
-            <p>Free helps you analyze repositories you already know. Pro helps you discover better repositories, prepare outreach, and manage the full proof-of-work workflow.</p>
+            <h1>Your free analysis trial is complete.</h1>
+            <p>You have used both full-quality repository analyses. Upgrade to Pro to continue analyzing new repositories, discover opportunities, and manage the complete proof-of-work workflow.</p>
             <div class="upgrade-features">
                 <span>Unlimited analyses</span>
                 <span>Pro Opportunity Finder</span>
@@ -31,9 +58,10 @@
                 <span>Advanced pipeline workflow</span>
             </div>
             <div class="upgrade-actions">
-                <a href="/pricing" class="nav-cta compact">View Pricing</a>
-                <a href="/" class="nav-outline compact">Analyze Later</a>
+                <a href="/billing/upgrade" class="nav-cta compact">Upgrade to Pro</a>
+                <a href="/pipeline" class="nav-outline compact">View My Pipeline</a>
             </div>
+            {% endif %}
         </div>
     </section>
     {% elif result %}
@@ -151,10 +179,10 @@
                 <span class="section-label">Pro Opportunity</span>
                 {% if result.score >= 70 %}
                     <h2>This repository scored {{ result.score }}.</h2>
-                    <p>Pro helps you discover more repositories with similar signals, prepare founder outreach, save opportunities, and analyze without daily limits.</p>
+                    <p>Pro helps you discover more repositories with similar signals, prepare founder outreach, save opportunities, and analyze without trial limits.</p>
                 {% elif result.score >= 50 %}
                     <h2>This repository scored {{ result.score }}.</h2>
-                    <p>This opportunity needs manual review. Pro helps you discover stronger repositories, prepare outreach, save opportunities, and analyze without daily limits.</p>
+                    <p>This opportunity needs manual review. Pro helps you discover stronger repositories, prepare outreach, save opportunities, and analyze without trial limits.</p>
                 {% else %}
                     <h2>This repository may not be worth your time.</h2>
                     <p>This repository scored {{ result.score }}. Pro helps you discover stronger opportunities before spending time on weak targets.</p>

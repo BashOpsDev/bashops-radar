@@ -174,7 +174,21 @@ def _register_verified_and_login(client, email="user@example.com", password="Str
     assert r.status_code == 303
 
 
-def test_free_user_limit_is_two_analyses_per_day(client, monkeypatch):
+def test_anonymous_visitor_gets_one_full_analysis_then_registration_cta(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+
+    r = _post_analysis(client)
+    assert r.status_code == 200
+    assert "Opportunity Report" in r.text
+
+    r = _post_analysis(client)
+    assert r.status_code == 200
+    assert "Your first free analysis is complete." in r.text
+    assert "Create Free Account" in r.text
+    assert "Log In" in r.text
+
+
+def test_free_user_limit_is_two_lifetime_analyses(client, monkeypatch):
     _stub_analysis(monkeypatch)
     _register_verified_and_login(client)
 
@@ -183,7 +197,125 @@ def test_free_user_limit_is_two_analyses_per_day(client, monkeypatch):
 
     r = _post_analysis(client)
     assert r.status_code == 200
-    assert "You used your 2 free analyses today" in r.text
+    assert "Your free analysis trial is complete." in r.text
+    assert "You have used both full-quality repository analyses" in r.text
+    assert "Upgrade to Pro" in r.text
+    assert "View My Pipeline" in r.text
+
+
+def test_failed_analysis_does_not_consume_free_lifetime_quota(client, monkeypatch):
+    import app as app_module
+
+    calls = {"count": 0}
+
+    def fake_build_analysis_result(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise ValueError("Please provide a valid GitHub repository URL.")
+        return _fake_analysis_result()
+
+    monkeypatch.setattr(app_module, "build_analysis_result", fake_build_analysis_result)
+    monkeypatch.setattr(app_module, "generate_ai_summary", lambda *args, **kwargs: {"text": "Basic AI summary.", "status": "available"})
+    _register_verified_and_login(client)
+
+    r = _post_analysis(client, repo_url="not-a-repo")
+    assert r.status_code == 200
+    assert "We could not analyze that repository." in r.text
+
+    assert _post_analysis(client).status_code == 200
+    assert _post_analysis(client).status_code == 200
+
+    r = _post_analysis(client)
+    assert "Your free analysis trial is complete." in r.text
+
+
+def test_existing_free_user_with_two_prior_targets_is_blocked(client, monkeypatch):
+    from database import SessionLocal
+    from models import Target, User
+
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    db.add(Target(user_id=user.id, repo="example/one", repo_url="", language="Python", score=80))
+    db.add(Target(user_id=user.id, repo="example/two", repo_url="", language="Python", score=81))
+    db.commit()
+    db.close()
+
+    r = _post_analysis(client)
+    assert r.status_code == 200
+    assert "Your free analysis trial is complete." in r.text
+
+
+def test_dashboard_and_pricing_use_lifetime_trial_wording(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+
+    r = client.get("/dashboard")
+    assert r.status_code == 200
+    assert "2 free analyses remaining." in r.text
+    assert "analyses remaining today" not in r.text
+    assert "2 analyses/day" not in r.text
+
+    _post_analysis(client)
+    r = client.get("/dashboard")
+    assert "1 free analysis remaining." in r.text
+
+    _post_analysis(client)
+    r = client.get("/dashboard")
+    assert "Free analysis trial complete." in r.text
+
+    r = client.get("/pricing")
+    assert "2 free analyses included" in r.text
+    assert "2 analyses/day" not in r.text
+
+
+def test_unverified_user_must_verify_before_account_analysis(client, monkeypatch):
+    from database import SessionLocal
+    from models import Target, User
+
+    _stub_analysis(monkeypatch)
+
+    r = client.get("/register")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/register",
+        data={"name": "Trial User", "email": "trial@example.com", "password": "StrongPass1", "csrf_token": token},
+    )
+    assert r.status_code == 200
+
+    r = client.get("/login")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/login",
+        data={"email": "trial@example.com", "password": "StrongPass1", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 200
+    assert "Please verify your email before logging in." in r.text
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "trial@example.com").first()
+    verify_token = user.email_verification_token
+    assert db.query(Target).filter(Target.user_id == user.id).count() == 0
+    db.close()
+
+    r = client.get(f"/verify-email?token={verify_token}")
+    assert r.status_code == 200
+
+    r = client.get("/login")
+    token = _csrf_token(r.text)
+    r = client.post(
+        "/login",
+        data={"email": "trial@example.com", "password": "StrongPass1", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+
+    r = _post_analysis(client)
+    assert r.status_code == 200
+    assert "Opportunity Report" in r.text
 
 
 def test_pro_user_remains_unlimited(client, monkeypatch):
@@ -438,6 +570,17 @@ def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
     assert r.status_code == 200
     assert "opportunity_score" in payload
     assert "score_transparency" not in payload
+
+
+def test_public_api_keeps_existing_anonymous_quota_behavior(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+
+    assert client.post("/api/v1/analyze", json={"repo_url": "https://github.com/example/repo"}).status_code == 200
+    assert client.post("/api/v1/analyze", json={"repo_url": "https://github.com/example/repo"}).status_code == 200
+
+    r = client.post("/api/v1/analyze", json={"repo_url": "https://github.com/example/repo"})
+    assert r.status_code == 429
+    assert "upgrade_url" in r.json()
 
 
 def _csrf_token(html: str) -> str:
