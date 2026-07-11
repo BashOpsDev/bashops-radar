@@ -1,0 +1,109 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Proof-of-Work Snapshot | BashOps Radar</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="snapshot-page">
+    <main class="snapshot-wrap">
+        {% if locked %}
+        <section class="snapshot-card snapshot-locked" aria-labelledby="snapshot-locked-title">
+            <div class="snapshot-brand-row">
+                <a class="snapshot-brand" href="/" aria-label="BashOps Radar home">
+                    <span class="terminal-icon">&gt;_</span>
+                    <span><strong>BashOps <em>Radar</em></strong><small>AI Opportunity Intelligence</small></span>
+                </a>
+                <span class="snapshot-stage">Pro</span>
+            </div>
+
+            <div class="snapshot-locked-copy">
+                <span class="section-label">Proof-of-Work Snapshot</span>
+                <h1 id="snapshot-locked-title">Proof-of-Work Snapshot is available for your first researched repository.</h1>
+                <p>Upgrade to Pro to create snapshots for every repository and every pipeline stage.</p>
+            </div>
+
+            <div class="snapshot-unlocks" aria-label="Pro snapshot features">
+                <span>Working snapshots</span>
+                <span>PR Submitted snapshots</span>
+                <span>PR Merged snapshots</span>
+                <span>Founder Contacted snapshots</span>
+                <span>Paid Sprint snapshots</span>
+                <span>Unlimited repository snapshots</span>
+            </div>
+
+            <div class="snapshot-actions">
+                <a href="/billing/upgrade" class="nav-cta compact">Unlock BashOps Pro</a>
+                <a href="/pricing" class="nav-outline compact">View Pricing</a>
+                <a href="/pipeline" class="nav-outline compact">Back to Pipeline</a>
+            </div>
+        </section>
+        {% else %}
+        <section class="snapshot-card" aria-labelledby="snapshot-title">
+            <div class="snapshot-brand-row">
+                <a class="snapshot-brand" href="/" aria-label="BashOps Radar home">
+                    <span class="terminal-icon">&gt;_</span>
+                    <span><strong>BashOps <em>Radar</em></strong><small>AI Opportunity Intelligence</small></span>
+                </a>
+                <span class="snapshot-stage">{{ stage_label }}</span>
+            </div>
+
+            <header class="snapshot-hero">
+                <span class="section-label">Proof-of-Work Snapshot</span>
+                <h1 id="snapshot-title">{{ target.repo }}</h1>
+                <p>{{ stage_copy }}</p>
+            </header>
+
+            <div class="snapshot-score-grid">
+                <div class="snapshot-score-box">
+                    <span>Opportunity Score</span>
+                    <strong>{{ target.score|round(1) }}<small>/100</small></strong>
+                </div>
+                <div><span>Recommendation</span><strong>{% if target.score >= 85 %}Contribute now{% elif target.score >= 60 %}Inspect manually{% else %}Skip for now{% endif %}</strong></div>
+                <div><span>Estimated Difficulty</span><strong>{{ target.difficulty }}</strong></div>
+                <div><span>Estimated Time</span><strong>{{ target.estimated_time }}</strong></div>
+                <div><span>Estimated Merge Probability</span><strong>{{ target.merge_probability }}</strong></div>
+            </div>
+
+            <div class="snapshot-content-grid">
+                <section class="snapshot-panel">
+                    <h2>Repository Signals</h2>
+                    {% if signals %}
+                    <ul class="snapshot-signal-list">
+                        {% for signal in signals %}
+                        <li><strong>{{ signal.label }}</strong><span>{{ signal.detail }}</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>Repository metadata saved in the BashOps pipeline.</p>
+                    {% endif %}
+                </section>
+
+                <section class="snapshot-panel">
+                    <h2>Contribution Direction</h2>
+                    <div class="snapshot-direction">
+                        <span>Recommended Focus</span>
+                        <strong>{{ focus }}</strong>
+                    </div>
+                    <div class="snapshot-direction">
+                        <span>Proof-of-Work Angle</span>
+                        <strong>{{ target.language }} contribution with focused repository research.</strong>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="snapshot-footer">
+                <div>
+                    <strong>Analyzed with BashOps Radar</strong>
+                    <span>Stop contributing to the wrong repositories.</span>
+                </div>
+                <a href="{{ site_url }}">Analyze your own repository at bashops.site</a>
+            </footer>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

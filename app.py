@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -1305,6 +1305,155 @@ def saved_analysis(request: Request, target_id: int):
             },
         )
 
+SNAPSHOT_STAGE_COPY = {
+    "New Target": (
+        "Researching",
+        "Evaluating this repository as a focused proof-of-work opportunity.",
+    ),
+    "Researching": (
+        "Researching",
+        "Evaluating this repository as a focused proof-of-work opportunity.",
+    ),
+    "Working": (
+        "Working",
+        "Actively working on a contribution for this repository.",
+    ),
+    "PR Submitted": (
+        "PR Submitted",
+        "A pull request has been submitted for review.",
+    ),
+    "PR Merged": (
+        "PR Merged",
+        "The contribution has been accepted and merged.",
+    ),
+    "Founder Contacted": (
+        "Founder Contacted",
+        "The contribution is now supporting a direct project conversation.",
+    ),
+    "Paid Sprint": (
+        "Paid Sprint",
+        "This proof-of-work journey has progressed into paid sprint work.",
+    ),
+    "Retainer": (
+        "Retainer",
+        "This contribution relationship has progressed into ongoing work.",
+    ),
+}
+
+
+def snapshot_issue_focus(target_data: dict, result: Optional[dict] = None) -> str:
+    best_issue = (result or {}).get("best_issue") or {}
+    issue_type = best_issue.get("type")
+    if issue_type:
+        return issue_type
+
+    stored_issue = (target_data.get("best_issue") or "").strip()
+    if stored_issue and not stored_issue.startswith("#"):
+        return stored_issue[:90]
+
+    return "Focused open-source contribution"
+
+
+@app.get("/pipeline/{target_id}/snapshot", response_class=HTMLResponse)
+def proof_of_work_snapshot(request: Request, target_id: int):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    db: Session = SessionLocal()
+    try:
+        target = db.query(Target).filter(Target.id == target_id, Target.user_id == current_user.id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Snapshot not found")
+
+        first_target = (
+            db.query(Target)
+            .filter(Target.user_id == current_user.id)
+            .order_by(Target.created_at.asc(), Target.id.asc())
+            .first()
+        )
+        first_target_id = first_target.id if first_target else target.id
+        repo_url = target.repo_url or (f"https://github.com/{target.repo}" if target.repo else "")
+
+        snapshot_target = {
+            "id": target.id,
+            "repo": target.repo or "Unknown repository",
+            "repo_url": repo_url,
+            "score": target.score if target.score is not None else 0,
+            "status": target.status or "New Target",
+            "language": target.language or "Unknown",
+            "difficulty": target.difficulty or "Estimate unavailable",
+            "merge_probability": target.merge_probability or "Estimate unavailable",
+            "estimated_time": target.estimated_time or "Estimate unavailable",
+            "stars": target.stars or 0,
+            "forks": target.forks or 0,
+            "open_issues": target.open_issues or 0,
+            "best_issue": target.best_issue or "",
+        }
+    finally:
+        db.close()
+
+    has_access = has_pro_access(current_user)
+    stage_label, stage_copy = SNAPSHOT_STAGE_COPY.get(
+        snapshot_target["status"],
+        ("Researching", "Evaluating this repository as a focused proof-of-work opportunity."),
+    )
+    free_stage_allowed = stage_label == "Researching"
+    free_target_allowed = target_id == first_target_id
+    locked = not has_access and (not free_target_allowed or not free_stage_allowed)
+
+    if locked:
+        return templates.TemplateResponse(
+            request=request,
+            name="proof_of_work_snapshot.html",
+            context={
+                "locked": True,
+                "stage_label": stage_label,
+                "stage_copy": stage_copy,
+                "target": None,
+                "signals": [],
+                "focus": "",
+                "site_url": config.SITE_URL,
+                **user_context(request, current_user),
+            },
+        )
+
+    signals = []
+    focus = snapshot_issue_focus(snapshot_target)
+    if snapshot_target["repo_url"]:
+        try:
+            result = build_analysis_result(snapshot_target["repo_url"])
+            signals = (result.get("score_transparency") or {}).get("reasons", [])[:5]
+            focus = snapshot_issue_focus(snapshot_target, result)
+        except Exception as e:
+            print(f"[/pipeline/{target_id}/snapshot analysis enrich error] {e!r}")
+
+    track_event(
+        request,
+        "snapshot_viewed",
+        user=current_user,
+        metadata={
+            "target_id": target_id,
+            "repo": snapshot_target["repo"],
+            "plan": "pro" if has_access else "free",
+            "stage": stage_label,
+        },
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="proof_of_work_snapshot.html",
+        context={
+            "locked": False,
+            "stage_label": stage_label,
+            "stage_copy": stage_copy,
+            "target": snapshot_target,
+            "signals": signals,
+            "focus": focus,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+        },
+    )
 
 @app.post("/analyze", response_class=HTMLResponse)
 def analyze(

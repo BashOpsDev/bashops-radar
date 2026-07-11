@@ -175,6 +175,7 @@ class="export-btn">
 
                 <div class="pipeline-actions">
                     <a href="/analysis/{{ row.id }}" class="nav-outline compact">View Full Analysis</a>
+                    <a href="/pipeline/{{ row.id }}/snapshot" class="nav-outline compact">View Snapshot</a>
 
                     <form method="post" action="/update-status" class="pipeline-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

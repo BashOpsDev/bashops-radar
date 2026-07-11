@@ -300,6 +300,135 @@ def test_pipeline_saved_target_reopens_full_analysis_without_duplicate(client, m
     assert after_count == before_count
 
 
+def _create_target_for_user(email, repo="example/repo", status="Researching", score=86, pitch=""):
+    from database import SessionLocal
+    from models import Target, User
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        target = Target(
+            user_id=user.id,
+            repo=repo,
+            repo_url=f"https://github.com/{repo}",
+            language="Python",
+            score=score,
+            status=status,
+            best_issue="#7",
+            best_issue_url=f"https://github.com/{repo}/issues/7",
+            merge_probability="High",
+            difficulty="Medium",
+            estimated_time="3-6 hours",
+            pitch=pitch,
+            stars=500,
+            forks=50,
+            open_issues=20,
+        )
+        db.add(target)
+        db.commit()
+        target_id = target.id
+    finally:
+        db.close()
+
+    return target_id
+
+
+def test_snapshot_route_requires_login(client):
+    r = client.get("/pipeline/1/snapshot", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/login"
+
+
+def test_free_user_can_view_first_researching_snapshot(client, monkeypatch):
+    _stub_analysis(monkeypatch, score=86)
+    _register_verified_and_login(client)
+    target_id = _create_target_for_user("user@example.com", pitch="private founder pitch")
+
+    r = client.get("/pipeline")
+    assert f'href="/pipeline/{target_id}/snapshot"' in r.text
+    assert "View Snapshot" in r.text
+    assert "Update Status" in r.text
+
+    r = client.get(f"/pipeline/{target_id}/snapshot")
+    assert r.status_code == 200
+    assert 'name="robots" content="noindex, nofollow"' in r.text
+    assert "BashOps Radar" in r.text
+    assert "Proof-of-Work Snapshot" in r.text
+    assert "example/repo" in r.text
+    assert "86" in r.text
+    assert "Repository Signals" in r.text
+    assert "private founder pitch" not in r.text
+    assert "#7" not in r.text
+
+
+def test_snapshot_route_blocks_other_users_target(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client, email="owner@example.com")
+    target_id = _create_target_for_user("owner@example.com")
+    client.get("/logout")
+
+    _register_verified_and_login(client, email="other@example.com")
+    r = client.get(f"/pipeline/{target_id}/snapshot", follow_redirects=False)
+    assert r.status_code == 404
+
+
+def test_free_user_second_snapshot_is_locked(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+    first_id = _create_target_for_user("user@example.com", repo="example/first")
+    second_id = _create_target_for_user("user@example.com", repo="example/second")
+
+    r = client.get(f"/pipeline/{first_id}/snapshot")
+    assert r.status_code == 200
+    assert "Proof-of-Work Snapshot is available for your first researched repository" not in r.text
+
+    r = client.get(f"/pipeline/{second_id}/snapshot")
+    assert r.status_code == 200
+    assert "Proof-of-Work Snapshot is available for your first researched repository" in r.text
+    assert "Upgrade to Pro" in r.text
+    assert "example/second" not in r.text
+
+
+def test_free_user_later_stage_snapshot_is_locked(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+    target_id = _create_target_for_user("user@example.com", status="PR Submitted")
+
+    r = client.get(f"/pipeline/{target_id}/snapshot")
+    assert r.status_code == 200
+    assert "Proof-of-Work Snapshot is available for your first researched repository" in r.text
+    assert "PR Submitted snapshots" in r.text
+    assert "example/repo" not in r.text
+
+
+def test_pro_user_can_view_multiple_and_later_stage_snapshots(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    _stub_analysis(monkeypatch)
+    _register_verified_and_login(client)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    user.plan = "pro"
+    db.commit()
+    db.close()
+
+    first_id = _create_target_for_user("user@example.com", repo="example/first", status="Researching")
+    second_id = _create_target_for_user("user@example.com", repo="example/second", status="PR Merged", score=91)
+
+    r = client.get(f"/pipeline/{first_id}/snapshot")
+    assert r.status_code == 200
+    assert "example/first" in r.text
+    assert "Researching" in r.text
+
+    r = client.get(f"/pipeline/{second_id}/snapshot")
+    assert r.status_code == 200
+    assert "example/second" in r.text
+    assert "PR Merged" in r.text
+    assert "The contribution has been accepted and merged." in r.text
+    assert "Proof-of-Work Snapshot is available for your first researched repository" not in r.text
+
 def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
     _stub_analysis(monkeypatch)
 
