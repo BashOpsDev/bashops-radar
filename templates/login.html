@@ -37,7 +37,7 @@
         <div class="auth-card">
             <span class="section-label">Login</span>
             <h2>Access your workspace</h2>
-            <p class="angle">Accounts are being prepared for Public Beta.</p>
+            <p class="angle">One BashOps account gives you access to Radar and Maintainer. Paid plans are purchased separately.</p>
 
             {% if registered %}
             <div class="success-card">
@@ -62,7 +62,8 @@
             {% endif %}
 
             <form method="post" action="/login" class="auth-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="next" value="{{ next_path }}">
                 <input type="email" name="email" placeholder="Email address" required>
                 <input type="password" name="password" placeholder="Password" required>
 
@@ -71,7 +72,7 @@
 
             {% if github_oauth_configured %}
             <div class="auth-oauth">
-                <a class="nav-outline" href="/auth/github/login">Continue with GitHub</a>
+                <a class="nav-outline" href="{{ github_login_url }}">Continue with GitHub</a>
             </div>
             {% else %}
             <p class="auth-note">GitHub login is not configured yet.</p>
@@ -83,7 +84,7 @@
 
             <p class="auth-switch">
                 New here?
-                <a href="/register">Create account</a>
+                <a href="{{ register_url }}">Create account</a>
             </p>
         </div>
     </section>

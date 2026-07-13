@@ -765,6 +765,216 @@ def _register_and_login(client, email="user@example.com", password="StrongPass1"
 
 # --- Auth / CSRF ------------------------------------------------------
 
+def _create_verified_user(email="user@example.com", password="StrongPass1", password_hash=True):
+    from auth import hash_password
+    from database import SessionLocal
+    from models import User
+
+    db = SessionLocal()
+    db.add(
+        User(
+            name="Existing User",
+            email=email,
+            password_hash=hash_password(password) if password_hash else None,
+            plan="free",
+            email_verified=True,
+            auth_provider="email" if password_hash else "github",
+        )
+    )
+    db.commit()
+    db.close()
+
+
+def test_shared_account_copy_appears_on_register_and_login(client):
+    shared_copy = "One BashOps account gives you access to Radar and Maintainer. Paid plans are purchased separately."
+    assert shared_copy in client.get("/register").text
+    assert shared_copy in client.get("/login").text
+
+
+def test_login_returns_existing_account_to_maintainer(client):
+    _create_verified_user()
+    page = client.get("/login?next=/maintainer")
+    assert 'name="next" value="/maintainer"' in page.text
+    response = client.post(
+        "/login",
+        data={
+            "email": " user@example.com ",
+            "password": "StrongPass1",
+            "next": "/maintainer",
+            "csrf_token": _csrf_token(page.text),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/maintainer"
+
+
+def test_failed_login_preserves_maintainer_destination(client):
+    _create_verified_user()
+    page = client.get("/login?next=/maintainer")
+    response = client.post(
+        "/login",
+        data={
+            "email": "user@example.com",
+            "password": "wrong",
+            "next": "/maintainer",
+            "csrf_token": _csrf_token(page.text),
+        },
+    )
+    assert response.status_code == 200
+    assert 'name="next" value="/maintainer"' in response.text
+
+
+@pytest.mark.parametrize(
+    "unsafe_next",
+    [
+        "https://evil.example/path",
+        "//evil.example/path",
+        "\\\\evil.example\\path",
+        "%2F%2Fevil.example/path",
+        "%252F%252Fevil.example/path",
+        "/%5C%5Cevil.example/path",
+        "%ZZ",
+        "javascript:alert(1)",
+        "data:text/html,evil",
+    ],
+)
+def test_login_rejects_unsafe_next_destinations(client, unsafe_next):
+    _create_verified_user()
+    page = client.get("/login", params={"next": unsafe_next})
+    assert 'name="next" value="/dashboard"' in page.text
+    response = client.post(
+        "/login",
+        data={
+            "email": "user@example.com",
+            "password": "StrongPass1",
+            "next": unsafe_next,
+            "csrf_token": _csrf_token(page.text),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/dashboard"
+
+
+def test_maintainer_registration_and_verification_preserve_destination(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    page = client.get("/register?next=/maintainer")
+    assert 'name="next" value="/maintainer"' in page.text
+    response = client.post(
+        "/register",
+        data={
+            "name": "Maintainer User",
+            "email": " Maintainer.New@Example.COM ",
+            "password": "StrongPass1",
+            "next": "/maintainer",
+            "csrf_token": _csrf_token(page.text),
+        },
+    )
+    assert response.status_code == 200
+    assert 'name="next" value="/maintainer"' in response.text
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "maintainer.new@example.com").first()
+    assert user is not None
+    verification_token = user.email_verification_token
+    db.close()
+
+    verified = client.get(f"/verify-email?token={verification_token}")
+    assert verified.status_code == 200
+    assert "Continue to BashOps Maintainer" in verified.text
+    assert "next=%2Fmaintainer" in verified.text
+
+    login_page = client.get("/login?next=/maintainer")
+    logged_in = client.post(
+        "/login",
+        data={
+            "email": "maintainer.new@example.com",
+            "password": "StrongPass1",
+            "next": "/maintainer",
+            "csrf_token": _csrf_token(login_page.text),
+        },
+        follow_redirects=False,
+    )
+    assert logged_in.headers["location"] == "/maintainer"
+
+    _stub_analysis(monkeypatch)
+    assert _post_analysis(client).status_code == 200
+    assert _post_analysis(client).status_code == 200
+    exhausted = _post_analysis(client)
+    assert "Your free analysis trial is complete." in exhausted.text
+
+
+def test_existing_mixed_case_email_shows_shared_account_actions(client, monkeypatch):
+    import config
+    from database import SessionLocal
+    from models import User
+
+    monkeypatch.setattr(config, "github_oauth_configured", True)
+    _create_verified_user(email="Legacy.User@Example.COM", password_hash=False)
+    page = client.get("/register?next=/maintainer")
+    response = client.post(
+        "/register",
+        data={
+            "name": "Duplicate",
+            "email": " legacy.user@example.com ",
+            "password": "StrongPass1",
+            "next": "/maintainer",
+            "csrf_token": _csrf_token(page.text),
+        },
+    )
+    assert "A BashOps account already exists for this email." in response.text
+    assert "Your existing account works with both BashOps Radar and BashOps Maintainer." in response.text
+    assert "Log In to Continue" in response.text
+    assert 'href="/forgot-password">Reset Password</a>' in response.text
+    assert "Continue with GitHub" in response.text
+
+    db = SessionLocal()
+    assert db.query(User).count() == 1
+    db.close()
+
+
+def test_github_oauth_uses_and_clears_safe_next(client, monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    import app as app_module
+    import config
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    monkeypatch.setattr(config, "GITHUB_CLIENT_ID", "client")
+    monkeypatch.setattr(config, "GITHUB_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(config, "GITHUB_OAUTH_REDIRECT_URI", "https://bashops.site/auth/github/callback")
+    monkeypatch.setattr(config, "github_oauth_configured", True)
+    monkeypatch.setattr(app_module.requests, "post", lambda *args, **kwargs: FakeResponse({"access_token": "token"}))
+
+    def fake_get(url, **kwargs):
+        if url.endswith("/user/emails"):
+            return FakeResponse([{"email": "oauth@example.com", "verified": True, "primary": True}])
+        return FakeResponse({"id": 123, "login": "oauth-user", "name": "OAuth User"})
+
+    monkeypatch.setattr(app_module.requests, "get", fake_get)
+    started = client.get("/auth/github/login?next=/maintainer", follow_redirects=False)
+    state = parse_qs(urlsplit(started.headers["location"]).query)["state"][0]
+    callback = client.get(f"/auth/github/callback?code=abc&state={state}", follow_redirects=False)
+    assert callback.status_code == 303
+    assert callback.headers["location"] == "/maintainer"
+
+    replay = client.get(f"/auth/github/callback?code=abc&state={state}", follow_redirects=False)
+    assert replay.status_code == 200
+    assert "session expired" in replay.text.lower()
+
+
 def test_register_requires_valid_csrf(client):
     r = client.post(
         "/register",
@@ -810,7 +1020,9 @@ def test_duplicate_email_registration_rejected(client):
     r = client.get("/register")
     token = _csrf_token(r.text)
     r = client.post("/register", data={"name": "B", "email": "dupe@example.com", "password": "StrongPass1", "csrf_token": token})
-    assert "already registered" in r.text.lower()
+    assert "already exists" in r.text.lower()
+    assert "Log In to Continue" in r.text
+    assert "Reset Password" in r.text
 
 
 def test_weak_password_rejected(client):

@@ -37,14 +37,24 @@
         <div class="auth-card">
             <span class="section-label">Workspace</span>
             <h2>Create your account</h2>
-            <p class="angle">Start building your proof-of-work pipeline.</p>
+            <p class="angle">One BashOps account gives you access to Radar and Maintainer. Paid plans are purchased separately.</p>
 
-            {% if error %}
+            {% if account_exists %}
+            <div class="error">
+                <strong>A BashOps account already exists for this email.</strong>
+                <p>Your existing account works with both BashOps Radar and BashOps Maintainer.</p>
+                <div class="quick-actions">
+                    <a class="nav-cta compact" href="{{ login_url }}">Log In to Continue</a>
+                    <a class="nav-outline compact" href="/forgot-password">Reset Password</a>
+                </div>
+            </div>
+            {% elif error %}
             <div class="error">{{ error }}</div>
             {% endif %}
 
             <form method="post" action="/register" class="auth-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="next" value="{{ next_path }}">
                 <input type="text" name="name" placeholder="Your name" required>
                 <input type="email" name="email" placeholder="Email address" required>
                 <input type="password" name="password" placeholder="Password" required>
@@ -58,7 +68,7 @@
 
             {% if github_oauth_configured %}
             <div class="auth-oauth">
-                <a class="nav-outline" href="/auth/github/login">Continue with GitHub</a>
+                <a class="nav-outline" href="{{ github_login_url }}">Continue with GitHub</a>
             </div>
             {% else %}
             <p class="auth-note">GitHub login is not configured yet.</p>
@@ -66,7 +76,7 @@
 
             <p class="auth-switch">
                 Already have an account?
-                <a href="/login">Login</a>
+                <a href="{{ login_url }}">Login</a>
             </p>
         </div>
     </section>

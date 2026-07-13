@@ -27,9 +27,10 @@
                 <form method="post" action="/resend-verification" class="inline-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="email" value="{{ email }}">
+                    <input type="hidden" name="next" value="{{ next_path }}">
                     <button type="submit" class="compact">Resend verification email</button>
                 </form>
-                <a class="nav-outline compact" href="/login">Back to login</a>
+                <a class="nav-outline compact" href="{{ login_url }}">Back to login</a>
             </div>
 
             <div class="troubleshooting-card">
@@ -45,13 +46,20 @@
 
         <aside class="verify-preview">
             <span class="section-label">What you'll unlock</span>
-            <h2>Your first opportunity workflow</h2>
+            <h2>{% if next_path == "/maintainer" %}Your Maintainer workflow{% else %}Your first opportunity workflow{% endif %}</h2>
             <ul>
+                {% if next_path == "/maintainer" %}
+                <li>One shared BashOps account</li>
+                <li>One completed Free Maintainer report</li>
+                <li>Private report history</li>
+                <li>Read-only issue intelligence</li>
+                {% else %}
                 <li>Repository analysis</li>
                 <li>Opportunity Score</li>
                 <li>Best First Issue</li>
                 <li>Proof-of-Work Pipeline</li>
                 <li>Pro founder outreach later</li>
+                {% endif %}
             </ul>
         </aside>
     </section>

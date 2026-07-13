@@ -5,7 +5,7 @@ import secrets
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import unquote, urlencode, urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
@@ -78,6 +78,8 @@ BETA_FILE = Path("beta_signups.csv")
 FREE_ANALYSIS_LIMIT = 2
 ANONYMOUS_ANALYSIS_LIMIT = 1
 MAINTAINER_PENDING_PARTIAL_SESSION_KEY = "maintainer_pending_partial"
+POST_AUTH_NEXT_SESSION_KEY = "post_auth_next"
+GITHUB_OAUTH_NEXT_SESSION_KEY = "github_oauth_next"
 EMAIL_VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
 PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 60
 
@@ -257,6 +259,39 @@ def validate_password_strength(password: str) -> Optional[str]:
     return None
 
 
+def safe_next_path(value: str, default: str = "/dashboard") -> str:
+    """Return a local BashOps path or the existing dashboard fallback."""
+    candidate = (value or "").strip()
+    if not candidate or "\\" in candidate or any(ord(char) < 32 for char in candidate):
+        return default
+
+    # Query parsing decodes once. Decode a few more times so double-encoded
+    # protocol-relative and backslash redirects cannot survive validation.
+    for _ in range(3):
+        decoded = unquote(candidate)
+        if decoded == candidate:
+            break
+        candidate = decoded
+
+    if "%" in candidate or "\\" in candidate or any(ord(char) < 32 for char in candidate):
+        return default
+
+    parsed = urlsplit(candidate)
+    if parsed.scheme or parsed.netloc or not candidate.startswith("/") or candidate.startswith("//"):
+        return default
+    return candidate
+
+
+def user_by_email(db: Session, email: str):
+    normalized_email = (email or "").strip().lower()
+    return db.query(User).filter(func.lower(User.email) == normalized_email).first()
+
+
+def auth_url(path: str, next_path: str, **params) -> str:
+    values = {**params, "next": safe_next_path(next_path)}
+    return f"{path}?{urlencode(values)}"
+
+
 def new_token() -> str:
     return secrets.token_urlsafe(48)
 
@@ -276,7 +311,9 @@ def render_login(
     registered: bool = False,
     verified: bool = False,
     reset: bool = False,
+    next_path: str = "/dashboard",
 ):
+    next_path = safe_next_path(next_path)
     return templates.TemplateResponse(
         request=request,
         name="login.html",
@@ -286,6 +323,9 @@ def render_login(
             "verified": verified,
             "reset": reset,
             "error": error,
+            "next_path": next_path,
+            "register_url": auth_url("/register", next_path),
+            "github_login_url": auth_url("/auth/github/login", next_path),
             "github_oauth_configured": config.github_oauth_configured,
             **user_context(request),
             **csrf_context(request),
@@ -293,12 +333,22 @@ def render_login(
     )
 
 
-def render_register(request: Request, error: Optional[str] = None):
+def render_register(
+    request: Request,
+    error: Optional[str] = None,
+    next_path: str = "/dashboard",
+    account_exists: bool = False,
+):
+    next_path = safe_next_path(next_path)
     return templates.TemplateResponse(
         request=request,
         name="register.html",
         context={
             "error": error,
+            "account_exists": account_exists,
+            "next_path": next_path,
+            "login_url": auth_url("/login", next_path),
+            "github_login_url": auth_url("/auth/github/login", next_path),
             "github_oauth_configured": config.github_oauth_configured,
             **user_context(request),
             **csrf_context(request),
@@ -1062,13 +1112,16 @@ def login(
     registered: bool = False,
     verified: bool = False,
     reset: bool = False,
+    next: str = "",
 ):
+    next_path = safe_next_path(next or request.session.get(POST_AUTH_NEXT_SESSION_KEY, ""))
     return render_login(
         request,
         joined=joined,
         registered=registered,
         verified=verified,
         reset=reset,
+        next_path=next_path,
     )
 
 
@@ -1078,27 +1131,35 @@ def login_user(
     email: str = Form(...),
     password: str = Form(...),
     csrf_token: str = Form(""),
+    next: str = Form(""),
 ):
+    next_path = safe_next_path(next or request.session.get(POST_AUTH_NEXT_SESSION_KEY, ""))
     if not check_csrf(request, csrf_token):
-        return render_login(request, error="Your session expired. Please try again.")
+        return render_login(request, error="Your session expired. Please try again.", next_path=next_path)
 
     db: Session = SessionLocal()
     try:
         normalized_email = email.strip().lower()
-        user = db.query(User).filter(User.email == normalized_email).first()
+        user = user_by_email(db, normalized_email)
 
         if not user or not user.password_hash or not verify_password(password, user.password_hash):
-            return render_login(request, error="Invalid email or password.")
+            return render_login(request, error="Invalid email or password.", next_path=next_path)
 
         if not user.email_verified:
-            return render_login(request, error="Please verify your email before logging in.")
+            request.session[POST_AUTH_NEXT_SESSION_KEY] = next_path
+            return render_login(
+                request,
+                error="Please verify your email before logging in.",
+                next_path=next_path,
+            )
 
         request.session["user_id"] = user.id
+        request.session.pop(POST_AUTH_NEXT_SESSION_KEY, None)
         track_event(request, "login_success", user=user)
     finally:
         db.close()
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=next_path, status_code=303)
 
 
 @app.get("/logout")
@@ -1108,12 +1169,18 @@ def logout(request: Request):
 
 
 @app.get("/auth/github/login")
-def github_login(request: Request):
+def github_login(request: Request, next: str = ""):
+    next_path = safe_next_path(next or request.session.get(POST_AUTH_NEXT_SESSION_KEY, ""))
     if not config.github_oauth_configured:
-        return render_login(request, error="GitHub login is not configured yet.")
+        return render_login(
+            request,
+            error="GitHub login is not configured yet.",
+            next_path=next_path,
+        )
 
     state = new_token()
     request.session["github_oauth_state"] = state
+    request.session[GITHUB_OAUTH_NEXT_SESSION_KEY] = next_path
     params = {
         "client_id": config.GITHUB_CLIENT_ID,
         "redirect_uri": config.GITHUB_OAUTH_REDIRECT_URI,
@@ -1129,15 +1196,29 @@ def github_login(request: Request):
 
 @app.get("/auth/github/callback", response_class=HTMLResponse)
 def github_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    next_path = safe_next_path(request.session.pop(GITHUB_OAUTH_NEXT_SESSION_KEY, ""))
     if error:
-        return render_login(request, error="GitHub login was cancelled or failed.")
+        request.session.pop("github_oauth_state", None)
+        return render_login(
+            request,
+            error="GitHub login was cancelled or failed.",
+            next_path=next_path,
+        )
 
     expected_state = request.session.pop("github_oauth_state", None)
     if not expected_state or not state or not secrets.compare_digest(expected_state, state):
-        return render_login(request, error="GitHub login session expired. Please try again.")
+        return render_login(
+            request,
+            error="GitHub login session expired. Please try again.",
+            next_path=next_path,
+        )
 
     if not config.github_oauth_configured:
-        return render_login(request, error="GitHub login is not configured yet.")
+        return render_login(
+            request,
+            error="GitHub login is not configured yet.",
+            next_path=next_path,
+        )
 
     try:
         token_response = requests.post(
@@ -1154,7 +1235,7 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
         token_response.raise_for_status()
         access_token = token_response.json().get("access_token")
         if not access_token:
-            return render_login(request, error="GitHub login failed. Please try again.")
+            return render_login(request, error="GitHub login failed. Please try again.", next_path=next_path)
 
         auth_headers = {
             "Authorization": f"Bearer {access_token}",
@@ -1169,7 +1250,7 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
         emails = emails_response.json()
     except Exception as exc:
         print(f"[/auth/github/callback error] {exc!r}")
-        return render_login(request, error="GitHub login failed. Please try again.")
+        return render_login(request, error="GitHub login failed. Please try again.", next_path=next_path)
 
     verified_email = None
     for item in emails:
@@ -1183,7 +1264,11 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
                 break
 
     if not verified_email:
-        return render_login(request, error="GitHub did not return a verified email address.")
+        return render_login(
+            request,
+            error="GitHub did not return a verified email address.",
+            next_path=next_path,
+        )
 
     github_id = str(profile.get("id") or "")
     github_username = profile.get("login") or ""
@@ -1193,7 +1278,7 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
     try:
         user = db.query(User).filter(User.github_id == github_id).first() if github_id else None
         if not user:
-            user = db.query(User).filter(User.email == verified_email).first()
+            user = user_by_email(db, verified_email)
             if user:
                 user.github_id = github_id
                 user.github_username = github_username
@@ -1216,10 +1301,11 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
 
         db.commit()
         request.session["user_id"] = user.id
+        request.session.pop(POST_AUTH_NEXT_SESSION_KEY, None)
     finally:
         db.close()
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=next_path, status_code=303)
 
 
 @app.post("/beta-signup")
@@ -1236,8 +1322,8 @@ def beta_signup(email: str = Form(...)):
 
 
 @app.get("/register", response_class=HTMLResponse)
-def register_page(request: Request):
-    return render_register(request)
+def register_page(request: Request, next: str = ""):
+    return render_register(request, next_path=safe_next_path(next))
 
 
 @app.post("/register")
@@ -1248,23 +1334,33 @@ def register_user(
     password: str = Form(...),
     marketing_opt_in: bool = Form(False),
     csrf_token: str = Form(""),
+    next: str = Form(""),
 ):
+    next_path = safe_next_path(next)
     if not check_csrf(request, csrf_token):
-        return render_register(request, error="Your session expired. Please try again.")
+        return render_register(
+            request,
+            error="Your session expired. Please try again.",
+            next_path=next_path,
+        )
 
     password_error = validate_password_strength(password)
     if password_error:
-        return render_register(request, error=password_error)
+        return render_register(request, error=password_error, next_path=next_path)
 
     normalized_email = email.strip().lower()
     track_event(request, "register_submitted", metadata={"email_domain": normalized_email.split("@")[-1] if "@" in normalized_email else ""})
 
     db: Session = SessionLocal()
     try:
-        existing_user = db.query(User).filter(User.email == normalized_email).first()
+        existing_user = user_by_email(db, normalized_email)
 
         if existing_user:
-            return render_register(request, error="Email already registered. Please login instead.")
+            return render_register(
+                request,
+                next_path=next_path,
+                account_exists=True,
+            )
 
         token = new_token()
         opted_in = bool(marketing_opt_in)
@@ -1283,6 +1379,7 @@ def register_user(
 
         db.add(user)
         db.commit()
+        request.session[POST_AUTH_NEXT_SESSION_KEY] = next_path
         email_utils.send_verification_email(normalized_email, verification_link(token))
     finally:
         db.close()
@@ -1290,12 +1387,20 @@ def register_user(
     return templates.TemplateResponse(
         request=request,
         name="verify_notice.html",
-        context={"email": normalized_email, **user_context(request), **csrf_context(request)},
+        context={
+            "email": normalized_email,
+            "next_path": next_path,
+            "login_url": auth_url("/login", next_path),
+            **user_context(request),
+            **csrf_context(request),
+        },
     )
 
 
 @app.get("/verify-email", response_class=HTMLResponse)
 def verify_email(request: Request, token: str = ""):
+    next_path = safe_next_path(request.session.get(POST_AUTH_NEXT_SESSION_KEY, ""))
+    login_url = auth_url("/login", next_path, verified="true")
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(User.email_verification_token == token).first() if token else None
@@ -1309,6 +1414,8 @@ def verify_email(request: Request, token: str = ""):
                 context={
                     "success": False,
                     "message": "That verification link is invalid or expired.",
+                    "next_path": next_path,
+                    "login_url": auth_url("/login", next_path),
                     **user_context(request),
                     **csrf_context(request),
                 },
@@ -1328,7 +1435,9 @@ def verify_email(request: Request, token: str = ""):
         name="verify_email_result.html",
         context={
             "success": True,
-            "message": "Email verified. You can now log in to BashOps Radar.",
+            "message": "Email verified. You can now log in to BashOps.",
+            "next_path": next_path,
+            "login_url": login_url,
             **user_context(request),
         },
     )
@@ -1339,7 +1448,9 @@ def resend_verification(
     request: Request,
     email: str = Form(...),
     csrf_token: str = Form(""),
+    next: str = Form(""),
 ):
+    next_path = safe_next_path(next or request.session.get(POST_AUTH_NEXT_SESSION_KEY, ""))
     if not check_csrf(request, csrf_token):
         return templates.TemplateResponse(
             request=request,
@@ -1347,6 +1458,8 @@ def resend_verification(
             context={
                 "email": email,
                 "message": "Your session expired. Please try again.",
+                "next_path": next_path,
+                "login_url": auth_url("/login", next_path),
                 **user_context(request),
                 **csrf_context(request),
             },
@@ -1355,12 +1468,13 @@ def resend_verification(
     normalized_email = email.strip().lower()
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.email == normalized_email).first()
+        user = user_by_email(db, normalized_email)
         if user and not user.email_verified:
             token = new_token()
             user.email_verification_token = token
             user.email_verification_sent_at = now_utc()
             db.commit()
+            request.session[POST_AUTH_NEXT_SESSION_KEY] = next_path
             email_utils.send_verification_email(normalized_email, verification_link(token))
     finally:
         db.close()
@@ -1371,6 +1485,8 @@ def resend_verification(
         context={
             "email": normalized_email,
             "message": "If the account exists and is unverified, a new verification link has been sent.",
+            "next_path": next_path,
+            "login_url": auth_url("/login", next_path),
             **user_context(request),
             **csrf_context(request),
         },
@@ -1409,7 +1525,7 @@ def forgot_password(
     track_event(request, "forgot_password_requested")
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.email == normalized_email).first()
+        user = user_by_email(db, normalized_email)
         if user and user.password_hash:
             token = new_token()
             user.password_reset_token = token

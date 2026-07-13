@@ -25,11 +25,17 @@
                 {% if maintainer_access %}
                 <a class="nav-cta" href="/maintainer/dashboard">Pilot Access Active</a>
                 {% else %}
-                <a class="nav-cta" href="mailto:support@bashops.site?subject=BashOps%20Maintainer%20Pilot">Request Pilot Access</a>
+                <p class="angle">Continued report access for active maintainers. Billing setup is in progress.</p>
+                {% if not current_user %}
+                <div class="quick-actions">
+                    <a class="nav-cta compact" href="/register?next=/maintainer">Create Account</a>
+                    <a class="nav-outline compact" href="/login?next=/maintainer">Log In</a>
+                </div>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
-        <div class="angle">Pilot access is activated manually. No automatic GitHub actions or repository changes are included.</div>
+        <div class="angle">Maintainer Pilot - ${{ pilot_price }}/month. No automatic GitHub actions or repository changes are included.</div>
     </section>
 </main>
 {% endblock %}

@@ -118,6 +118,20 @@ def test_maintainer_landing_loads(client):
     assert response.status_code == 200
     assert "Reduce GitHub Issue Triage Without Losing Human Control" in response.text
     assert "never edits or closes GitHub issues" in response.text
+    assert "Already use BashOps Radar?" in response.text
+    assert 'href="/login?next=/maintainer"' in response.text
+
+
+def test_maintainer_pricing_is_honest_before_self_serve_billing(client):
+    response = client.get("/maintainer/pricing")
+    assert response.status_code == 200
+    assert "Maintainer Pilot" in response.text
+    assert "$49" in response.text
+    assert "Billing setup is in progress" in response.text
+    assert "Request Pilot Access" not in response.text
+    assert "activated manually" not in response.text
+    assert 'href="/register?next=/maintainer"' in response.text
+    assert 'href="/login?next=/maintainer"' in response.text
 
 
 def test_maintainer_navigation_marks_current_product_and_links_to_radar(client):
@@ -240,8 +254,8 @@ def test_anonymous_user_gets_one_completed_trial(client, monkeypatch):
     assert "Triage summary" in first.text
     assert "Issue review" in first.text
     assert "Free Maintainer preview used" in first.text
-    assert 'href="/register">Create Account</a>' in first.text
-    assert 'href="/login">Log In</a>' in first.text
+    assert 'href="/register?next=/maintainer">Create Account</a>' in first.text
+    assert 'href="/login?next=/maintainer">Log In</a>' in first.text
 
     second = _post_maintainer(client)
     assert second.status_code == 429
@@ -273,8 +287,8 @@ def test_anonymous_partial_report_consumes_preview_and_blocks_second_repository(
     assert "Free Maintainer preview used" in first.text
     assert "Triage summary" in first.text
     assert "Issue review" in first.text
-    assert 'href="/register">Create Account</a>' in first.text
-    assert 'href="/login">Log In</a>' in first.text
+    assert 'href="/register?next=/maintainer">Create Account</a>' in first.text
+    assert 'href="/login?next=/maintainer">Log In</a>' in first.text
 
     db = SessionLocal()
     assert db.query(MaintainerAnalysis).count() == 0
@@ -285,8 +299,8 @@ def test_anonymous_partial_report_consumes_preview_and_blocks_second_repository(
     assert "Create an account to continue evaluating repository issue queues" in second.text
     assert "Triage summary" not in second.text
     assert "Issue review" not in second.text
-    assert 'href="/register">Create Account</a>' in second.text
-    assert 'href="/login">Log In</a>' in second.text
+    assert 'href="/register?next=/maintainer">Create Account</a>' in second.text
+    assert 'href="/login?next=/maintainer">Log In</a>' in second.text
     assert len(calls) == 1
 
 
@@ -345,6 +359,45 @@ def test_registered_free_user_gets_one_completed_trial(client, monkeypatch):
     assert first.headers["location"].startswith("/maintainer/report/")
     second = _post_maintainer(client)
     assert second.status_code == 429
+
+
+def test_radar_registered_account_receives_maintainer_free_report(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    _stub_complete(monkeypatch)
+    register_page = client.get("/register")
+    registered = client.post(
+        "/register",
+        data={
+            "name": "Radar User",
+            "email": "radar-user@example.com",
+            "password": "StrongPass1",
+            "csrf_token": _csrf_token(register_page.text),
+        },
+    )
+    assert registered.status_code == 200
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "radar-user@example.com").first()
+    verification_token = user.email_verification_token
+    db.close()
+    assert client.get(f"/verify-email?token={verification_token}").status_code == 200
+
+    login_page = client.get("/login?next=/maintainer")
+    logged_in = client.post(
+        "/login",
+        data={
+            "email": "radar-user@example.com",
+            "password": "StrongPass1",
+            "next": "/maintainer",
+            "csrf_token": _csrf_token(login_page.text),
+        },
+        follow_redirects=False,
+    )
+    assert logged_in.headers["location"] == "/maintainer"
+    assert _post_maintainer(client).status_code == 303
+    assert _post_maintainer(client).status_code == 429
 
 
 def test_registered_free_partial_does_not_consume_complete_entitlement(client, monkeypatch):

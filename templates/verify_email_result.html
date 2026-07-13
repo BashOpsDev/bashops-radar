@@ -3,7 +3,7 @@
 {% block extra_head %}
 <meta name="robots" content="noindex">
 {% if success %}
-<meta http-equiv="refresh" content="3;url=/login?verified=true">
+<meta http-equiv="refresh" content="3;url={{ login_url }}">
 {% endif %}
 {% endblock %}
 {% block content %}
@@ -13,15 +13,15 @@
         <h1>{% if success %}Email verified{% else %}Verification failed{% endif %}</h1>
         <p class="angle">{{ message }}</p>
         {% if success %}
-        <p>You can now log in and analyze your first GitHub repository. Redirecting to login in 3 seconds.</p>
+        <p>{% if next_path == "/maintainer" %}Log in to continue to BashOps Maintainer.{% else %}You can now log in and analyze your first GitHub repository.{% endif %} Redirecting to login in 3 seconds.</p>
         <div class="quick-actions">
-            <a class="nav-cta compact" href="/login?verified=true">Login now</a>
-            <a class="nav-outline compact" href="/">Analyze Repository</a>
+            <a class="nav-cta compact" href="{{ login_url }}">{% if next_path == "/maintainer" %}Continue to BashOps Maintainer{% else %}Login now{% endif %}</a>
+            <a class="nav-outline compact" href="{% if next_path == '/maintainer' %}/maintainer{% else %}/{% endif %}">{% if next_path == "/maintainer" %}Back to Maintainer{% else %}Analyze Repository{% endif %}</a>
         </div>
         {% else %}
         <div class="quick-actions">
-            <a class="nav-cta compact" href="/register">Create Account</a>
-            <a class="nav-outline compact" href="/login">Back to Login</a>
+            <a class="nav-cta compact" href="/register?next={{ next_path | urlencode }}">Create Account</a>
+            <a class="nav-outline compact" href="{{ login_url }}">Back to Login</a>
         </div>
         {% endif %}
     </section>
