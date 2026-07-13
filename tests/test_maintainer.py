@@ -99,6 +99,14 @@ def _complete_outcome(repo="example/repo"):
     return {"report": report, "is_partial": False, "error_code": None}
 
 
+def _partial_outcome(repo="example/repo"):
+    outcome = _complete_outcome(repo)
+    outcome["is_partial"] = True
+    outcome["error_code"] = "ai_schema_invalid"
+    outcome["report"]["is_partial"] = True
+    return outcome
+
+
 def _stub_complete(monkeypatch):
     import app as app_module
 
@@ -196,36 +204,67 @@ def test_anonymous_user_gets_one_completed_trial(client, monkeypatch):
     first = _post_maintainer(client)
     assert first.status_code == 200
     assert "Triage summary" in first.text
+    assert "Your free Maintainer preview has been used" in first.text
 
     second = _post_maintainer(client)
     assert second.status_code == 429
-    assert "Your Maintainer trial report is complete" in second.text
+    assert "Your free Maintainer preview has been used" in second.text
 
     db = SessionLocal()
     assert db.query(MaintainerAnalysis).count() == 1
     db.close()
 
 
-def test_partial_report_does_not_consume_trial(client, monkeypatch):
+def test_anonymous_partial_report_consumes_preview_and_blocks_second_repository(client, monkeypatch):
     import app as app_module
     from database import SessionLocal
     from models import MaintainerAnalysis
 
-    partial = _complete_outcome()
-    partial["is_partial"] = True
-    partial["error_code"] = "ai_schema_invalid"
-    partial["report"]["is_partial"] = True
-    outcomes = iter([partial, _complete_outcome()])
-    monkeypatch.setattr(app_module, "build_maintainer_report", lambda *args, **kwargs: next(outcomes))
+    calls = []
+
+    def fake_build(repo_url):
+        calls.append(repo_url)
+        return _partial_outcome()
+
+    monkeypatch.setattr(app_module, "build_maintainer_report", fake_build)
 
     first = _post_maintainer(client)
     assert first.status_code == 200
-    assert "did not consume your trial" in first.text
+    assert "Your free Maintainer preview has been used" in first.text
 
     db = SessionLocal()
     assert db.query(MaintainerAnalysis).count() == 0
     db.close()
 
+    second = _post_maintainer(client, "https://github.com/example/other")
+    assert second.status_code == 429
+    assert "Create an account to continue evaluating repository issue queues" in second.text
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "error_code",
+    ["invalid_url", "archived_repository", "no_open_issues"],
+    ids=["invalid-url", "archived-repository", "no-open-issues"],
+)
+def test_rejected_repository_does_not_consume_anonymous_preview(client, monkeypatch, error_code):
+    import app as app_module
+
+    outcomes = iter(
+        [
+            maintainer_service.MaintainerServiceError("Repository cannot be analyzed.", error_code),
+            _complete_outcome(),
+        ]
+    )
+
+    def fake_build(*args, **kwargs):
+        outcome = next(outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(app_module, "build_maintainer_report", fake_build)
+    assert _post_maintainer(client).status_code == 400
     assert _post_maintainer(client).status_code == 200
 
 
@@ -258,6 +297,66 @@ def test_registered_free_user_gets_one_completed_trial(client, monkeypatch):
     assert first.headers["location"].startswith("/maintainer/report/")
     second = _post_maintainer(client)
     assert second.status_code == 429
+
+
+def test_registered_free_partial_does_not_consume_complete_entitlement(client, monkeypatch):
+    import app as app_module
+    from database import SessionLocal
+    from models import MaintainerAnalysis
+
+    _login(client)
+    outcomes = iter([_partial_outcome(), _complete_outcome()])
+    monkeypatch.setattr(app_module, "build_maintainer_report", lambda *args, **kwargs: next(outcomes))
+
+    partial = _post_maintainer(client)
+    assert partial.status_code == 200
+    assert "retry this repository without using your complete-report trial" in partial.text
+
+    db = SessionLocal()
+    assert db.query(MaintainerAnalysis).count() == 0
+    db.close()
+
+    completed = _post_maintainer(client)
+    assert completed.status_code == 303
+
+    db = SessionLocal()
+    assert db.query(MaintainerAnalysis).count() == 1
+    db.close()
+
+
+def test_registered_free_can_retry_same_partial_repository(client, monkeypatch):
+    import app as app_module
+
+    _login(client)
+    calls = []
+
+    def fake_build(repo_url):
+        calls.append(repo_url)
+        return _partial_outcome()
+
+    monkeypatch.setattr(app_module, "build_maintainer_report", fake_build)
+    assert _post_maintainer(client).status_code == 200
+    assert _post_maintainer(client, "https://github.com/EXAMPLE/REPO.git/").status_code == 200
+    assert len(calls) == 2
+
+
+def test_registered_free_partial_blocks_different_repository(client, monkeypatch):
+    import app as app_module
+
+    _login(client)
+    calls = []
+
+    def fake_build(repo_url):
+        calls.append(repo_url)
+        return _partial_outcome()
+
+    monkeypatch.setattr(app_module, "build_maintainer_report", fake_build)
+    assert _post_maintainer(client).status_code == 200
+
+    blocked = _post_maintainer(client, "https://github.com/example/other")
+    assert blocked.status_code == 429
+    assert "Finish or retry your current repository analysis" in blocked.text
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("email,pilot", [("pilot@example.com", True), ("bashops1@gmail.com", False)])

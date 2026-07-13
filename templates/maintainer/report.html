@@ -8,7 +8,7 @@
         <h1>{{ report.repository.full_name }}</h1>
         <p>{{ report.repository.description }}</p>
         <div class="checks"><span>{{ report.issues_reviewed }} issues reviewed</span><span>{{ report.analyzed_at[:10] }}</span><span>No GitHub changes made</span></div>
-        {% if partial_message %}<div class="error">{{ partial_message }}</div>{% endif %}
+        {% if report_notice %}<div class="error">{{ report_notice }}</div>{% endif %}
         <div class="angle"><strong>Maintainer review required.</strong> {{ report.disclaimer }}</div>
     </section>
 

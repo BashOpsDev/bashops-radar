@@ -42,7 +42,7 @@ from analysis_service import build_analysis_result, to_public_api_payload
 from discovery_service import DiscoveryError, category_options, discover_opportunities
 from maintainer_schemas import MaintainerReport
 from maintainer_service import ANALYSIS_VERSION as MAINTAINER_ANALYSIS_VERSION
-from maintainer_service import MaintainerServiceError, build_maintainer_report
+from maintainer_service import MaintainerServiceError, build_maintainer_report, parse_repository_url
 import config
 
 try:
@@ -77,6 +77,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BETA_FILE = Path("beta_signups.csv")
 FREE_ANALYSIS_LIMIT = 2
 ANONYMOUS_ANALYSIS_LIMIT = 1
+MAINTAINER_PENDING_PARTIAL_SESSION_KEY = "maintainer_pending_partial"
 EMAIL_VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
 PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 60
 
@@ -381,6 +382,17 @@ def maintainer_trial_used(request: Request, user, ip: str) -> bool:
         db.close()
 
 
+def maintainer_pending_partial_repository(request: Request, user) -> Optional[str]:
+    """Return the Free user's session-bound partial repository, if any."""
+    if not user or has_maintainer_access(user):
+        return None
+    pending = request.session.get(MAINTAINER_PENDING_PARTIAL_SESSION_KEY)
+    if not isinstance(pending, dict) or pending.get("user_id") != user.id:
+        return None
+    repository = pending.get("repository")
+    return repository if isinstance(repository, str) and repository else None
+
+
 def maintainer_plan_context(user) -> str:
     if has_owner_pro_override(user):
         return "owner_admin"
@@ -543,6 +555,7 @@ def render_maintainer_landing(
     current_user=None,
     error: Optional[str] = None,
     trial_blocked: bool = False,
+    trial_block_reason: Optional[str] = None,
     status_code: int = 200,
 ):
     return templates.TemplateResponse(
@@ -551,6 +564,7 @@ def render_maintainer_landing(
         context={
             "error": error,
             "trial_blocked": trial_blocked,
+            "trial_block_reason": trial_block_reason,
             **maintainer_template_context(request, current_user),
             **csrf_context(request),
         },
@@ -598,6 +612,32 @@ def maintainer_analyze(
             status_code=429,
         )
 
+    pending_repository = maintainer_pending_partial_repository(request, current_user)
+    if pending_repository:
+        try:
+            owner, repository, _ = parse_repository_url(repo_url)
+        except MaintainerServiceError as exc:
+            return render_maintainer_landing(
+                request,
+                current_user,
+                error=exc.public_message,
+                status_code=400,
+            )
+        if f"{owner}/{repository}".casefold() != pending_repository:
+            track_event(
+                request,
+                "maintainer_trial_blocked",
+                user=current_user,
+                metadata={"access": maintainer_plan_context(current_user), "reason": "pending_partial"},
+            )
+            return render_maintainer_landing(
+                request,
+                current_user,
+                trial_blocked=True,
+                trial_block_reason="pending_partial",
+                status_code=429,
+            )
+
     track_event(request, "maintainer_analysis_started", user=current_user, metadata={"repo_url": repo_url})
     try:
         outcome = build_maintainer_report(repo_url)
@@ -631,6 +671,25 @@ def maintainer_analyze(
 
     report = MaintainerReport.model_validate(outcome["report"]).model_dump(mode="json")
     if outcome["is_partial"]:
+        if not current_user:
+            request.session["maintainer_trial_used"] = True
+            report_notice = (
+                "AI-assisted review was unavailable, so this deterministic partial report was generated. "
+                "Your free Maintainer preview has been used. Create an account to continue evaluating "
+                "repository issue queues."
+            )
+        elif has_maintainer_access(current_user):
+            report_notice = "AI-assisted review was unavailable, so this deterministic partial report was generated."
+        else:
+            owner, repository, _ = parse_repository_url(repo_url)
+            request.session[MAINTAINER_PENDING_PARTIAL_SESSION_KEY] = {
+                "user_id": current_user.id,
+                "repository": f"{owner}/{repository}".casefold(),
+            }
+            report_notice = (
+                "The AI-assisted report was temporarily unavailable. You can retry this repository "
+                "without using your complete-report trial."
+            )
         track_event(
             request,
             "maintainer_analysis_failed",
@@ -643,7 +702,7 @@ def maintainer_analyze(
             context={
                 "report": report,
                 "analysis": None,
-                "partial_message": "AI-assisted review was unavailable. This deterministic preview is partial and did not consume your trial.",
+                "report_notice": report_notice,
                 **maintainer_template_context(request, current_user),
             },
         )
@@ -688,6 +747,15 @@ def maintainer_analyze(
 
     if not current_user:
         request.session["maintainer_trial_used"] = True
+        report_notice = (
+            "Your free Maintainer preview has been used. Create an account to continue evaluating "
+            "repository issue queues."
+        )
+    else:
+        pending = request.session.get(MAINTAINER_PENDING_PARTIAL_SESSION_KEY)
+        if isinstance(pending, dict) and pending.get("user_id") == current_user.id:
+            request.session.pop(MAINTAINER_PENDING_PARTIAL_SESSION_KEY, None)
+        report_notice = None
 
     track_event(
         request,
@@ -705,7 +773,7 @@ def maintainer_analyze(
         context={
             "report": report,
             "analysis": None,
-            "partial_message": None,
+            "report_notice": report_notice,
             **maintainer_template_context(request, current_user),
         },
     )
@@ -739,7 +807,7 @@ def maintainer_report(request: Request, analysis_id: int):
         context={
             "report": report,
             "analysis": analysis,
-            "partial_message": None,
+            "report_notice": None,
             **maintainer_template_context(request, current_user),
         },
     )

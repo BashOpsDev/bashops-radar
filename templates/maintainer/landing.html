@@ -18,12 +18,17 @@
         {% if error %}<div class="error">{{ error }}</div>{% endif %}
         {% if trial_blocked %}
         <div class="upgrade-card">
+            {% if trial_block_reason == "pending_partial" %}
+            <h2>Your current repository preview is still open.</h2>
+            <p>Finish or retry your current repository analysis, or activate Maintainer Pilot to analyze additional repositories.</p>
+            <a class="nav-cta compact" href="/maintainer/pricing">View Pilot Pricing</a>
+            {% elif current_user %}
             <h2>Your Maintainer trial report is complete.</h2>
-            {% if current_user %}
             <p>Request Maintainer Pilot access to continue creating full triage reports.</p>
             <a class="nav-cta compact" href="/maintainer/pricing">View Pilot Pricing</a>
             {% else %}
-            <p>Create an account for one registered trial report, or log in to view your reports.</p>
+            <h2>Your free Maintainer preview has been used.</h2>
+            <p>Create an account to continue evaluating repository issue queues.</p>
             <a class="nav-cta compact" href="/register">Create Account</a>
             <a class="nav-outline compact" href="/login">Log In</a>
             {% endif %}
