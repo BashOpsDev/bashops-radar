@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 import requests
 
 from database import SessionLocal
-from models import Event, Target, User
+from models import Event, MaintainerAnalysis, Target, User
 from auth import (
     hash_password,
     verify_password,
@@ -40,6 +40,9 @@ import paddle_billing
 import email_utils
 from analysis_service import build_analysis_result, to_public_api_payload
 from discovery_service import DiscoveryError, category_options, discover_opportunities
+from maintainer_schemas import MaintainerReport
+from maintainer_service import ANALYSIS_VERSION as MAINTAINER_ANALYSIS_VERSION
+from maintainer_service import MaintainerServiceError, build_maintainer_report
 import config
 
 try:
@@ -339,6 +342,64 @@ def free_account_analysis_count(user) -> int:
     return lifetime_analysis_count(user.id)
 
 
+def require_maintainer_enabled() -> None:
+    if not config.MAINTAINER_ENABLED:
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+def has_maintainer_access(user) -> bool:
+    return bool(
+        user
+        and (
+            has_owner_pro_override(user)
+            or bool(getattr(user, "maintainer_pilot_access", False))
+        )
+    )
+
+
+def maintainer_trial_used(request: Request, user, ip: str) -> bool:
+    if has_maintainer_access(user):
+        return False
+    if not user and request.session.get("maintainer_trial_used"):
+        return True
+
+    db: Session = SessionLocal()
+    try:
+        query = db.query(MaintainerAnalysis).filter(
+            MaintainerAnalysis.status == "completed",
+            MaintainerAnalysis.is_partial.is_(False),
+        )
+        if user:
+            query = query.filter(MaintainerAnalysis.user_id == user.id)
+        else:
+            query = query.filter(
+                MaintainerAnalysis.user_id.is_(None),
+                MaintainerAnalysis.ip_address == ip,
+            )
+        return query.count() >= 1
+    finally:
+        db.close()
+
+
+def maintainer_plan_context(user) -> str:
+    if has_owner_pro_override(user):
+        return "owner_admin"
+    if user and getattr(user, "maintainer_pilot_access", False):
+        return "pilot"
+    return "registered_trial" if user else "anonymous_trial"
+
+
+def maintainer_template_context(request: Request, current_user=None) -> dict:
+    if current_user is None:
+        current_user = get_current_user(request)
+    return {
+        **user_context(request, current_user),
+        "maintainer_access": has_maintainer_access(current_user),
+        "pilot_price": config.MAINTAINER_PILOT_PRICE_USD,
+        "site_url": config.SITE_URL,
+    }
+
+
 @app.exception_handler(StarletteHTTPException)
 async def not_found_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 404:
@@ -377,6 +438,8 @@ def robots_txt():
         "Disallow: /pipeline",
         "Disallow: /admin/",
         "Disallow: /billing/",
+        "Disallow: /maintainer/dashboard",
+        "Disallow: /maintainer/report/",
         "Disallow: /export-pipeline",
         f"Sitemap: {config.SITE_URL}/sitemap.xml",
     ]
@@ -400,6 +463,8 @@ def sitemap_xml():
         "/refund",
         "/contact",
     ]
+    if config.MAINTAINER_ENABLED:
+        urls.extend(["/maintainer", "/maintainer/pricing"])
     body = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for path in urls:
         body.append(f"<url><loc>{config.SITE_URL}{path}</loc></url>")
@@ -470,6 +535,260 @@ def pricing(request: Request):
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
         },
+    )
+
+
+def render_maintainer_landing(
+    request: Request,
+    current_user=None,
+    error: Optional[str] = None,
+    trial_blocked: bool = False,
+    status_code: int = 200,
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/landing.html",
+        context={
+            "error": error,
+            "trial_blocked": trial_blocked,
+            **maintainer_template_context(request, current_user),
+            **csrf_context(request),
+        },
+        status_code=status_code,
+    )
+
+
+@app.get("/maintainer", response_class=HTMLResponse)
+def maintainer_landing(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    track_event(request, "maintainer_page_viewed", user=current_user)
+    return render_maintainer_landing(request, current_user)
+
+
+@app.post("/maintainer/analyze", response_class=HTMLResponse)
+def maintainer_analyze(
+    request: Request,
+    repo_url: str = Form(...),
+    csrf_token: str = Form(""),
+):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    ip = request.client.host if request.client else "unknown"
+
+    if not check_csrf(request, csrf_token):
+        return render_maintainer_landing(
+            request,
+            current_user,
+            error="Your session expired. Please try again.",
+            status_code=400,
+        )
+
+    if maintainer_trial_used(request, current_user, ip):
+        track_event(
+            request,
+            "maintainer_trial_blocked",
+            user=current_user,
+            metadata={"access": maintainer_plan_context(current_user)},
+        )
+        return render_maintainer_landing(
+            request,
+            current_user,
+            trial_blocked=True,
+            status_code=429,
+        )
+
+    track_event(request, "maintainer_analysis_started", user=current_user, metadata={"repo_url": repo_url})
+    try:
+        outcome = build_maintainer_report(repo_url)
+    except MaintainerServiceError as exc:
+        track_event(
+            request,
+            "maintainer_analysis_failed",
+            user=current_user,
+            metadata={"error_code": exc.error_code},
+        )
+        return render_maintainer_landing(
+            request,
+            current_user,
+            error=exc.public_message,
+            status_code=400,
+        )
+    except Exception as exc:
+        print(f"[/maintainer/analyze error] {exc!r}")
+        track_event(
+            request,
+            "maintainer_analysis_failed",
+            user=current_user,
+            metadata={"error_code": "unexpected_error"},
+        )
+        return render_maintainer_landing(
+            request,
+            current_user,
+            error="The report could not be completed. Please try again.",
+            status_code=500,
+        )
+
+    report = MaintainerReport.model_validate(outcome["report"]).model_dump(mode="json")
+    if outcome["is_partial"]:
+        track_event(
+            request,
+            "maintainer_analysis_failed",
+            user=current_user,
+            metadata={"error_code": outcome["error_code"], "partial": True},
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="maintainer/report.html",
+            context={
+                "report": report,
+                "analysis": None,
+                "partial_message": "AI-assisted review was unavailable. This deterministic preview is partial and did not consume your trial.",
+                **maintainer_template_context(request, current_user),
+            },
+        )
+
+    db: Session = SessionLocal()
+    try:
+        analysis = MaintainerAnalysis(
+            user_id=current_user.id if current_user else None,
+            repository_full_name=report["repository"]["full_name"],
+            repository_url=report["repository"]["url"],
+            status="completed",
+            analyzed_issue_count=report["issues_reviewed"],
+            report_json=json.dumps(report, ensure_ascii=True),
+            is_partial=False,
+            error_code=None,
+            plan_context=maintainer_plan_context(current_user),
+            analysis_version=MAINTAINER_ANALYSIS_VERSION,
+            ip_address=ip,
+            completed_at=now_utc(),
+        )
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+        analysis_id = analysis.id
+    except Exception as exc:
+        db.rollback()
+        print(f"[/maintainer/analyze persistence error] {exc!r}")
+        track_event(
+            request,
+            "maintainer_analysis_failed",
+            user=current_user,
+            metadata={"error_code": "persistence_failed"},
+        )
+        return render_maintainer_landing(
+            request,
+            current_user,
+            error="The report could not be saved, so your trial was not consumed. Please try again.",
+            status_code=500,
+        )
+    finally:
+        db.close()
+
+    if not current_user:
+        request.session["maintainer_trial_used"] = True
+
+    track_event(
+        request,
+        "maintainer_analysis_completed",
+        user=current_user,
+        metadata={"analysis_id": analysis_id, "repository": report["repository"]["full_name"]},
+    )
+    track_event(request, "maintainer_trial_completed", user=current_user, metadata={"analysis_id": analysis_id})
+
+    if current_user:
+        return RedirectResponse(url=f"/maintainer/report/{analysis_id}", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/report.html",
+        context={
+            "report": report,
+            "analysis": None,
+            "partial_message": None,
+            **maintainer_template_context(request, current_user),
+        },
+    )
+
+
+@app.get("/maintainer/report/{analysis_id}", response_class=HTMLResponse)
+def maintainer_report(request: Request, analysis_id: int):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    db: Session = SessionLocal()
+    try:
+        analysis = db.query(MaintainerAnalysis).filter(
+            MaintainerAnalysis.id == analysis_id,
+            MaintainerAnalysis.user_id == current_user.id,
+            MaintainerAnalysis.status == "completed",
+            MaintainerAnalysis.is_partial.is_(False),
+        ).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Report not found")
+        report = MaintainerReport.model_validate_json(analysis.report_json).model_dump(mode="json")
+    finally:
+        db.close()
+
+    track_event(request, "maintainer_report_viewed", user=current_user, metadata={"analysis_id": analysis_id})
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/report.html",
+        context={
+            "report": report,
+            "analysis": analysis,
+            "partial_message": None,
+            **maintainer_template_context(request, current_user),
+        },
+    )
+
+
+@app.get("/maintainer/dashboard", response_class=HTMLResponse)
+def maintainer_dashboard(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    db: Session = SessionLocal()
+    try:
+        analyses = db.query(MaintainerAnalysis).filter(
+            MaintainerAnalysis.user_id == current_user.id,
+            MaintainerAnalysis.status == "completed",
+            MaintainerAnalysis.is_partial.is_(False),
+        ).order_by(MaintainerAnalysis.created_at.desc()).all()
+        rows = []
+        for analysis in analyses:
+            try:
+                report = MaintainerReport.model_validate_json(analysis.report_json)
+            except Exception:
+                continue
+            rows.append({"analysis": analysis, "counts": report.counts.model_dump()})
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/dashboard.html",
+        context={
+            "rows": rows,
+            **maintainer_template_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.get("/maintainer/pricing", response_class=HTMLResponse)
+def maintainer_pricing(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    track_event(request, "maintainer_pilot_clicked", user=current_user)
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/pricing.html",
+        context={**maintainer_template_context(request, current_user)},
     )
 
 

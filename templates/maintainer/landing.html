@@ -1,0 +1,66 @@
+{% extends "maintainer/base.html" %}
+{% block title %}BashOps Maintainer - Read-only GitHub Issue Triage{% endblock %}
+{% block extra_head %}
+<meta name="description" content="Analyze recent GitHub issues, identify possible duplicates, spot missing information, and surface contributor-ready work without changing GitHub.">
+<link rel="canonical" href="{{ site_url }}/maintainer">
+<meta property="og:title" content="Reduce GitHub Issue Triage Without Losing Human Control">
+<meta property="og:description" content="A read-only maintainer triage report for public open-source repositories.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ site_url }}/maintainer">
+{% endblock %}
+{% block content %}
+<main>
+    <section class="card">
+        <span class="section-label">BashOps Maintainer v0.1</span>
+        <h1>Reduce GitHub Issue Triage Without Losing Human Control</h1>
+        <p class="angle">Analyze recent issues, identify possible duplicates, spot missing reproduction details, suggest labels, and surface contributor-ready work.</p>
+
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        {% if trial_blocked %}
+        <div class="upgrade-card">
+            <h2>Your Maintainer trial report is complete.</h2>
+            {% if current_user %}
+            <p>Request Maintainer Pilot access to continue creating full triage reports.</p>
+            <a class="nav-cta compact" href="/maintainer/pricing">View Pilot Pricing</a>
+            {% else %}
+            <p>Create an account for one registered trial report, or log in to view your reports.</p>
+            <a class="nav-cta compact" href="/register">Create Account</a>
+            <a class="nav-outline compact" href="/login">Log In</a>
+            {% endif %}
+        </div>
+        {% else %}
+        <form method="post" action="/maintainer/analyze">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="sr-only" for="maintainer-repo-url">Public GitHub repository URL</label>
+            <input id="maintainer-repo-url" name="repo_url" type="url" placeholder="https://github.com/owner/repository" required>
+            <button type="submit">Analyze One Repository Free</button>
+        </form>
+        {% endif %}
+        <div class="checks">
+            <span>Read-only</span><span>20 recent issues</span><span>No GitHub changes</span><span>Human review required</span>
+        </div>
+    </section>
+
+    <section class="features">
+        <span class="section-label">What It Checks</span>
+        <h2>One focused triage report</h2>
+        <div class="feature-grid">
+            <div><strong>Suggested classification</strong><span>Conservative issue categories and label recommendations.</span></div>
+            <div><strong>Possible duplicates</strong><span>Similar issue candidates that always require maintainer confirmation.</span></div>
+            <div><strong>Missing information</strong><span>Reproduction, environment, expected behavior, and context gaps.</span></div>
+            <div><strong>Contributor readiness</strong><span>Issues that may be suitable for new or experienced contributors.</span></div>
+            <div><strong>Estimated priority</strong><span>Advisory attention levels, never automatic queue changes.</span></div>
+            <div><strong>First-response drafts</strong><span>Concise replies for maintainer review before use.</span></div>
+        </div>
+    </section>
+
+    <section class="demo">
+        <div>
+            <span class="section-label">Read-only Promise</span>
+            <h2>BashOps Maintainer never edits or closes GitHub issues.</h2>
+            <p>It does not post comments, assign contributors, or change labels. Every output is a review-ready suggestion.</p>
+        </div>
+        <a class="nav-outline compact" href="/maintainer/pricing">Maintainer Pilot - ${{ pilot_price }}/month</a>
+    </section>
+</main>
+{% endblock %}

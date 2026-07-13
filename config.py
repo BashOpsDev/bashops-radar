@@ -35,3 +35,6 @@ GITHUB_OAUTH_REDIRECT_URI = os.getenv(
 )
 
 github_oauth_configured = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET and GITHUB_OAUTH_REDIRECT_URI)
+
+MAINTAINER_ENABLED = os.getenv("MAINTAINER_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+MAINTAINER_PILOT_PRICE_USD = 49

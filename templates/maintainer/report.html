@@ -1,0 +1,62 @@
+{% extends "maintainer/base.html" %}
+{% block title %}{{ report.repository.full_name }} Triage Report - BashOps Maintainer{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main class="dashboard-page">
+    <section class="dashboard-hero">
+        <span class="section-label">Read-only Analysis</span>
+        <h1>{{ report.repository.full_name }}</h1>
+        <p>{{ report.repository.description }}</p>
+        <div class="checks"><span>{{ report.issues_reviewed }} issues reviewed</span><span>{{ report.analyzed_at[:10] }}</span><span>No GitHub changes made</span></div>
+        {% if partial_message %}<div class="error">{{ partial_message }}</div>{% endif %}
+        <div class="angle"><strong>Maintainer review required.</strong> {{ report.disclaimer }}</div>
+    </section>
+
+    <section class="card-flat">
+        <h2>Triage summary</h2>
+        <p>{{ report.summary }}</p>
+        <div class="dashboard-stats">
+            <div class="metric-card"><span>High priority</span><strong>{{ report.counts.high_priority }}</strong></div>
+            <div class="metric-card"><span>Possible duplicates</span><strong>{{ report.counts.possible_duplicates }}</strong></div>
+            <div class="metric-card"><span>Missing information</span><strong>{{ report.counts.missing_information }}</strong></div>
+            <div class="metric-card"><span>Contributor ready</span><strong>{{ report.counts.contributor_ready }}</strong></div>
+            <div class="metric-card"><span>Manual review</span><strong>{{ report.counts.needs_manual_review }}</strong></div>
+        </div>
+    </section>
+
+    <section class="card-flat">
+        <h2>Immediate maintainer attention</h2>
+        {% for issue in report.issues if issue.estimated_priority == "High" %}
+        <div class="issue-row"><strong>#{{ issue.number }} {{ issue.title }}</strong><p>Estimated priority: High · {{ issue.suggested_category }}</p><a href="{{ issue.url }}" rel="noopener noreferrer">Open on GitHub</a></div>
+        {% else %}<p>No issues were assigned an estimated high priority.</p>{% endfor %}
+    </section>
+
+    <section class="card-flat">
+        <h2>Issue review</h2>
+        {% for issue in report.issues %}
+        <article class="pipeline-card">
+            <div class="pipeline-card-top">
+                <div><span class="status-badge">Estimated priority: {{ issue.estimated_priority }}</span><h3>#{{ issue.number }} {{ issue.title }}</h3></div>
+                <a class="nav-outline compact" href="{{ issue.url }}" rel="noopener noreferrer">GitHub</a>
+            </div>
+            <p><strong>Suggested category:</strong> {{ issue.suggested_category }} · <strong>Confidence:</strong> {{ issue.confidence }}</p>
+            <p><strong>Current labels:</strong> {{ issue.current_labels | join(", ") if issue.current_labels else "None" }}</p>
+            <p><strong>Contributor suitability:</strong> {{ issue.contributor_suitability }}</p>
+
+            <div class="grid">
+                <div><strong>Missing information</strong>{% if issue.missing_information %}<ul>{% for item in issue.missing_information %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p>No obvious information gap detected.</p>{% endif %}</div>
+                <div><strong>Suggested labels</strong>{% if issue.suggested_labels %}<ul>{% for label in issue.suggested_labels %}<li>{{ label.name }} — {{ label.reason }} ({{ label.confidence }})</li>{% endfor %}</ul>{% else %}<p>No label suggestion.</p>{% endif %}</div>
+                <div><strong>Possible duplicates</strong>{% if issue.possible_duplicates %}<ul>{% for duplicate in issue.possible_duplicates %}<li>Possible duplicate: #{{ duplicate.issue_number }} — {{ duplicate.reason }} ({{ duplicate.confidence }})</li>{% endfor %}</ul>{% else %}<p>No likely duplicate candidate detected.</p>{% endif %}</div>
+            </div>
+            <div class="angle"><strong>Suggested first response</strong><p>{{ issue.suggested_first_response }}</p></div>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="card-flat">
+        <h2>Confidence and limitations</h2>
+        <p>{{ report.disclaimer }}</p>
+        <p>This validation report reviews a limited recent issue set and does not inspect full comment history, repository internals, or private maintainer context.</p>
+    </section>
+</main>
+{% endblock %}

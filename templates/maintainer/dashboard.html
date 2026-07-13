@@ -1,0 +1,31 @@
+{% extends "maintainer/base.html" %}
+{% block title %}Maintainer Reports - BashOps Maintainer{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main class="dashboard-page">
+    <section class="dashboard-hero">
+        <span class="section-label">Private Reports</span>
+        <h1>Maintainer dashboard</h1>
+        <p>{% if maintainer_access %}Pilot access active. Create additional read-only reports.{% else %}Your completed trial reports remain available here.{% endif %}</p>
+        <a class="nav-cta compact" href="/maintainer">New Analysis</a>
+    </section>
+
+    <section class="card-flat">
+        <h2>Report history</h2>
+        {% if rows %}
+        <div class="opportunity-grid">
+            {% for row in rows %}
+            <article class="opportunity-card">
+                <span class="section-label">{{ row.analysis.analyzed_issue_count }} issues reviewed</span>
+                <h3>{{ row.analysis.repository_full_name }}</h3>
+                <p>{{ row.counts.high_priority }} high priority · {{ row.counts.possible_duplicates }} possible duplicates · {{ row.counts.contributor_ready }} contributor ready</p>
+                <a class="nav-outline compact" href="/maintainer/report/{{ row.analysis.id }}">Open Report</a>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-dashboard"><h3>No completed reports yet.</h3><p>Analyze one public repository to create your first private triage report.</p></div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

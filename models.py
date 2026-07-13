@@ -28,10 +28,12 @@ class User(Base):
     paddle_customer_id = Column(String(255), nullable=True, index=True)
     paddle_subscription_id = Column(String(255), nullable=True, index=True)
     subscription_status = Column(String(50), nullable=True)
+    maintainer_pilot_access = Column(Boolean, default=False, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     targets = relationship("Target", back_populates="user")
+    maintainer_analyses = relationship("MaintainerAnalysis", back_populates="user")
 
 
 class Target(Base):
@@ -88,3 +90,24 @@ class Event(Base):
     user_agent = Column(String(500), nullable=True)
     metadata_json = Column("metadata", Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class MaintainerAnalysis(Base):
+    __tablename__ = "maintainer_analyses"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    repository_full_name = Column(String(255), nullable=False, index=True)
+    repository_url = Column(String(500), nullable=False)
+    status = Column(String(50), nullable=False, default="completed")
+    analyzed_issue_count = Column(Integer, nullable=False)
+    report_json = Column(Text, nullable=False)
+    is_partial = Column(Boolean, nullable=False, default=False)
+    error_code = Column(String(100), nullable=True)
+    plan_context = Column(String(50), nullable=False)
+    analysis_version = Column(String(50), nullable=False)
+    ip_address = Column(String(64), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="maintainer_analyses")

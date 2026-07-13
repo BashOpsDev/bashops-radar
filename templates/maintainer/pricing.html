@@ -1,0 +1,35 @@
+{% extends "maintainer/base.html" %}
+{% block title %}Maintainer Pilot Pricing - BashOps Maintainer{% endblock %}
+{% block extra_head %}
+<meta name="description" content="BashOps Maintainer Pilot pricing for active open-source teams testing a faster issue-triage workflow.">
+<link rel="canonical" href="{{ site_url }}/maintainer/pricing">
+{% endblock %}
+{% block content %}
+<main>
+    <section class="pricing">
+        <span class="section-label">Validation Pilot</span>
+        <h1>Maintainer Pilot</h1>
+        <p>For active open-source teams testing a faster issue-triage workflow.</p>
+        <div class="pricing-grid">
+            <div class="pro">
+                <h2>Maintainer Pilot</h2>
+                <p class="price">${{ pilot_price }}<small>/month</small></p>
+                <ul>
+                    <li>Full issue-triage reports</li>
+                    <li>Possible duplicate detection</li>
+                    <li>Missing-information checks</li>
+                    <li>Contributor-readiness signals</li>
+                    <li>Suggested labels and first responses</li>
+                    <li>Private report history</li>
+                </ul>
+                {% if maintainer_access %}
+                <a class="nav-cta" href="/maintainer/dashboard">Pilot Access Active</a>
+                {% else %}
+                <a class="nav-cta" href="mailto:support@bashops.site?subject=BashOps%20Maintainer%20Pilot">Request Pilot Access</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="angle">Pilot access is activated manually. No automatic GitHub actions or repository changes are included.</div>
+    </section>
+</main>
+{% endblock %}

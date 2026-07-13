@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BashOps Maintainer{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="app-navbar">
+    <div class="nav-inner">
+        <a href="/maintainer" class="nav-brand">
+            <span class="nav-logo">&gt;_</span>
+            <span><strong>BashOps <em>Maintainer</em></strong><small>Read-only issue intelligence</small></span>
+        </a>
+        <button class="nav-toggle" type="button" onclick="toggleNav()">Menu</button>
+        <div class="nav-menu" id="navMenu">
+            <div class="nav-center">
+                <a href="/maintainer">Analyze</a>
+                <a href="/maintainer/pricing">Pilot Pricing</a>
+                {% if current_user %}<a href="/maintainer/dashboard">Reports</a>{% endif %}
+                <a href="/">BashOps Radar</a>
+            </div>
+            <div class="nav-right">
+                {% if current_user %}
+                <a href="/logout" class="nav-outline">Logout</a>
+                {% else %}
+                <a href="/login" class="nav-outline">Log In</a>
+                {% endif %}
+                <a href="/maintainer" class="nav-primary">Analyze Repository</a>
+            </div>
+        </div>
+    </div>
+</nav>
+{% block content %}{% endblock %}
+<footer>
+    <strong>BashOps Maintainer</strong>
+    <p>Read-only issue intelligence for commercially backed open-source teams.</p>
+    <p><a href="/privacy">Privacy</a> <a href="/terms">Terms</a> <a href="/contact">Contact</a></p>
+    <span>Copyright 2026 BashOps</span>
+</footer>
+<script>
+function toggleNav() {
+    const menu = document.getElementById("navMenu");
+    if (menu) menu.classList.toggle("open");
+}
+</script>
+</body>
+</html>

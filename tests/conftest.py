@@ -12,7 +12,7 @@ it would in production, and no test ever touches your real DATABASE_URL.
 
 Between tests, instead of a fresh database file per test (which WOULD
 require re-running Alembic per test and reintroduce the reload problem),
-the `client` fixture below just deletes all rows from the two tables.
+the `client` fixture below just deletes all rows from the application tables.
 Cheap on SQLite, fully order-independent, and keeps tests from leaking
 data into each other.
 """
@@ -69,11 +69,12 @@ def client():
     (no users, no targets) at the start of every test."""
     from starlette.testclient import TestClient
     from database import SessionLocal
-    from models import Event, Target, User
+    from models import Event, MaintainerAnalysis, Target, User
 
     db = SessionLocal()
     db.query(Event).delete()
     db.query(Target).delete()
+    db.query(MaintainerAnalysis).delete()
     db.query(User).delete()
     db.commit()
     db.close()
