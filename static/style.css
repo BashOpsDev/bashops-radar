@@ -3752,15 +3752,62 @@ footer,
     white-space: nowrap;
 }
 
-.product-switcher-link.current {
+.product-switcher-link.is-active {
     background: rgba(245, 158, 11, 0.13);
     color: var(--text);
 }
 
-.product-switcher-link small {
+.product-active-badge {
     color: var(--primary);
     font-size: 10px;
     text-transform: uppercase;
+}
+
+.vscode-interest-confirmation {
+    display: grid;
+    gap: 3px;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(34, 197, 94, 0.45);
+    border-radius: 10px;
+    color: #86efac;
+}
+
+.vscode-interest-confirmation span {
+    color: var(--muted);
+}
+
+.maintainer-trial-gate {
+    margin: 18px 0;
+    padding: 18px;
+    border: 1px solid rgba(245, 158, 11, 0.48);
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.07);
+}
+
+.maintainer-trial-gate h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+}
+
+.maintainer-trial-gate p,
+.maintainer-trial-gate small {
+    display: block;
+    margin: 0;
+}
+
+.maintainer-trial-gate small {
+    margin-top: 12px;
+    color: var(--muted);
+}
+
+.maintainer-trial-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
 }
 
 .product-promo-layout {
@@ -3827,7 +3874,7 @@ button:focus-visible {
 }
 
 @media (min-width: 1181px) {
-    .nav-center,
+    .nav-page-links,
     .nav-right {
         flex-wrap: nowrap;
     }
@@ -3836,7 +3883,7 @@ button:focus-visible {
         gap: 14px;
     }
 
-    .nav-center,
+    .nav-page-links,
     .nav-right {
         gap: 9px;
     }
@@ -3887,6 +3934,11 @@ button:focus-visible {
         justify-content: center;
         white-space: normal;
         overflow-wrap: anywhere;
+        text-align: center;
+    }
+
+    .maintainer-trial-actions > a {
+        flex: 1 1 150px;
         text-align: center;
     }
 }

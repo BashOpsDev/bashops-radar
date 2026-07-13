@@ -326,6 +326,24 @@ def track_event(request: Request, event_name: str, user=None, metadata=None) -> 
         print(f"[event tracking failed] {event_name}: {exc!r}")
 
 
+def user_has_vscode_interest(user) -> bool:
+    if not user:
+        return False
+    db: Session = SessionLocal()
+    try:
+        return (
+            db.query(Event.id)
+            .filter(
+                Event.user_id == user.id,
+                Event.event_name == "vscode_interest_submitted",
+            )
+            .first()
+            is not None
+        )
+    finally:
+        db.close()
+
+
 def anonymous_website_analysis_used(request: Request, ip: str) -> bool:
     """
     Website-only anonymous trial guard. The session flag is the primary signal;
@@ -501,6 +519,7 @@ def home(request: Request, source: str = "", vscode_interest: str = ""):
             "site_url": config.SITE_URL,
             "pro_price": config.PRO_PRICE_USD,
             "vscode_interest_status": vscode_interest if vscode_interest in {"joined", "already", "error"} else "",
+            "has_vscode_interest": user_has_vscode_interest(current_user),
             **user_context(request, current_user),
             **csrf_context(request),
         },
@@ -709,6 +728,7 @@ def maintainer_analyze(
                 "report": report,
                 "analysis": None,
                 "report_notice": report_notice,
+                "anonymous_preview_used": not current_user,
                 **maintainer_template_context(request, current_user),
             },
         )
@@ -780,6 +800,7 @@ def maintainer_analyze(
             "report": report,
             "analysis": None,
             "report_notice": report_notice,
+            "anonymous_preview_used": not current_user,
             **maintainer_template_context(request, current_user),
         },
     )
@@ -814,6 +835,7 @@ def maintainer_report(request: Request, analysis_id: int):
             "report": report,
             "analysis": analysis,
             "report_notice": None,
+            "anonymous_preview_used": False,
             **maintainer_template_context(request, current_user),
         },
     )
@@ -893,21 +915,7 @@ def vscode_interest(request: Request, csrf_token: str = Form("")):
         return RedirectResponse(url="/register", status_code=303)
 
     track_event(request, "vscode_waitlist_clicked", user=current_user)
-    db: Session = SessionLocal()
-    try:
-        already_registered = (
-            db.query(Event.id)
-            .filter(
-                Event.user_id == current_user.id,
-                Event.event_name == "vscode_interest_submitted",
-            )
-            .first()
-            is not None
-        )
-    finally:
-        db.close()
-
-    if already_registered:
+    if user_has_vscode_interest(current_user):
         return RedirectResponse(url="/?vscode_interest=already#vscode-extension", status_code=303)
 
     track_event(request, "vscode_interest_submitted", user=current_user)

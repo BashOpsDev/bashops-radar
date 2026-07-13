@@ -17,13 +17,12 @@
         </a>
         <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navMenu" onclick="toggleNav()">Menu</button>
         <div class="nav-menu" id="navMenu">
-            <div class="nav-center">
-                {% set current_product = "maintainer" %}
-                {% include "components/product_switcher.html" %}
+            {% set current_product = "maintainer" %}
+            {% include "components/product_switcher.html" %}
+            <div class="nav-center nav-page-links">
                 <a href="/maintainer">Analyze</a>
                 <a href="/maintainer/pricing">Pilot Pricing</a>
                 {% if current_user %}<a href="/maintainer/dashboard">Reports</a>{% endif %}
-                <a href="/">BashOps Radar</a>
             </div>
             <div class="nav-right">
                 {% if current_user %}

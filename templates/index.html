@@ -161,15 +161,14 @@
         </ul>
         <p class="validation-note"><strong>The VS Code Extension is not available yet.</strong> Interest will help determine what gets built first.</p>
 
-        {% if vscode_interest_status == "joined" %}
-        <p class="interest-message success" role="status">You're registered for BashOps for VS Code updates.</p>
-        {% elif vscode_interest_status == "already" %}
-        <p class="interest-message success" role="status">You're already registered for BashOps for VS Code updates.</p>
+        {% if current_user and has_vscode_interest %}
+        <div class="vscode-interest-confirmation" role="status">
+            <strong>You're on the VS Code interest list.</strong>
+            <span>Your interest will help determine which editor workflows are prioritized.</span>
+        </div>
         {% elif vscode_interest_status == "error" %}
         <p class="interest-message error" role="alert">Your session expired. Please try again.</p>
-        {% endif %}
-
-        {% if current_user %}
+        {% elif current_user %}
         <form class="compact-interest-form" method="post" action="/vscode-interest">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit">Notify Me</button>

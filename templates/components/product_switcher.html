@@ -1,20 +1,22 @@
 <div class="product-switcher" role="group" aria-label="BashOps products">
     <a
-        class="product-switcher-link{% if current_product == 'radar' %} current{% endif %}"
+        class="product-switcher-link{% if current_product == 'radar' %} is-active{% endif %}"
         href="/{% if current_product == 'maintainer' %}?source=maintainer{% endif %}"
+        aria-label="BashOps Radar"
         {% if current_product == "radar" %}aria-current="page"{% endif %}
     >
-        <span>BashOps Radar</span>
-        {% if current_product == "radar" %}<small>Current</small>{% endif %}
+        <span>Radar</span>
+        {% if current_product == "radar" %}<small class="product-active-badge">Active</small>{% endif %}
     </a>
     {% if maintainer_enabled %}
     <a
-        class="product-switcher-link{% if current_product == 'maintainer' %} current{% endif %}"
+        class="product-switcher-link{% if current_product == 'maintainer' %} is-active{% endif %}"
         href="/maintainer{% if current_product == 'radar' %}?source=radar{% endif %}"
+        aria-label="BashOps Maintainer"
         {% if current_product == "maintainer" %}aria-current="page"{% endif %}
     >
-        <span>BashOps Maintainer</span>
-        {% if current_product == "maintainer" %}<small>Current</small>{% endif %}
+        <span>Maintainer</span>
+        {% if current_product == "maintainer" %}<small class="product-active-badge">Active</small>{% endif %}
     </a>
     {% endif %}
 </div>

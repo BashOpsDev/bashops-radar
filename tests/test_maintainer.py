@@ -123,11 +123,17 @@ def test_maintainer_landing_loads(client):
 def test_maintainer_navigation_marks_current_product_and_links_to_radar(client):
     response = client.get("/maintainer")
     assert response.status_code == 200
-    assert "BashOps Radar" in response.text
-    assert "BashOps Maintainer" in response.text
+    assert response.text.count('aria-label="BashOps Radar"') == 1
+    assert response.text.count('aria-label="BashOps Maintainer"') == 1
     assert 'aria-current="page"' in response.text
+    assert '>Maintainer</span>' in response.text
+    assert '>Active</small>' in response.text
+    assert '>Current</small>' not in response.text
     assert 'href="/?source=maintainer"' in response.text
     assert "Explore BashOps Radar" in response.text
+    nav = re.search(r"<nav.*?</nav>", response.text, re.DOTALL)
+    assert nav
+    assert '<a href="/">BashOps Radar</a>' not in nav.group(0)
     assert 'id="navToggle"' in response.text
     assert 'aria-expanded="false"' in response.text
     assert 'aria-controls="navMenu"' in response.text
@@ -218,18 +224,31 @@ def test_issue_limit_and_pull_request_exclusion(monkeypatch):
 
 
 def test_anonymous_user_gets_one_completed_trial(client, monkeypatch):
+    import app as app_module
     from database import SessionLocal
     from models import MaintainerAnalysis
 
-    _stub_complete(monkeypatch)
+    calls = []
+
+    def fake_build(repo_url):
+        calls.append(repo_url)
+        return _complete_outcome()
+
+    monkeypatch.setattr(app_module, "build_maintainer_report", fake_build)
     first = _post_maintainer(client)
     assert first.status_code == 200
     assert "Triage summary" in first.text
-    assert "Your free Maintainer preview has been used" in first.text
+    assert "Issue review" in first.text
+    assert "Free Maintainer preview used" in first.text
+    assert 'href="/register">Create Account</a>' in first.text
+    assert 'href="/login">Log In</a>' in first.text
 
     second = _post_maintainer(client)
     assert second.status_code == 429
-    assert "Your free Maintainer preview has been used" in second.text
+    assert "Free Maintainer preview used" in second.text
+    assert "Triage summary" not in second.text
+    assert "Issue review" not in second.text
+    assert len(calls) == 1
 
     db = SessionLocal()
     assert db.query(MaintainerAnalysis).count() == 1
@@ -251,7 +270,11 @@ def test_anonymous_partial_report_consumes_preview_and_blocks_second_repository(
 
     first = _post_maintainer(client)
     assert first.status_code == 200
-    assert "Your free Maintainer preview has been used" in first.text
+    assert "Free Maintainer preview used" in first.text
+    assert "Triage summary" in first.text
+    assert "Issue review" in first.text
+    assert 'href="/register">Create Account</a>' in first.text
+    assert 'href="/login">Log In</a>' in first.text
 
     db = SessionLocal()
     assert db.query(MaintainerAnalysis).count() == 0
@@ -260,6 +283,10 @@ def test_anonymous_partial_report_consumes_preview_and_blocks_second_repository(
     second = _post_maintainer(client, "https://github.com/example/other")
     assert second.status_code == 429
     assert "Create an account to continue evaluating repository issue queues" in second.text
+    assert "Triage summary" not in second.text
+    assert "Issue review" not in second.text
+    assert 'href="/register">Create Account</a>' in second.text
+    assert 'href="/login">Log In</a>' in second.text
     assert len(calls) == 1
 
 

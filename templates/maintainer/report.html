@@ -8,7 +8,18 @@
         <h1>{{ report.repository.full_name }}</h1>
         <p>{{ report.repository.description }}</p>
         <div class="checks"><span>{{ report.issues_reviewed }} issues reviewed</span><span>{{ report.analyzed_at[:10] }}</span><span>No GitHub changes made</span></div>
-        {% if report_notice %}<div class="error">{{ report_notice }}</div>{% endif %}
+        {% if anonymous_preview_used %}
+        <div class="maintainer-trial-gate">
+            <h2>Free Maintainer preview used</h2>
+            <p>Create an account to continue evaluating repository issue queues and keep future reports private.</p>
+            {% if report.is_partial %}<p>The AI-assisted report was unavailable, so this preview uses deterministic issue signals.</p>{% endif %}
+            <div class="maintainer-trial-actions">
+                <a class="nav-cta compact" href="/register">Create Account</a>
+                <a class="nav-outline compact" href="/login">Log In</a>
+            </div>
+            <small>A verified Free account includes one completed Maintainer report. Maintainer Pilot provides continued report access.</small>
+        </div>
+        {% elif report_notice %}<div class="error">{{ report_notice }}</div>{% endif %}
         <div class="angle"><strong>Maintainer review required.</strong> {{ report.disclaimer }}</div>
     </section>
 

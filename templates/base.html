@@ -20,9 +20,9 @@
         </a>
         <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navMenu" onclick="toggleNav()">Menu</button>
         <div class="nav-menu" id="navMenu">
-            <div class="nav-center">
-                {% set current_product = "radar" %}
-                {% include "components/product_switcher.html" %}
+            {% set current_product = "radar" %}
+            {% include "components/product_switcher.html" %}
+            <div class="nav-center nav-page-links">
                 <a href="/#features">Features</a>
                 <a href="/pricing">Pricing</a>
                 <a href="/discover">Discover</a>

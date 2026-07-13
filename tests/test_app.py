@@ -85,9 +85,12 @@ def test_radar_product_navigation_and_maintainer_promotion_follow_feature_flag(c
     assert enabled.status_code == 200
     assert 'href="/"' in enabled.text
     assert 'aria-current="page"' in enabled.text
-    assert "BashOps Radar" in enabled.text
-    assert "Current" in enabled.text
+    assert enabled.text.count('aria-label="BashOps Radar"') == 1
+    assert '>Radar</span>' in enabled.text
+    assert '>Active</small>' in enabled.text
+    assert '>Current</small>' not in enabled.text
     assert 'href="/maintainer?source=radar"' in enabled.text
+    assert enabled.text.count('aria-label="BashOps Maintainer"') == 1
     assert "Explore BashOps Maintainer" in enabled.text
 
     monkeypatch.setattr(config, "MAINTAINER_ENABLED", False)
@@ -105,8 +108,8 @@ def test_radar_mobile_navigation_markup_and_anonymous_links_are_preserved(client
     assert 'id="navToggle"' in response.text
     assert 'aria-expanded="false"' in response.text
     assert 'aria-controls="navMenu"' in response.text
-    assert "BashOps Radar" in response.text
-    assert "BashOps Maintainer" in response.text
+    assert 'aria-label="BashOps Radar"' in response.text
+    assert 'aria-label="BashOps Maintainer"' in response.text
     assert 'href="/register"' in response.text
     assert 'href="/login"' in response.text
 
@@ -239,8 +242,6 @@ def test_authenticated_navigation_and_vscode_interest_are_preserved_and_deduplic
     assert first.status_code == 303
     assert first.headers["location"] == "/?vscode_interest=joined#vscode-extension"
 
-    page = client.get("/")
-    token = _csrf_token(page.text)
     repeated = client.post(
         "/vscode-interest",
         data={"csrf_token": token},
@@ -264,9 +265,12 @@ def test_authenticated_navigation_and_vscode_interest_are_preserved_and_deduplic
     assert "user@example.com" not in (interests[0].metadata_json or "")
     db.close()
 
-    joined = client.get(first.headers["location"].split("#", 1)[0])
-    assert 'role="status"' in joined.text
-    assert "registered for BashOps for VS Code updates" in joined.text
+    refreshed = client.get("/")
+    assert 'role="status"' in refreshed.text
+    assert "You're on the VS Code interest list." in refreshed.text
+    assert "Your interest will help determine which editor workflows are prioritized." in refreshed.text
+    assert "Notify Me" not in refreshed.text
+    assert 'action="/vscode-interest"' not in refreshed.text
 
 
 def test_vscode_interest_requires_csrf(client):
