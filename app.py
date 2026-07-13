@@ -213,6 +213,7 @@ def user_context(request: Request, current_user=None) -> dict:
         "is_admin": is_admin(current_user),
         "has_pro_access": pro_access,
         "effective_plan": "pro" if pro_access else "free",
+        "maintainer_enabled": config.MAINTAINER_ENABLED,
     }
 
 
@@ -485,8 +486,10 @@ def sitemap_xml():
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request):
+def home(request: Request, source: str = "", vscode_interest: str = ""):
     current_user = get_current_user(request)
+    if source == "maintainer":
+        track_event(request, "maintainer_to_radar_clicked", user=current_user)
     track_event(request, "landing_view", user=current_user)
     return templates.TemplateResponse(
         request=request,
@@ -497,6 +500,7 @@ def home(request: Request):
             "limit_reached": False,
             "site_url": config.SITE_URL,
             "pro_price": config.PRO_PRICE_USD,
+            "vscode_interest_status": vscode_interest if vscode_interest in {"joined", "already", "error"} else "",
             **user_context(request, current_user),
             **csrf_context(request),
         },
@@ -573,9 +577,11 @@ def render_maintainer_landing(
 
 
 @app.get("/maintainer", response_class=HTMLResponse)
-def maintainer_landing(request: Request):
+def maintainer_landing(request: Request, source: str = ""):
     require_maintainer_enabled()
     current_user = get_current_user(request)
+    if source == "radar":
+        track_event(request, "radar_to_maintainer_clicked", user=current_user)
     track_event(request, "maintainer_page_viewed", user=current_user)
     return render_maintainer_landing(request, current_user)
 
@@ -876,6 +882,36 @@ def github_opportunity_score_tool(request: Request):
             **csrf_context(request),
         },
     )
+
+
+@app.post("/vscode-interest")
+def vscode_interest(request: Request, csrf_token: str = Form("")):
+    current_user = get_current_user(request)
+    if not check_csrf(request, csrf_token):
+        return RedirectResponse(url="/?vscode_interest=error#vscode-extension", status_code=303)
+    if not current_user:
+        return RedirectResponse(url="/register", status_code=303)
+
+    track_event(request, "vscode_waitlist_clicked", user=current_user)
+    db: Session = SessionLocal()
+    try:
+        already_registered = (
+            db.query(Event.id)
+            .filter(
+                Event.user_id == current_user.id,
+                Event.event_name == "vscode_interest_submitted",
+            )
+            .first()
+            is not None
+        )
+    finally:
+        db.close()
+
+    if already_registered:
+        return RedirectResponse(url="/?vscode_interest=already#vscode-extension", status_code=303)
+
+    track_event(request, "vscode_interest_submitted", user=current_user)
+    return RedirectResponse(url="/?vscode_interest=joined#vscode-extension", status_code=303)
 
 
 @app.get("/tools/best-first-issue-finder", response_class=HTMLResponse)

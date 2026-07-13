@@ -77,6 +77,49 @@ def test_homepage_links_to_free_developer_tools(client):
     assert "Should I Contribute Here?" in r.text
 
 
+def test_radar_product_navigation_and_maintainer_promotion_follow_feature_flag(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "MAINTAINER_ENABLED", True)
+    enabled = client.get("/")
+    assert enabled.status_code == 200
+    assert 'href="/"' in enabled.text
+    assert 'aria-current="page"' in enabled.text
+    assert "BashOps Radar" in enabled.text
+    assert "Current" in enabled.text
+    assert 'href="/maintainer?source=radar"' in enabled.text
+    assert "Explore BashOps Maintainer" in enabled.text
+
+    monkeypatch.setattr(config, "MAINTAINER_ENABLED", False)
+    disabled = client.get("/")
+    assert disabled.status_code == 200
+    assert 'href="/maintainer' not in disabled.text
+    assert "Explore BashOps Maintainer" not in disabled.text
+
+
+def test_radar_mobile_navigation_markup_and_anonymous_links_are_preserved(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "MAINTAINER_ENABLED", True)
+    response = client.get("/")
+    assert 'id="navToggle"' in response.text
+    assert 'aria-expanded="false"' in response.text
+    assert 'aria-controls="navMenu"' in response.text
+    assert "BashOps Radar" in response.text
+    assert "BashOps Maintainer" in response.text
+    assert 'href="/register"' in response.text
+    assert 'href="/login"' in response.text
+
+
+def test_vscode_validation_section_is_honest_and_anonymous_cta_registers(client):
+    response = client.get("/")
+    assert "BashOps for VS Code - Coming Soon" in response.text
+    assert "The VS Code Extension is not available yet" in response.text
+    assert 'href="/register">Create an Account to Join</a>' in response.text
+    assert "download" not in response.text.lower()
+    assert "marketplace" not in response.text.lower()
+
+
 def _fake_analysis_result(score=88):
     return {
         "repo": "example/repo",
@@ -175,6 +218,97 @@ def _register_verified_and_login(client, email="user@example.com", password="Str
         follow_redirects=False,
     )
     assert r.status_code == 303
+
+
+def test_authenticated_navigation_and_vscode_interest_are_preserved_and_deduplicated(client):
+    from database import SessionLocal
+    from models import Event, User
+
+    _register_verified_and_login(client)
+    page = client.get("/")
+    assert 'href="/dashboard"' in page.text
+    assert 'href="/logout"' in page.text
+    assert "Notify Me" in page.text
+
+    token = _csrf_token(page.text)
+    first = client.post(
+        "/vscode-interest",
+        data={"csrf_token": token},
+        follow_redirects=False,
+    )
+    assert first.status_code == 303
+    assert first.headers["location"] == "/?vscode_interest=joined#vscode-extension"
+
+    page = client.get("/")
+    token = _csrf_token(page.text)
+    repeated = client.post(
+        "/vscode-interest",
+        data={"csrf_token": token},
+        follow_redirects=False,
+    )
+    assert repeated.status_code == 303
+    assert repeated.headers["location"] == "/?vscode_interest=already#vscode-extension"
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    interests = db.query(Event).filter(
+        Event.user_id == user.id,
+        Event.event_name == "vscode_interest_submitted",
+    ).all()
+    clicks = db.query(Event).filter(
+        Event.user_id == user.id,
+        Event.event_name == "vscode_waitlist_clicked",
+    ).count()
+    assert len(interests) == 1
+    assert clicks == 2
+    assert "user@example.com" not in (interests[0].metadata_json or "")
+    db.close()
+
+    joined = client.get(first.headers["location"].split("#", 1)[0])
+    assert 'role="status"' in joined.text
+    assert "registered for BashOps for VS Code updates" in joined.text
+
+
+def test_vscode_interest_requires_csrf(client):
+    from database import SessionLocal
+    from models import Event
+
+    _register_verified_and_login(client)
+    response = client.post(
+        "/vscode-interest",
+        data={"csrf_token": "forged"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?vscode_interest=error#vscode-extension"
+
+    db = SessionLocal()
+    assert db.query(Event).filter(Event.event_name == "vscode_interest_submitted").count() == 0
+    db.close()
+
+    error_page = client.get(response.headers["location"].split("#", 1)[0])
+    assert 'role="alert"' in error_page.text
+
+
+def test_cross_product_links_record_only_safe_events(client, monkeypatch):
+    import config
+    from database import SessionLocal
+    from models import Event
+
+    monkeypatch.setattr(config, "MAINTAINER_ENABLED", True)
+    assert client.get("/maintainer?source=radar").status_code == 200
+    assert client.get("/?source=maintainer").status_code == 200
+
+    db = SessionLocal()
+    events = db.query(Event).filter(
+        Event.event_name.in_(["radar_to_maintainer_clicked", "maintainer_to_radar_clicked"])
+    ).all()
+    assert {event.event_name for event in events} == {
+        "radar_to_maintainer_clicked",
+        "maintainer_to_radar_clicked",
+    }
+    assert all("@" not in (event.metadata_json or "") for event in events)
+    db.close()
 
 
 def test_anonymous_visitor_gets_one_full_analysis_then_registration_cta(client, monkeypatch):

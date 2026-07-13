@@ -125,6 +125,60 @@
         {% include "components/pricing_cards.html" %}
     </section>
 
+    {% if maintainer_enabled %}
+    <section class="developer-platform product-family-section">
+        <span class="section-label">More from BashOps</span>
+        <h2>Tools for both sides of open-source work</h2>
+        <p>Tools for both sides of open-source work: contributors choosing where to invest their time and maintainers organizing incoming issues.</p>
+        <div class="product-promo-layout">
+            <div>
+                <h3>BashOps Maintainer</h3>
+                <p>Read-only issue-triage reports for open-source maintainers.</p>
+                <ul class="compact-feature-list">
+                    <li>Identify possible duplicate candidates</li>
+                    <li>Spot missing reproduction details</li>
+                    <li>Suggest categories and labels</li>
+                    <li>Surface contributor-ready work</li>
+                    <li>Draft first responses for maintainer review</li>
+                </ul>
+            </div>
+            <a class="nav-cta compact" href="/maintainer?source=radar">Explore BashOps Maintainer</a>
+        </div>
+    </section>
+    {% endif %}
+
+    <section id="vscode-extension" class="developer-platform vscode-validation-section">
+        <span class="section-label">Editor Workflow</span>
+        <h2>BashOps for VS Code - Coming Soon</h2>
+        <p>Evaluate repositories, review contribution signals, and move from research to execution without leaving your editor.</p>
+        <ul class="vscode-concept-list">
+            <li>View a repository's Opportunity Score</li>
+            <li>Open the recommended first issue</li>
+            <li>Review score signals and main risks</li>
+            <li>Move a target to Working</li>
+            <li>Access proof-of-work notes</li>
+            <li>Open the repository or issue directly</li>
+        </ul>
+        <p class="validation-note"><strong>The VS Code Extension is not available yet.</strong> Interest will help determine what gets built first.</p>
+
+        {% if vscode_interest_status == "joined" %}
+        <p class="interest-message success" role="status">You're registered for BashOps for VS Code updates.</p>
+        {% elif vscode_interest_status == "already" %}
+        <p class="interest-message success" role="status">You're already registered for BashOps for VS Code updates.</p>
+        {% elif vscode_interest_status == "error" %}
+        <p class="interest-message error" role="alert">Your session expired. Please try again.</p>
+        {% endif %}
+
+        {% if current_user %}
+        <form class="compact-interest-form" method="post" action="/vscode-interest">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit">Notify Me</button>
+        </form>
+        {% else %}
+        <a class="nav-cta compact" href="/register">Create an Account to Join</a>
+        {% endif %}
+    </section>
+
     <section class="social-proof">
         <h2>Built from real OSS experience</h2>
         <p>Sourcebot · Aegra · Sova · Nango · Stagewise</p>

@@ -120,6 +120,27 @@ def test_maintainer_landing_loads(client):
     assert "never edits or closes GitHub issues" in response.text
 
 
+def test_maintainer_navigation_marks_current_product_and_links_to_radar(client):
+    response = client.get("/maintainer")
+    assert response.status_code == 200
+    assert "BashOps Radar" in response.text
+    assert "BashOps Maintainer" in response.text
+    assert 'aria-current="page"' in response.text
+    assert 'href="/?source=maintainer"' in response.text
+    assert "Explore BashOps Radar" in response.text
+    assert 'id="navToggle"' in response.text
+    assert 'aria-expanded="false"' in response.text
+    assert 'aria-controls="navMenu"' in response.text
+
+
+def test_authenticated_maintainer_navigation_preserves_reports_and_logout(client):
+    _login(client)
+    response = client.get("/maintainer")
+    assert response.status_code == 200
+    assert 'href="/maintainer/dashboard"' in response.text
+    assert 'href="/logout"' in response.text
+
+
 def test_feature_flag_hides_all_maintainer_routes(client, monkeypatch):
     monkeypatch.setattr(config, "MAINTAINER_ENABLED", False)
     for path in ("/maintainer", "/maintainer/pricing", "/maintainer/dashboard", "/maintainer/report/1"):

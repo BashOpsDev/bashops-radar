@@ -15,9 +15,11 @@
             <span class="nav-logo">&gt;_</span>
             <span><strong>BashOps <em>Maintainer</em></strong><small>Read-only issue intelligence</small></span>
         </a>
-        <button class="nav-toggle" type="button" onclick="toggleNav()">Menu</button>
+        <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navMenu" onclick="toggleNav()">Menu</button>
         <div class="nav-menu" id="navMenu">
             <div class="nav-center">
+                {% set current_product = "maintainer" %}
+                {% include "components/product_switcher.html" %}
                 <a href="/maintainer">Analyze</a>
                 <a href="/maintainer/pricing">Pilot Pricing</a>
                 {% if current_user %}<a href="/maintainer/dashboard">Reports</a>{% endif %}
@@ -44,8 +46,33 @@
 <script>
 function toggleNav() {
     const menu = document.getElementById("navMenu");
-    if (menu) menu.classList.toggle("open");
+    const toggle = document.getElementById("navToggle");
+    if (!menu || !toggle) return;
+    const isOpen = menu.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", String(isOpen));
 }
+
+function closeNav(restoreFocus) {
+    const menu = document.getElementById("navMenu");
+    const toggle = document.getElementById("navToggle");
+    if (!menu || !toggle) return;
+    const wasOpen = menu.classList.contains("open");
+    menu.classList.remove("open");
+    toggle.setAttribute("aria-expanded", "false");
+    if (restoreFocus && wasOpen) toggle.focus();
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("#navMenu a").forEach(function (link) {
+        link.addEventListener("click", function () { closeNav(false); });
+    });
+});
+
+document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+        closeNav(true);
+    }
+});
 </script>
 </body>
 </html>
