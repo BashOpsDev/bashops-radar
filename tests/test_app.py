@@ -14,12 +14,15 @@ import hashlib
 import json
 import re
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 
 def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
     import analysis_service
+
+    pushed_at = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat().replace("+00:00", "Z")
 
     issue = {
         "number": 7,
@@ -38,7 +41,7 @@ def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
                 "stargazers_count": 10,
                 "forks_count": 2,
                 "open_issues_count": 4,
-                "pushed_at": "2026-07-09T00:00:00Z",
+                "pushed_at": pushed_at,
             },
             {"Python": 100},
             [(92, "Docs", issue)],
