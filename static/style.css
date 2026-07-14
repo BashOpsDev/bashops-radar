@@ -1875,6 +1875,19 @@ main > .nav {
     color: var(--muted);
 }
 
+@media (min-width: 981px) {
+    .maintainer-report-meta {
+        align-self: start;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .maintainer-report-meta span {
+        flex: 0 0 auto;
+        width: auto;
+    }
+}
+
 .plan-chip {
     display: inline-flex;
     align-items: center;
