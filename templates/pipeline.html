@@ -74,7 +74,7 @@ class="export-btn">
 </a>
 
         <div class="pipeline-list">
-            {% for row in rows[-20:] %}
+            {% for row in rows[:20] %}
             <div class="pipeline-card searchable-card"
                  data-score="{{ row.score }}"
                  data-status="{{ row.status }}"

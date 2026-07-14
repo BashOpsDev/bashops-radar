@@ -724,6 +724,126 @@ def test_public_api_keeps_existing_anonymous_quota_behavior(client, monkeypatch)
     assert "upgrade_url" in r.json()
 
 
+def _private_repository_response(monkeypatch):
+    import radar
+
+    calls = []
+
+    def fake_github_get(endpoint):
+        calls.append(endpoint)
+        if len(calls) > 1:
+            raise AssertionError("Private repository analysis must stop after metadata lookup")
+        return {"private": True, "full_name": "private-owner/private-repo"}
+
+    monkeypatch.setattr(radar, "github_get", fake_github_get)
+    return calls
+
+
+def test_private_repository_is_rejected_on_website(client, monkeypatch):
+    calls = _private_repository_response(monkeypatch)
+
+    response = _post_analysis(client, "https://github.com/private-owner/private-repo")
+
+    assert response.status_code == 200
+    assert "Private repositories are not supported." in response.text
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("client_header", ["", "github-action"], ids=["public-api", "github-action"])
+def test_private_repository_is_rejected_by_api_clients(client, monkeypatch, client_header):
+    calls = _private_repository_response(monkeypatch)
+    headers = {"X-BashOps-Client": client_header} if client_header else {}
+
+    response = client.post(
+        "/api/v1/analyze",
+        json={"repo_url": "https://github.com/private-owner/private-repo"},
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Private repositories are not supported."}
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "referrer,expected",
+    [
+        ("https://bashops.site/verify-email?token=verification-secret", "https://bashops.site/verify-email"),
+        ("https://bashops.site/reset-password?token=reset-secret#form", "https://bashops.site/reset-password"),
+        ("https://bashops.site/auth/github/callback?code=oauth-code&state=oauth-state", "https://bashops.site/auth/github/callback"),
+        ("not a valid referrer", ""),
+    ],
+)
+def test_event_referrers_strip_sensitive_url_data(client, referrer, expected):
+    from database import SessionLocal
+    from models import Event
+
+    assert client.get("/", headers={"referer": referrer}).status_code == 200
+
+    db = SessionLocal()
+    event = db.query(Event).order_by(Event.id.desc()).first()
+    assert event.referrer == expected
+    db.close()
+
+
+def test_email_delivery_logs_never_include_token_links_or_full_recipient(monkeypatch, capsys):
+    import config
+    import email_utils
+
+    monkeypatch.setattr(config, "email_configured", False)
+    verification_url = "https://bashops.site/verify-email?token=verification-secret"
+    reset_url = "https://bashops.site/reset-password?token=reset-secret"
+
+    assert email_utils.send_verification_email("person@example.com", verification_url) is False
+    assert email_utils.send_password_reset_email("person@example.com", reset_url) is False
+
+    output = capsys.readouterr().out
+    assert "verification-secret" not in output
+    assert "reset-secret" not in output
+    assert verification_url not in output
+    assert reset_url not in output
+    assert "person@example.com" not in output
+    assert "p***@example.com" in output
+
+
+def test_resend_failure_log_does_not_include_response_body(monkeypatch, capsys):
+    import config
+    import email_utils
+
+    class FailedResponse:
+        status_code = 400
+        text = "rejected token=provider-secret"
+
+    monkeypatch.setattr(config, "email_configured", True)
+    monkeypatch.setattr(config, "RESEND_API_KEY", "configured")
+    monkeypatch.setattr(config, "EMAIL_FROM", "support@bashops.site")
+    monkeypatch.setattr(email_utils.requests, "post", lambda *args, **kwargs: FailedResponse())
+
+    assert email_utils.send_email("person@example.com", "Test email", "token=message-secret") is False
+    output = capsys.readouterr().out
+    assert "provider-secret" not in output
+    assert "message-secret" not in output
+    assert "person@example.com" not in output
+    assert "resend_status=400" in output
+
+
+def test_session_cookie_security_tracks_site_scheme(client):
+    import app as app_module
+
+    assert app_module.session_cookie_https_only("https://bashops.site") is True
+    assert app_module.session_cookie_https_only("http://127.0.0.1:8000") is False
+    session_middleware = next(
+        middleware
+        for middleware in app_module.app.user_middleware
+        if middleware.cls.__name__ == "SessionMiddleware"
+    )
+    assert session_middleware.kwargs["https_only"] is False
+    assert session_middleware.kwargs["same_site"] == "lax"
+    cookie_header = client.get("/").headers.get("set-cookie", "").lower()
+    assert "httponly" in cookie_header
+    assert "secure" not in cookie_header
+
+
 def _csrf_token(html: str) -> str:
     match = re.search(r'name="csrf_token" value="([^"]+)"', html)
     assert match, "csrf_token not found in response HTML"
@@ -1220,10 +1340,106 @@ def test_analyze_requires_valid_csrf(client):
     assert "session expired" in r.text.lower()
 
 
+def test_unavailable_ai_summary_has_no_full_analysis_retry_form(client, monkeypatch):
+    import app as app_module
+    from database import SessionLocal
+    from models import Target
+
+    _stub_analysis(monkeypatch)
+    monkeypatch.setattr(
+        app_module,
+        "generate_ai_summary",
+        lambda *args, **kwargs: {
+            "text": "AI summary temporarily unavailable. Core repository analysis completed successfully.",
+            "status": "unavailable",
+        },
+    )
+    _register_and_login(client)
+
+    response = _post_analysis(client)
+
+    assert response.status_code == 200
+    assert "AI summary unavailable. The repository analysis remains available." in response.text
+    assert "Retry AI Summary" not in response.text
+    assert 'class="analysis-retry-form"' not in response.text
+    db = SessionLocal()
+    assert db.query(Target).count() == 1
+    db.close()
+
+
 def test_navbar_hides_admin_link_for_regular_users(client):
     _register_and_login(client)
     r = client.get("/pipeline")
     assert 'href="/admin/analytics"' not in r.text
+
+
+@pytest.mark.parametrize(
+    "email,plan,maintainer_pilot,allowed",
+    [
+        ("free@example.com", "free", False, False),
+        ("maintainer@example.com", "free", True, False),
+        ("pro@example.com", "pro", False, True),
+        ("bashops1@gmail.com", "free", False, True),
+    ],
+)
+def test_pipeline_csv_export_uses_radar_pro_entitlement(
+    client, email, plan, maintainer_pilot, allowed
+):
+    from database import SessionLocal
+    from models import Target, User
+
+    _register_and_login(client, email=email)
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    user.plan = plan
+    user.maintainer_pilot_access = maintainer_pilot
+    db.add(Target(user_id=user.id, repo="example/repo", repo_url="", score=80))
+    db.commit()
+    db.close()
+
+    response = client.get("/export-pipeline", follow_redirects=False)
+
+    if allowed:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/csv")
+        assert "example/repo" in response.text
+    else:
+        assert response.status_code == 303
+        assert response.headers["location"] == "/pricing"
+        pricing = client.get(response.headers["location"])
+        assert 'href="/billing/upgrade"' in pricing.text
+
+
+def test_pipeline_displays_twenty_newest_targets(client):
+    from database import SessionLocal
+    from models import Target, User
+
+    _register_and_login(client)
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").first()
+    started_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    for index in range(22):
+        db.add(
+            Target(
+                user_id=user.id,
+                repo=f"example/target-{index:02d}",
+                repo_url=f"https://github.com/example/target-{index:02d}",
+                score=60 + index,
+                created_at=started_at + timedelta(minutes=index),
+            )
+        )
+    db.commit()
+    db.close()
+
+    response = client.get("/pipeline")
+
+    assert response.status_code == 200
+    assert "example/target-21" in response.text
+    assert "example/target-02" in response.text
+    assert "example/target-01" not in response.text
+    assert "example/target-00" not in response.text
+    assert 'id="pipelineSearch"' in response.text
+    assert 'id="sortPipeline"' in response.text
 
 
 # --- Pro-gated pitch generation -------------------------------------------
@@ -1281,6 +1497,47 @@ def test_pro_user_can_generate_and_persist_founder_pitch(client, monkeypatch):
     row = db.query(Target).filter(Target.repo == "octocat/hello").first()
     assert row.pitch == "Pro pitch for octocat/hello #1"
     db.close()
+
+
+@pytest.mark.parametrize(
+    "email,name",
+    [("alice@example.com", "Alice"), ("bob@example.com", "Bob")],
+)
+def test_generated_pitch_never_leaks_owner_signature(client, monkeypatch, email, name):
+    import analytics
+    from database import SessionLocal
+    from models import Target, User
+
+    monkeypatch.setattr(analytics, "GEMINI_API_KEY", None)
+    _register_and_login(client, email=email, name=name)
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    user.plan = "pro"
+    db.add(Target(user_id=user.id, repo="octocat/hello", repo_url="", language="Python", score=80, pitch=""))
+    db.commit()
+    db.close()
+
+    page = client.get("/pipeline")
+    response = client.post(
+        "/generate-pitch",
+        data={"repo": "octocat/hello", "best_issue": "#1", "csrf_token": _csrf_token(page.text)},
+    )
+
+    assert response.status_code == 200
+    assert "Bashir" not in response.text
+
+
+def test_contact_and_legal_pages_use_public_support_address(client):
+    contact = client.get("/contact")
+    assert 'href="mailto:support@bashops.site">support@bashops.site</a>' in contact.text
+    assert "web3hausa1@gmail.com" not in contact.text
+
+    for path in ("/terms", "/privacy", "/refund", "/pricing"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "support@bashops.site" in response.text
+        assert "bashops1@gmail.com" not in response.text
 
 
 # --- Paddle webhook -------------------------------------------------------

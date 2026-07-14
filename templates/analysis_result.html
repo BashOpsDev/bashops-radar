@@ -220,14 +220,7 @@
                     <div class="ai-summary-box">
                         <p>{{ result.ai_summary }}</p>
                         {% if result.ai_status == "unavailable" %}
-                        <form method="post" action="/analyze" class="analysis-retry-form">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <input type="hidden" name="repo_url" value="{{ result.repo_url }}">
-                            {% if from_discover %}
-                            <input type="hidden" name="source" value="discover">
-                            {% endif %}
-                            <button type="submit" class="retry-btn">Retry AI Summary</button>
-                        </form>
+                        <p class="analysis-retry-note">AI summary unavailable. The repository analysis remains available.</p>
                         {% endif %}
                     </div>
 

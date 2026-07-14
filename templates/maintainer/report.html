@@ -3,12 +3,16 @@
 {% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
 <main class="dashboard-page">
-    <section class="dashboard-hero">
+    <section class="dashboard-hero maintainer-report-hero">
         <span class="section-label">Read-only Analysis</span>
         <h1>{{ report.repository.full_name }}</h1>
         <p>{{ report.repository.description }}</p>
         <a class="nav-outline compact" href="{{ report.repository.url }}" target="_blank" rel="noopener noreferrer">Open repository on GitHub</a>
-        <div class="checks maintainer-report-meta"><span>{{ report.issues_reviewed }} issues reviewed</span><span>{{ report.analyzed_at[:10] }}</span><span>No GitHub changes made</span></div>
+        <div class="maintainer-report-meta">
+            <span class="maintainer-report-meta-item">{{ report.issues_reviewed }} issues reviewed</span>
+            <span class="maintainer-report-meta-item">{{ report.analyzed_at[:10] }}</span>
+            <span class="maintainer-report-meta-item">No GitHub changes made</span>
+        </div>
         {% if anonymous_preview_used %}
         <div class="maintainer-trial-gate">
             <h2>Free Maintainer preview used</h2>

@@ -273,6 +273,9 @@ def get_analysis(repo_url: str):
     owner, repo_name = parse_github_url(repo_url)
 
     repo = github_get(f"/repos/{owner}/{repo_name}")
+    if repo.get("private") is True:
+        raise ValueError("Private repositories are not supported.")
+
     issues_raw = github_get(f"/repos/{owner}/{repo_name}/issues?state=open&per_page=30")
     languages = github_get(f"/repos/{owner}/{repo_name}/languages")
 

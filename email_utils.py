@@ -7,6 +7,13 @@ import config
 RESEND_EMAILS_URL = "https://api.resend.com/emails"
 
 
+def _masked_recipient(to_email: str) -> str:
+    local, separator, domain = (to_email or "").strip().partition("@")
+    if not separator or not local or not domain:
+        return "invalid-recipient"
+    return f"{local[0]}***@{domain.casefold()}"
+
+
 def _sender() -> str:
     if config.EMAIL_FROM_NAME:
         return f"{config.EMAIL_FROM_NAME} <{config.EMAIL_FROM}>"
@@ -35,8 +42,9 @@ def _email_shell(headline: str, body_html: str, cta_text: str, cta_url: str) -> 
 
 
 def send_email(to_email: str, subject: str, body: str, html_body: Optional[str] = None) -> bool:
+    recipient = _masked_recipient(to_email)
     if not config.email_configured:
-        print(f"[email disabled] {subject} for {to_email}: {body}")
+        print(f"[email disabled] subject={subject!r} recipient={recipient}")
         return False
 
     payload = {
@@ -56,13 +64,16 @@ def send_email(to_email: str, subject: str, body: str, html_body: Optional[str] 
         response = requests.post(RESEND_EMAILS_URL, json=payload, headers=headers, timeout=10)
         if response.status_code >= 400:
             print(
-                f"[email send failed] {subject} for {to_email}: "
-                f"resend_status={response.status_code} body={response.text[:500]!r}"
+                f"[email send failed] subject={subject!r} recipient={recipient} "
+                f"resend_status={response.status_code}"
             )
             return False
         return True
     except Exception as exc:
-        print(f"[email send failed] {subject} for {to_email}: {exc!r}")
+        print(
+            f"[email send failed] subject={subject!r} recipient={recipient} "
+            f"error={exc.__class__.__name__}"
+        )
         return False
 
 

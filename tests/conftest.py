@@ -29,6 +29,7 @@ _TEST_DB_URL = f"sqlite:///{_TEST_DB_PATH}"
 
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["DATABASE_URL"] = _TEST_DB_URL
+os.environ["SITE_URL"] = "http://testserver"
 os.environ["PADDLE_WEBHOOK_SECRET"] = "paddle_test_secret"
 for _var in (
     "PADDLE_API_KEY",

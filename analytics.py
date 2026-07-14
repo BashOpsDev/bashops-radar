@@ -106,9 +106,7 @@ I reviewed {repo} and noticed {issue_text}, which looks like a strong proof-of-w
 I can investigate it, submit a focused PR, and include a clear technical summary with tests where practical.
 
 If the first contribution is useful, I would be happy to help with a focused 48-hour backend/API reliability sprint.
-
-Best,
-Bashir"""
+"""
 
 
 def fallback_pitch(repo, best_issue):
@@ -141,8 +139,9 @@ The message should:
 2. Offer to submit a focused, well-tested PR
 3. Softly open the door to a short paid sprint AFTER the PR is useful/merged — do not ask for payment upfront
 4. Sound like a real developer message, not a sales email
+5. Do not add a personal signature or sign-off
 
-Sign off as "Bashir". Output only the message text, no preamble."""
+Output only the message text, no preamble."""
 
     try:
         model = genai.GenerativeModel("gemini-2.5-flash-lite")

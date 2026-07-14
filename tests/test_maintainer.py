@@ -392,6 +392,57 @@ def test_registered_free_user_gets_one_completed_trial(client, monkeypatch):
     assert second.status_code == 429
 
 
+def test_unverified_user_cannot_start_maintainer_analysis(client, monkeypatch):
+    import app as app_module
+    from database import SessionLocal
+    from models import MaintainerAnalysis, User
+
+    _login(client)
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "maintainer@example.com").first()
+    user.email_verified = False
+    db.commit()
+    db.close()
+
+    calls = {"quota": 0, "analysis": 0}
+
+    def unexpected_quota(*args, **kwargs):
+        calls["quota"] += 1
+        return False
+
+    def unexpected_analysis(*args, **kwargs):
+        calls["analysis"] += 1
+        return _complete_outcome()
+
+    monkeypatch.setattr(app_module, "maintainer_trial_used", unexpected_quota)
+    monkeypatch.setattr(app_module, "build_maintainer_report", unexpected_analysis)
+
+    response = _post_maintainer(client)
+
+    assert response.status_code == 403
+    assert "Please verify your email before creating a Maintainer report." in response.text
+    assert "Resend verification email" in response.text
+    assert calls == {"quota": 0, "analysis": 0}
+    db = SessionLocal()
+    assert db.query(MaintainerAnalysis).count() == 0
+    db.close()
+
+
+def test_report_metadata_uses_dedicated_compact_badge_classes(client, monkeypatch):
+    _stub_complete(monkeypatch)
+
+    response = _post_maintainer(client)
+    css = client.get("/static/style.css")
+
+    assert response.status_code == 200
+    assert 'class="dashboard-hero maintainer-report-hero"' in response.text
+    assert 'class="maintainer-report-meta"' in response.text
+    assert response.text.count('class="maintainer-report-meta-item"') == 3
+    assert 'class="checks maintainer-report-meta"' not in response.text
+    assert ".maintainer-report-meta-item" in css.text
+    assert "aspect-ratio: auto" in css.text
+
+
 def test_radar_registered_account_receives_maintainer_free_report(client, monkeypatch):
     from database import SessionLocal
     from models import User

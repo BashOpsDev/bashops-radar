@@ -65,9 +65,20 @@ if not SECRET_KEY:
 
 app = FastAPI(title="BashOps Radar")
 
+
+def session_cookie_https_only(site_url: str) -> bool:
+    """Keep production cookies HTTPS-only while allowing explicit HTTP local URLs."""
+    try:
+        return urlsplit(site_url).scheme.casefold() == "https"
+    except (TypeError, ValueError):
+        return False
+
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
+    https_only=session_cookie_https_only(config.SITE_URL),
+    same_site="lax",
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -358,6 +369,21 @@ def render_register(
     )
 
 
+def sanitize_referrer(referrer: str) -> str:
+    """Retain attribution without persisting tokens from URL queries/fragments."""
+    if not referrer:
+        return ""
+    try:
+        parsed = urlsplit(referrer)
+        if parsed.scheme.casefold() not in {"http", "https"} or not parsed.netloc:
+            return ""
+        if parsed.username or parsed.password:
+            return ""
+        return parsed._replace(query="", fragment="").geturl()[:500]
+    except (TypeError, ValueError):
+        return ""
+
+
 def track_event(request: Request, event_name: str, user=None, metadata=None) -> None:
     try:
         db: Session = SessionLocal()
@@ -366,7 +392,7 @@ def track_event(request: Request, event_name: str, user=None, metadata=None) -> 
                 user_id=user.id if user else None,
                 event_name=event_name,
                 page=str(request.url.path)[:500],
-                referrer=(request.headers.get("referer") or "")[:500],
+                referrer=sanitize_referrer(request.headers.get("referer") or ""),
                 user_agent=(request.headers.get("user-agent") or "")[:500],
                 metadata_json=json.dumps(metadata or {}, default=str),
             )
@@ -587,6 +613,9 @@ def export_pipeline(request: Request):
     current_user = get_current_user(request)
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
+    if not has_pro_access(current_user):
+        track_event(request, "export_blocked", user=current_user, metadata={"reason": "radar_pro_required"})
+        return RedirectResponse(url="/pricing", status_code=303)
 
     import csv
     import io
@@ -677,6 +706,22 @@ def maintainer_analyze(
             current_user,
             error="Your session expired. Please try again.",
             status_code=400,
+        )
+
+    if current_user and not current_user.email_verified:
+        request.session[POST_AUTH_NEXT_SESSION_KEY] = "/maintainer"
+        return templates.TemplateResponse(
+            request=request,
+            name="verify_notice.html",
+            context={
+                "email": current_user.email,
+                "message": "Please verify your email before creating a Maintainer report.",
+                "next_path": "/maintainer",
+                "login_url": auth_url("/login", "/maintainer"),
+                **user_context(request, current_user),
+                **csrf_context(request),
+            },
+            status_code=403,
         )
 
     if maintainer_trial_used(request, current_user, ip):
@@ -2299,7 +2344,13 @@ def analyze(
         print(f"[/analyze error] {e!r}")
 
         error_text = str(e)
-        safe_prefixes = ("Please provide a valid", "GitHub API rate limit", "GitHub API timed out", "Could not connect to GitHub API")
+        safe_prefixes = (
+            "Please provide a valid",
+            "Private repositories are not supported.",
+            "GitHub API rate limit",
+            "GitHub API timed out",
+            "Could not connect to GitHub API",
+        )
         message = error_text if error_text.startswith(safe_prefixes) else (
             "Something went wrong analyzing that repository. Please check the URL and try again."
         )
@@ -2398,6 +2449,7 @@ async def api_analyze(request: Request):
         error_text = str(e)
         safe_prefixes = (
             "Please provide a valid",
+            "Private repositories are not supported.",
             "GitHub API rate limit",
             "GitHub API timed out",
             "Could not connect to GitHub API",
