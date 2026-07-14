@@ -577,7 +577,13 @@ def sitemap_xml():
         "/contact",
     ]
     if config.MAINTAINER_ENABLED:
-        urls.extend(["/maintainer", "/maintainer/pricing"])
+        urls.extend(
+            [
+                "/maintainer",
+                "/maintainer/pricing",
+                "/tools/github-maintainer-workload-report",
+            ]
+        )
     body = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for path in urls:
         body.append(f"<url><loc>{config.SITE_URL}{path}</loc></url>")
@@ -1099,6 +1105,28 @@ def github_opportunity_score_tool(request: Request):
             "site_url": config.SITE_URL,
             "pro_price": config.PRO_PRICE_USD,
             **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.get("/tools/github-maintainer-workload-report", response_class=HTMLResponse)
+def github_maintainer_workload_report_tool(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    # This acquisition page delegates to the existing Maintainer analysis route
+    # so validation, quotas, AI fallback, persistence, and report rendering stay centralized.
+    track_event(
+        request,
+        "tool_view",
+        user=current_user,
+        metadata={"tool": "github_maintainer_workload_report"},
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="tool_github_maintainer_workload_report.html",
+        context={
+            **maintainer_template_context(request, current_user),
             **csrf_context(request),
         },
     )

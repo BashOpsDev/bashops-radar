@@ -77,7 +77,7 @@
 
     <section class="features tools-section">
         <span class="section-label">Free Developer Tools</span>
-        <h2>Answer one repository question before you write code</h2>
+        <h2>Answer one repository question before the next decision</h2>
         <div class="feature-grid tool-grid">
             <a class="tool-card" href="/tools/github-opportunity-score">
                 <strong>GitHub Opportunity Score</strong>
@@ -89,6 +89,13 @@
                 <span>Find the strongest issue to start with in a repository you already know.</span>
                 <em>Open Tool</em>
             </a>
+            {% if maintainer_enabled %}
+            <a class="tool-card" href="/tools/github-maintainer-workload-report">
+                <strong>GitHub Maintainer Workload Report</strong>
+                <span>Review backlog pressure, pull-request workload, repository health, and the top three maintainer actions.</span>
+                <em>Open Tool</em>
+            </a>
+            {% endif %}
             <div class="tool-card muted">
                 <strong>Repository Health Checker</strong>
                 <span>Coming soon: review activity, issue quality, and maintainer signals before contributing.</span>

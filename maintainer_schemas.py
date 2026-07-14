@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -76,6 +76,26 @@ class ReportIssue(IssueTriageResult):
     current_labels: list[str] = Field(default_factory=list)
 
 
+class RepositoryIntelligenceSignal(BaseModel):
+    key: str
+    label: str
+    value: str
+    detail: str
+    available: bool = True
+
+
+class MaintainerWorkload(BaseModel):
+    open_issues_reviewed: int = Field(ge=0)
+    github_open_items: int = Field(ge=0)
+    stale_issues: int = Field(ge=0)
+    prs_awaiting_review: Optional[int] = Field(default=None, ge=0)
+    prs_with_failing_checks: Optional[int] = Field(default=None, ge=0)
+    unanswered_issues: int = Field(ge=0)
+    oldest_waiting_pr: Optional[dict[str, Any]] = None
+    average_response_time: Optional[str] = None
+    limitations: list[str] = Field(default_factory=list)
+
+
 class MaintainerReport(BaseModel):
     schema_version: str
     analysis_version: str
@@ -87,3 +107,11 @@ class MaintainerReport(BaseModel):
     issues: list[ReportIssue] = Field(min_length=1, max_length=30)
     disclaimer: str
     is_partial: bool
+    repository_intelligence: list[RepositoryIntelligenceSignal] = Field(default_factory=list)
+    workload: Optional[MaintainerWorkload] = None
+    daily_priorities: list[dict[str, Any]] = Field(default_factory=list, max_length=3)
+    weekly_overview: dict[str, Any] = Field(default_factory=dict)
+    submission_intelligence: dict[str, int] = Field(default_factory=dict)
+    estimated_hours_saved: dict[str, Any] = Field(default_factory=dict)
+    contributor_trust: dict[str, Any] = Field(default_factory=dict)
+    integration: dict[str, Any] = Field(default_factory=dict)

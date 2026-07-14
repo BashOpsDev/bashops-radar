@@ -22,6 +22,7 @@ from radar import (
     score_repo,
     score_repo_signal_report,
 )
+from repository_intelligence import build_repository_intelligence
 
 
 # --- parse_github_url -------------------------------------------------
@@ -188,6 +189,50 @@ def test_score_repo_signal_report_matches_numeric_score():
     assert any(item["label"] == "Recently maintained" for item in report["reasons"])
     assert any(item["label"] == "Good contributor fit" for item in report["reasons"])
     assert any(signal["label"] == "Repository Activity" for signal in report["signals_used"])
+
+
+def test_repository_intelligence_is_deterministic_and_marks_unavailable_data():
+    reference_time = datetime(2026, 7, 14, tzinfo=timezone.utc)
+    repo = {
+        **_repo(open_issues=20, stars=500, forks=50),
+        "pushed_at": "2026-07-12T00:00:00Z",
+        "description": "Example project",
+        "homepage": "https://example.com",
+        "has_wiki": True,
+        "license": {"spdx_id": "MIT"},
+        "owner": {"type": "Organization"},
+    }
+    issues = [
+        {
+            "updated_at": "2026-07-13T00:00:00Z",
+            "comments": 2,
+            "labels": [{"name": "good first issue"}],
+        }
+    ]
+
+    signals = build_repository_intelligence(repo, issues, reference_time=reference_time)
+    by_key = {signal["key"]: signal for signal in signals}
+
+    assert by_key["health"]["value"] == "Strong"
+    assert by_key["friendliness"]["value"] == "Strong"
+    assert by_key["maintainer_responsiveness"]["available"] is False
+    assert by_key["acceptance"]["value"] == "Unavailable"
+    assert "README quality was not inspected" in by_key["documentation"]["detail"]
+
+
+def test_repository_intelligence_acceptance_rate_uses_sampled_closed_pulls():
+    signals = build_repository_intelligence(
+        _repo(),
+        [],
+        pull_sample={
+            "available": True,
+            "open": [],
+            "closed": [{"merged_at": "2026-07-10T00:00:00Z"}, {"merged_at": None}],
+        },
+    )
+    acceptance = next(signal for signal in signals if signal["key"] == "acceptance")
+    assert acceptance["value"] == "50%"
+    assert "sampled recently closed" in acceptance["detail"]
 
 
 def test_issue_difficulty_estimator_varies_by_issue_type():

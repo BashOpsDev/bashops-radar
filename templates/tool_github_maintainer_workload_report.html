@@ -1,0 +1,78 @@
+{% extends "maintainer/base.html" %}
+{% block title %}Free GitHub Maintainer Workload Report - BashOps{% endblock %}
+{% block extra_head %}
+<meta name="description" content="Generate a free read-only GitHub maintainer workload report with backlog signals, review queue, repository health, and top priorities.">
+<link rel="canonical" href="{{ site_url }}/tools/github-maintainer-workload-report">
+<meta property="og:title" content="Free GitHub Maintainer Workload Report">
+<meta property="og:description" content="See which repository issues and pull requests deserve maintainer attention first.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ site_url }}/tools/github-maintainer-workload-report">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Free GitHub Maintainer Workload Report">
+<meta name="twitter:description" content="Review backlog, repository health, review queue, and top maintainer priorities.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "GitHub Maintainer Workload Report",
+  "url": "{{ site_url }}/tools/github-maintainer-workload-report",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Web",
+  "description": "A read-only workload and triage report for maintainers of public GitHub repositories."
+}
+</script>
+{% endblock %}
+{% block content %}
+<main>
+    <section class="hero tool-hero">
+        <div class="hero-copy">
+            <span class="section-label">Free Maintainer Tool</span>
+            <h1>What deserves attention in this repository today?</h1>
+            <p class="hero-lead">Generate a read-only workload report for a public GitHub repository. BashOps reviews a bounded issue and pull-request sample, then surfaces backlog pressure, top priorities, and transparent limitations.</p>
+            <form method="post" action="/maintainer/analyze" class="repo-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label for="workload-repo-url">Public GitHub repository URL</label>
+                <div class="input-row">
+                    <input id="workload-repo-url" name="repo_url" type="url" placeholder="https://github.com/owner/repository" required>
+                    <button type="submit">Generate Workload Report</button>
+                </div>
+            </form>
+            <small>No GitHub changes are made. All priorities and suggestions require maintainer review.</small>
+        </div>
+        <aside class="sample-card">
+            <div class="sample-header">Report scope</div>
+            <div class="sample-score">Read-only</div>
+            <p>Backlog, stale issues, review queue, repository health, contributor signals, and top three actions.</p>
+            <div class="sample-signal">Bounded GitHub data</div>
+        </aside>
+    </section>
+
+    <section class="features">
+        <span class="section-label">Transparent Workload Intelligence</span>
+        <h2>Move from queue size to a practical review plan</h2>
+        <div class="feature-grid">
+            <div><strong>Backlog</strong><span>See open-item pressure, stale issues, and unanswered issue counts from the reviewed sample.</span></div>
+            <div><strong>Review queue</strong><span>Review a bounded pull-request sample, including the oldest waiting PR when available.</span></div>
+            <div><strong>Top three priorities</strong><span>Get deterministic actions with a reason and estimated review time.</span></div>
+            <div><strong>Repository health</strong><span>Understand activity, momentum, risk, friendliness, and data limitations.</span></div>
+            <div><strong>Suggested actions</strong><span>Review missing information, possible duplicates, labels, and neutral response drafts.</span></div>
+            <div><strong>Honest gaps</strong><span>Checks and response times are marked unavailable when the required GitHub data was not fetched.</span></div>
+        </div>
+    </section>
+
+    <section class="developer-platform">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">BashOps Maintainer Pilot</span>
+                <h2>Turn the report into a repeatable issue-review workflow.</h2>
+                <p>Maintainer Pilot provides continued private report access, issue classification, duplicate candidates, contributor-readiness signals, and response drafts.</p>
+            </div>
+            {% if maintainer_access %}
+            <a class="nav-cta compact" href="/maintainer/dashboard">Open Reports</a>
+            {% else %}
+            <a class="nav-cta compact" href="/maintainer/pricing">View Maintainer Pilot</a>
+            {% endif %}
+        </div>
+    </section>
+</main>
+{% endblock %}

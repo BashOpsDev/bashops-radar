@@ -19,6 +19,7 @@ from maintainer_schemas import (
     SuggestedLabel,
 )
 from radar import github_get
+from repository_intelligence import build_maintainer_operations, build_repository_intelligence
 
 try:
     import google.generativeai as genai
@@ -26,8 +27,8 @@ except Exception:
     genai = None
 
 
-ANALYSIS_VERSION = "maintainer-v0.1"
-REPORT_SCHEMA_VERSION = "1.0"
+ANALYSIS_VERSION = "maintainer-v1.0"
+REPORT_SCHEMA_VERSION = "1.1"
 DEFAULT_ISSUE_LIMIT = 20
 MAX_ISSUE_LIMIT = 30
 MAX_ISSUE_BODY_CHARS = 2000
@@ -141,8 +142,31 @@ def fetch_recent_open_issues(repo_url: str, limit: int = DEFAULT_ISSUE_LIMIT) ->
         "description": repo.get("description") or "No repository description provided.",
         "stars": int(repo.get("stargazers_count") or 0),
         "open_issues": int(repo.get("open_issues_count") or 0),
+        "pushed_at": repo.get("pushed_at"),
+        "updated_at": repo.get("updated_at"),
+        "homepage": repo.get("homepage"),
+        "has_wiki": bool(repo.get("has_wiki")),
+        "has_sponsors": bool(repo.get("has_sponsors")),
+        "license": repo.get("license"),
+        "owner": repo.get("owner"),
+        "forks": int(repo.get("forks_count") or 0),
     }
     return repository, issues
+
+
+def fetch_pull_request_samples(repository_full_name: str) -> dict:
+    """Fetch bounded PR lists; report generation remains available if either request fails."""
+    samples = {"available": True, "open": [], "closed": [], "error_code": None}
+    try:
+        samples["open"] = github_get(
+            f"/repos/{repository_full_name}/pulls?state=open&sort=updated&direction=desc&per_page=20"
+        )
+        samples["closed"] = github_get(
+            f"/repos/{repository_full_name}/pulls?state=closed&sort=updated&direction=desc&per_page=20"
+        )
+    except Exception:
+        samples = {"available": False, "open": [], "closed": [], "error_code": "pull_data_unavailable"}
+    return samples
 
 
 def _label_names(issue: dict) -> list[str]:
@@ -400,6 +424,7 @@ def _build_report(
     issues: list[dict],
     triage_results: list[IssueTriageResult],
     is_partial: bool,
+    pull_sample: dict | None = None,
 ) -> MaintainerReport:
     source_by_number = {int(issue.get("number") or 0): issue for issue in issues}
     report_issues = []
@@ -460,6 +485,14 @@ def _build_report(
         f"{len(duplicate_pairs)} may be duplicates, {contributor_ready} appear suitable for contributors, "
         f"and {high_priority} deserve immediate maintainer attention."
     )
+    report_issue_data = [item.model_dump(mode="json") for item in report_issues]
+    repository_intelligence = build_repository_intelligence(repository, issues, pull_sample=pull_sample)
+    operations = build_maintainer_operations(
+        repository,
+        issues,
+        report_issue_data,
+        pull_sample=pull_sample,
+    )
     return MaintainerReport(
         schema_version=REPORT_SCHEMA_VERSION,
         analysis_version=ANALYSIS_VERSION,
@@ -471,11 +504,14 @@ def _build_report(
         issues=report_issues,
         disclaimer=DISCLAIMER,
         is_partial=is_partial,
+        repository_intelligence=repository_intelligence,
+        **operations,
     )
 
 
 def build_maintainer_report(repo_url: str, limit: int = DEFAULT_ISSUE_LIMIT) -> dict:
     repository, issues = fetch_recent_open_issues(repo_url, limit=limit)
+    pull_sample = fetch_pull_request_samples(repository["full_name"])
     duplicate_pairs = _duplicate_candidates(issues)
     is_partial = False
     error_code = None
@@ -487,7 +523,13 @@ def build_maintainer_report(repo_url: str, limit: int = DEFAULT_ISSUE_LIMIT) -> 
         is_partial = True
         error_code = exc.error_code
 
-    report = _build_report(repository, issues, triage_results, is_partial=is_partial)
+    report = _build_report(
+        repository,
+        issues,
+        triage_results,
+        is_partial=is_partial,
+        pull_sample=pull_sample,
+    )
     return {
         "report": report.model_dump(mode="json"),
         "is_partial": is_partial,

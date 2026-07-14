@@ -92,12 +92,14 @@ def test_radar_product_navigation_and_maintainer_promotion_follow_feature_flag(c
     assert 'href="/maintainer?source=radar"' in enabled.text
     assert enabled.text.count('aria-label="BashOps Maintainer"') == 1
     assert "Explore BashOps Maintainer" in enabled.text
+    assert 'href="/tools/github-maintainer-workload-report"' in enabled.text
 
     monkeypatch.setattr(config, "MAINTAINER_ENABLED", False)
     disabled = client.get("/")
     assert disabled.status_code == 200
     assert 'href="/maintainer' not in disabled.text
     assert "Explore BashOps Maintainer" not in disabled.text
+    assert 'href="/tools/github-maintainer-workload-report"' not in disabled.text
 
 
 def test_radar_mobile_navigation_markup_and_anonymous_links_are_preserved(client, monkeypatch):
@@ -174,6 +176,22 @@ def _fake_analysis_result(score=88):
             "confidence": "High",
             "confidence_reasons": ["Repository metadata available", "Ranked issue candidates found"],
         },
+        "repository_intelligence": [
+            {
+                "key": "health",
+                "label": "Repository Health",
+                "value": "Strong",
+                "detail": "Recent repository activity and open issues were detected.",
+                "available": True,
+            },
+            {
+                "key": "maintainer_responsiveness",
+                "label": "Maintainer Responsiveness",
+                "value": "Unavailable",
+                "detail": "Comment timelines were not requested.",
+                "available": False,
+            },
+        ],
     }
 
 
@@ -192,6 +210,18 @@ def _post_analysis(client, repo_url="https://github.com/example/repo"):
         data={"repo_url": repo_url, "csrf_token": token},
         follow_redirects=False,
     )
+
+
+def test_radar_result_renders_repository_intelligence_without_changing_api(client, monkeypatch):
+    _stub_analysis(monkeypatch)
+
+    response = _post_analysis(client)
+
+    assert response.status_code == 200
+    assert "Deterministic repository signals" in response.text
+    assert "Repository Health" in response.text
+    assert "Maintainer Responsiveness" in response.text
+    assert "Comment timelines were not requested." in response.text
 
 
 def _register_verified_and_login(client, email="user@example.com", password="StrongPass1", name="Test User"):
@@ -711,6 +741,7 @@ def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
     assert r.status_code == 200
     assert "opportunity_score" in payload
     assert "score_transparency" not in payload
+    assert "repository_intelligence" not in payload
 
 
 def test_public_api_keeps_existing_anonymous_quota_behavior(client, monkeypatch):
@@ -1666,6 +1697,31 @@ def test_sitemap_contains_public_pages(client):
     assert "<loc>" in r.text
     assert "/tools/github-opportunity-score" in r.text
     assert "/tools/best-first-issue-finder" in r.text
+
+
+def test_maintainer_workload_tool_is_indexable_when_enabled(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "MAINTAINER_ENABLED", True)
+    page = client.get("/tools/github-maintainer-workload-report")
+    sitemap = client.get("/sitemap.xml")
+
+    assert page.status_code == 200
+    assert "What deserves attention in this repository today?" in page.text
+    assert 'action="/maintainer/analyze"' in page.text
+    assert 'name="csrf_token"' in page.text
+    assert 'rel="canonical"' in page.text
+    assert 'name="twitter:card"' in page.text
+    assert '"@type": "WebApplication"' in page.text
+    assert "/tools/github-maintainer-workload-report" in sitemap.text
+
+
+def test_maintainer_workload_tool_follows_feature_flag(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "MAINTAINER_ENABLED", False)
+    assert client.get("/tools/github-maintainer-workload-report").status_code == 404
+    assert "/tools/github-maintainer-workload-report" not in client.get("/sitemap.xml").text
 
 
 def test_github_opportunity_score_tool_loads(client):

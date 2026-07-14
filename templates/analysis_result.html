@@ -162,6 +162,26 @@
                 </div>
             </section>
 
+            {% if result.repository_intelligence %}
+            <section class="repository-intelligence">
+                <div class="score-explainer-header">
+                    <div>
+                        <span class="section-label">Repository Intelligence</span>
+                        <h2>Deterministic repository signals</h2>
+                    </div>
+                </div>
+                <div class="intelligence-grid">
+                    {% for signal in result.repository_intelligence %}
+                    <article class="intelligence-card{% if not signal.available %} unavailable{% endif %}">
+                        <span>{{ signal.label }}</span>
+                        <strong>{{ signal.value }}</strong>
+                        <p>{{ signal.detail }}</p>
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
             {% if from_discover %}
             <div class="discover-return-bar">
                 <div>

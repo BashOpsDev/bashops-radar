@@ -28,6 +28,80 @@
         <div class="angle"><strong>Maintainer review required.</strong> {{ report.disclaimer }}</div>
     </section>
 
+    {% if report.workload %}
+    <section class="card-flat">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">Repository Workload</span>
+                <h2>Current queue pressure</h2>
+            </div>
+            {% if report.estimated_hours_saved %}
+            <div class="decision-pill">
+                <span>Estimated triage time saved</span>
+                <strong>{{ report.estimated_hours_saved.hours }} hours</strong>
+            </div>
+            {% endif %}
+        </div>
+        <div class="dashboard-stats maintainer-workload-grid">
+            <div class="metric-card"><span>Open issues reviewed</span><strong>{{ report.workload.open_issues_reviewed }}</strong></div>
+            <div class="metric-card"><span>GitHub open items</span><strong>{{ report.workload.github_open_items }}</strong></div>
+            <div class="metric-card"><span>Stale issues</span><strong>{{ report.workload.stale_issues }}</strong></div>
+            <div class="metric-card"><span>Unanswered issues</span><strong>{{ report.workload.unanswered_issues }}</strong></div>
+            <div class="metric-card"><span>PRs awaiting review</span><strong>{{ report.workload.prs_awaiting_review if report.workload.prs_awaiting_review is not none else "Unavailable" }}</strong></div>
+            <div class="metric-card"><span>PRs with failing checks</span><strong>{{ report.workload.prs_with_failing_checks if report.workload.prs_with_failing_checks is not none else "Unavailable" }}</strong></div>
+        </div>
+        <div class="maintainer-detail-grid">
+            <div>
+                <strong>Oldest waiting PR</strong>
+                {% if report.workload.oldest_waiting_pr %}
+                <p>#{{ report.workload.oldest_waiting_pr.number }} waited {{ report.workload.oldest_waiting_pr.waiting_days }} days.</p>
+                <a href="{{ report.workload.oldest_waiting_pr.url }}" target="_blank" rel="noopener noreferrer">Open on GitHub</a>
+                {% else %}<p>Unavailable in the current PR sample.</p>{% endif %}
+            </div>
+            <div>
+                <strong>Average response time</strong>
+                <p>{{ report.workload.average_response_time or "Unavailable because comment timelines were not fetched." }}</p>
+            </div>
+        </div>
+        <ul class="report-limitations">
+            {% for limitation in report.workload.limitations %}<li>{{ limitation }}</li>{% endfor %}
+        </ul>
+        {% if report.estimated_hours_saved %}<small>{{ report.estimated_hours_saved.detail }}</small>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if report.daily_priorities %}
+    <section class="card-flat">
+        <span class="section-label">Daily Priorities</span>
+        <h2>Top {{ report.daily_priorities | length }} actions</h2>
+        <div class="priority-list">
+            {% for priority in report.daily_priorities %}
+            <article>
+                <span>{{ loop.index }}</span>
+                <div><strong>{{ priority.action }}</strong><p>{{ priority.reason }}</p></div>
+                <small>{{ priority.estimated_review_minutes }} min review</small>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if report.repository_intelligence %}
+    <section class="card-flat">
+        <span class="section-label">Repository Summary</span>
+        <h2>Health and operating signals</h2>
+        <div class="intelligence-grid">
+            {% for signal in report.repository_intelligence %}
+            <article class="intelligence-card{% if not signal.available %} unavailable{% endif %}">
+                <span>{{ signal.label }}</span>
+                <strong>{{ signal.value }}</strong>
+                <p>{{ signal.detail }}</p>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     <section class="card-flat">
         <h2>Triage summary</h2>
         <p>{{ report.summary }}</p>
@@ -40,12 +114,85 @@
         </div>
     </section>
 
+    {% if report.submission_intelligence %}
+    <section class="card-flat">
+        <span class="section-label">Submission Intelligence</span>
+        <h2>Review-ready classifications</h2>
+        <div class="dashboard-stats">
+            <div class="metric-card"><span>High-value contribution</span><strong>{{ report.submission_intelligence.high_value_contribution }}</strong></div>
+            <div class="metric-card"><span>Needs more information</span><strong>{{ report.submission_intelligence.needs_more_information }}</strong></div>
+            <div class="metric-card"><span>Likely duplicate</span><strong>{{ report.submission_intelligence.likely_duplicate }}</strong></div>
+            <div class="metric-card"><span>Needs human review</span><strong>{{ report.submission_intelligence.needs_human_review }}</strong></div>
+            <div class="metric-card"><span>Security sensitive</span><strong>{{ report.submission_intelligence.security_sensitive }}</strong></div>
+        </div>
+    </section>
+    {% endif %}
+
     <section class="card-flat">
         <h2>Immediate maintainer attention</h2>
         {% for issue in report.issues if issue.estimated_priority == "High" %}
         <div class="issue-row"><strong>#{{ issue.number }} {{ issue.title }}</strong><p>Estimated priority: High · {{ issue.suggested_category }}</p><a href="{{ issue.url }}" target="_blank" rel="noopener noreferrer">Open on GitHub</a></div>
         {% else %}<p>No issues were assigned an estimated high priority.</p>{% endfor %}
     </section>
+
+    {% if report.weekly_overview %}
+    <section class="card-flat">
+        <span class="section-label">Weekly Overview</span>
+        <h2>Activity in the reviewed sample</h2>
+        <div class="dashboard-stats">
+            <div class="metric-card"><span>Issues opened</span><strong>{{ report.weekly_overview.issues_opened }}</strong></div>
+            <div class="metric-card"><span>Issues updated</span><strong>{{ report.weekly_overview.issues_updated }}</strong></div>
+            <div class="metric-card"><span>PRs updated</span><strong>{{ report.weekly_overview.pull_requests_updated if report.weekly_overview.pull_requests_updated is not none else "Unavailable" }}</strong></div>
+            <div class="metric-card"><span>PRs merged</span><strong>{{ report.weekly_overview.pull_requests_merged if report.weekly_overview.pull_requests_merged is not none else "Unavailable" }}</strong></div>
+        </div>
+        <small>{{ report.weekly_overview.sample_note }}</small>
+    </section>
+    {% endif %}
+
+    {% if report.contributor_trust %}
+    <section class="card-flat">
+        <span class="section-label">Contributor Trust</span>
+        <h2>Evidence from the bounded PR sample</h2>
+        {% if report.contributor_trust.contributors %}
+        <div class="contributor-grid">
+            {% for contributor in report.contributor_trust.contributors %}
+            <article>
+                <strong>@{{ contributor.author }}</strong>
+                <span>{{ contributor.repository_familiarity }}</span>
+                <p>{{ contributor.evidence }}</p>
+                <dl class="contributor-signals">
+                    {% for signal in contributor.signals %}
+                    <div><dt>{{ signal.label }}</dt><dd><strong>{{ signal.value }}</strong> {{ signal.detail }}</dd></div>
+                    {% endfor %}
+                </dl>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}<p>No contributor history was available in the current PR sample.</p>{% endif %}
+        <div class="angle">
+            <strong>Signals not assessed</strong>
+            <ul>{% for item in report.contributor_trust.unavailable_signals %}<li>{{ item }}</li>{% endfor %}</ul>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if report.integration %}
+    <section class="card-flat">
+        <span class="section-label">Contributor Opportunity</span>
+        <h2>Evidence for the next maintainer decision</h2>
+        <div class="maintainer-detail-grid">
+            <div><strong>Contributor history</strong><p>{{ report.integration.contributor_history }}</p></div>
+            <div><strong>Relevant previous work</strong><p>{{ report.integration.relevant_previous_work }}</p></div>
+            <div><strong>Potential paid sprint candidate</strong><p>{{ report.integration.potential_paid_sprint_candidate }}</p></div>
+            <div>
+                <strong>Suggested next issue</strong>
+                {% if report.integration.suggested_next_issue %}
+                <p>#{{ report.integration.suggested_next_issue.number }} {{ report.integration.suggested_next_issue.title }} - {{ report.integration.suggested_next_issue.reason }}</p>
+                {% else %}<p>No issue met the contributor-ready threshold in this sample.</p>{% endif %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="card-flat">
         <h2>Issue review</h2>

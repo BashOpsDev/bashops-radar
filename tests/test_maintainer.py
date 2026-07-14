@@ -3,6 +3,7 @@ import hmac
 import json
 import re
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -145,6 +146,73 @@ def test_maintainer_landing_loads(client):
     assert 'href="/login?next=/maintainer"' in response.text
 
 
+def test_maintainer_report_renders_v1_workload_and_transparent_gaps(client, monkeypatch):
+    import app as app_module
+
+    outcome = _complete_outcome()
+    outcome["report"].update(
+        {
+            "schema_version": "1.1",
+            "analysis_version": "maintainer-v1.0",
+            "repository_intelligence": [
+                {
+                    "key": "health",
+                    "label": "Repository Health",
+                    "value": "Strong",
+                    "detail": "Recent activity was detected.",
+                    "available": True,
+                }
+            ],
+            "workload": {
+                "open_issues_reviewed": 1,
+                "github_open_items": 2,
+                "stale_issues": 0,
+                "prs_awaiting_review": 1,
+                "prs_with_failing_checks": None,
+                "unanswered_issues": 1,
+                "oldest_waiting_pr": None,
+                "average_response_time": None,
+                "limitations": ["Failing checks were not fetched."],
+            },
+            "daily_priorities": [
+                {"action": "Request missing information on #1", "reason": "Reproduction steps missing", "estimated_review_minutes": 5}
+            ],
+            "weekly_overview": {
+                "issues_opened": 1,
+                "issues_updated": 1,
+                "pull_requests_updated": 1,
+                "pull_requests_merged": 0,
+                "sample_note": "Bounded sample.",
+            },
+            "submission_intelligence": {
+                "high_value_contribution": 0,
+                "needs_more_information": 1,
+                "likely_duplicate": 0,
+                "needs_human_review": 1,
+                "security_sensitive": 0,
+            },
+            "estimated_hours_saved": {"hours": 0.1, "detail": "Transparent time heuristic."},
+            "contributor_trust": {"contributors": [], "unavailable_signals": ["PR checks were not fetched."]},
+            "integration": {
+                "contributor_history": "No PR history in the sample.",
+                "relevant_previous_work": "No evidence available.",
+                "potential_paid_sprint_candidate": "No candidate met the threshold.",
+                "suggested_next_issue": None,
+            },
+        }
+    )
+    monkeypatch.setattr(app_module, "build_maintainer_report", lambda *args, **kwargs: outcome)
+
+    response = _post_maintainer(client)
+
+    assert response.status_code == 200
+    assert "Repository Workload" in response.text
+    assert "Top 1 actions" in response.text
+    assert "PRs with failing checks" in response.text
+    assert "Unavailable" in response.text
+    assert "Contributor Trust" in response.text
+
+
 def test_maintainer_pricing_has_shared_account_actions_when_logged_out(client):
     response = client.get("/maintainer/pricing")
     assert response.status_code == 200
@@ -266,6 +334,40 @@ def test_issue_limit_and_pull_request_exclusion(monkeypatch):
     assert len(calls) == 2
     assert len(returned) == 30
     assert all("pull_request" not in issue for issue in returned)
+
+
+def test_pull_request_samples_use_two_bounded_requests(monkeypatch):
+    calls = []
+
+    def fake_get(endpoint):
+        calls.append(endpoint)
+        return []
+
+    monkeypatch.setattr(maintainer_service, "github_get", fake_get)
+    sample = maintainer_service.fetch_pull_request_samples("example/repo")
+
+    assert sample["available"] is True
+    assert calls == [
+        "/repos/example/repo/pulls?state=open&sort=updated&direction=desc&per_page=20",
+        "/repos/example/repo/pulls?state=closed&sort=updated&direction=desc&per_page=20",
+    ]
+
+
+def test_pull_request_failure_keeps_report_metrics_available_with_honest_gap(monkeypatch):
+    monkeypatch.setattr(
+        maintainer_service,
+        "github_get",
+        lambda endpoint: (_ for _ in ()).throw(RuntimeError("rate limited")),
+    )
+
+    sample = maintainer_service.fetch_pull_request_samples("example/repo")
+
+    assert sample == {
+        "available": False,
+        "open": [],
+        "closed": [],
+        "error_code": "pull_data_unavailable",
+    }
 
 
 def test_anonymous_user_gets_one_completed_trial(client, monkeypatch):
@@ -675,10 +777,118 @@ def test_ai_failure_returns_partial_without_storing_issue_body(monkeypatch):
         "_ai_triage",
         lambda *args, **kwargs: (_ for _ in ()).throw(maintainer_service.MaintainerAIError("ai_schema_invalid")),
     )
+    monkeypatch.setattr(
+        maintainer_service,
+        "fetch_pull_request_samples",
+        lambda *args, **kwargs: {"available": False, "open": [], "closed": [], "error_code": "pull_data_unavailable"},
+    )
     outcome = maintainer_service.build_maintainer_report("https://github.com/example/repo")
     assert outcome["is_partial"] is True
     assert outcome["error_code"] == "ai_schema_invalid"
     assert "SECRET BODY" not in str(outcome["report"])
+
+
+def test_complete_report_adds_workload_priorities_and_contributor_evidence(monkeypatch):
+    now = datetime.now(timezone.utc)
+    issues = [
+        {
+            "number": 1,
+            "title": "Security error needs reproduction details",
+            "body": "The application reports a security error.",
+            "labels": [{"name": "security"}],
+            "html_url": "https://github.com/example/repo/issues/1",
+            "comments": 0,
+            "created_at": (now - timedelta(days=10)).isoformat(),
+            "updated_at": (now - timedelta(days=3)).isoformat(),
+        },
+        {
+            "number": 2,
+            "title": "Improve contributor documentation",
+            "body": "Update the contributor guide with setup examples and expected commands.",
+            "labels": [{"name": "good first issue"}, {"name": "documentation"}],
+            "html_url": "https://github.com/example/repo/issues/2",
+            "comments": 1,
+            "created_at": (now - timedelta(days=4)).isoformat(),
+            "updated_at": (now - timedelta(days=1)).isoformat(),
+        },
+    ]
+    repository = {
+        "full_name": "example/repo",
+        "url": "https://github.com/example/repo",
+        "description": "Example project",
+        "stars": 100,
+        "forks": 12,
+        "open_issues": 8,
+        "pushed_at": (now - timedelta(days=1)).isoformat(),
+        "homepage": "https://example.com",
+        "has_wiki": True,
+        "license": {"spdx_id": "MIT"},
+        "owner": {"type": "Organization"},
+    }
+    pull_sample = {
+        "available": True,
+        "open": [
+            {
+                "number": 10,
+                "title": "Add API tests",
+                "html_url": "https://github.com/example/repo/pull/10",
+                "created_at": (now - timedelta(days=12)).isoformat(),
+                "updated_at": (now - timedelta(days=2)).isoformat(),
+                "draft": False,
+                "user": {"login": "alice"},
+            }
+        ],
+        "closed": [
+            {
+                "number": 8,
+                "title": "Fix API docs",
+                "merged_at": (now - timedelta(days=2)).isoformat(),
+                "user": {"login": "alice"},
+            },
+            {
+                "number": 7,
+                "title": "Refactor API client",
+                "merged_at": None,
+                "user": {"login": "bob"},
+            },
+        ],
+        "error_code": None,
+    }
+    monkeypatch.setattr(maintainer_service, "fetch_recent_open_issues", lambda *args, **kwargs: (repository, issues))
+    monkeypatch.setattr(maintainer_service, "fetch_pull_request_samples", lambda *args, **kwargs: pull_sample)
+    monkeypatch.setattr(
+        maintainer_service,
+        "_ai_triage",
+        lambda _repository, source_issues, duplicate_pairs: maintainer_service._deterministic_triage(source_issues, duplicate_pairs),
+    )
+
+    outcome = maintainer_service.build_maintainer_report("https://github.com/example/repo")
+    report = outcome["report"]
+
+    assert outcome["is_partial"] is False
+    assert report["workload"]["open_issues_reviewed"] == 2
+    assert report["workload"]["prs_awaiting_review"] == 1
+    assert report["workload"]["prs_with_failing_checks"] is None
+    assert report["workload"]["average_response_time"] is None
+    assert 1 <= len(report["daily_priorities"]) <= 3
+    assert report["submission_intelligence"]["security_sensitive"] == 1
+    assert report["weekly_overview"]["pull_requests_merged"] == 1
+    assert report["contributor_trust"]["contributors"][0]["author"] == "alice"
+    contributor_signals = report["contributor_trust"]["contributors"][0]["signals"]
+    assert {signal["label"] for signal in contributor_signals} == {
+        "Merged PR History",
+        "Repository Familiarity",
+        "Documentation Quality",
+        "Consistency",
+    }
+    assert all(signal["detail"] for signal in contributor_signals)
+    acceptance = next(signal for signal in report["repository_intelligence"] if signal["key"] == "acceptance")
+    assert acceptance["value"] == "50%"
+    responsiveness = next(
+        signal for signal in report["repository_intelligence"] if signal["key"] == "maintainer_responsiveness"
+    )
+    assert responsiveness["available"] is False
+    assert "body" not in json.dumps(report)
 
 
 def test_report_is_private_noindex_and_user_scoped(client, monkeypatch):

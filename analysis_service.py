@@ -7,6 +7,7 @@ from radar import (
     recommend_angle,
     score_repo_signal_report,
 )
+from repository_intelligence import build_repository_intelligence
 
 
 def contract_potential(score: int) -> str:
@@ -66,6 +67,10 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
         [issue for _score, _issue_type, issue in issue_rankings],
         languages,
     )
+    repository_intelligence = build_repository_intelligence(
+        repo,
+        [issue for _score, _issue_type, issue in issue_rankings],
+    )
 
     return {
         "repo": f"{owner}/{repo_name}",
@@ -109,6 +114,7 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
         "issues": issue_rankings[:8],
         "languages": languages,
         "score_transparency": score_transparency,
+        "repository_intelligence": repository_intelligence,
     }
 
 
