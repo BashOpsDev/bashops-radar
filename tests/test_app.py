@@ -795,6 +795,7 @@ def test_login_returns_existing_account_to_maintainer(client):
     _create_verified_user()
     page = client.get("/login?next=/maintainer")
     assert 'name="next" value="/maintainer"' in page.text
+    assert "Continue to BashOps Maintainer" in page.text
     response = client.post(
         "/login",
         data={
@@ -863,6 +864,7 @@ def test_maintainer_registration_and_verification_preserve_destination(client, m
 
     page = client.get("/register?next=/maintainer")
     assert 'name="next" value="/maintainer"' in page.text
+    assert "Create a BashOps account for Maintainer" in page.text
     response = client.post(
         "/register",
         data={
@@ -1297,9 +1299,13 @@ def test_webhook_rejects_bad_signature(client):
     assert r.status_code == 400
 
 
-def test_webhook_transaction_completed_upgrades_user(client):
+def test_webhook_transaction_completed_upgrades_user(client, monkeypatch):
+    import config
     from database import SessionLocal
     from models import User
+
+    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
+    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
 
     _register_and_login(client)
 
@@ -1317,6 +1323,7 @@ def test_webhook_transaction_completed_upgrades_user(client):
             "customer_id": "ctm_x",
             "subscription_id": "sub_x",
             "status": "completed",
+            "items": [{"price": {"id": "pri_radar"}}],
         },
     }
     r = _signed_webhook_request(client, event)
@@ -1329,9 +1336,13 @@ def test_webhook_transaction_completed_upgrades_user(client):
     db.close()
 
 
-def test_webhook_subscription_canceled_downgrades_user(client):
+def test_webhook_subscription_canceled_downgrades_user(client, monkeypatch):
+    import config
     from database import SessionLocal
     from models import User
+
+    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
+    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
 
     _register_and_login(client)
 
@@ -1346,7 +1357,11 @@ def test_webhook_subscription_canceled_downgrades_user(client):
     event = {
         "id": "evt_2",
         "event_type": "subscription.canceled",
-        "data": {"id": "sub_x", "status": "canceled"},
+        "data": {
+            "id": "sub_x",
+            "status": "canceled",
+            "items": [{"price": {"id": "pri_radar"}}],
+        },
     }
     r = _signed_webhook_request(client, event)
     assert r.status_code == 200
@@ -1355,6 +1370,21 @@ def test_webhook_subscription_canceled_downgrades_user(client):
     user = db.query(User).filter(User.id == user_id).first()
     assert user.plan == "free"
     db.close()
+
+
+def test_radar_checkout_keeps_radar_price_when_maintainer_price_is_configured(client, monkeypatch):
+    import config
+
+    monkeypatch.setattr(config, "PADDLE_CLIENT_TOKEN", "test_client_token")
+    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
+    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
+    monkeypatch.setattr(config, "paddle_configured", True)
+    _register_and_login(client)
+
+    response = client.get("/billing/upgrade")
+    assert response.status_code == 200
+    assert "pri_radar" in response.text
+    assert "pri_maintainer" not in response.text
 
 
 # --- Error pages -----------------------------------------------------

@@ -15,23 +15,38 @@
                 <h2>Maintainer Pilot</h2>
                 <p class="price">${{ pilot_price }}<small>/month</small></p>
                 <ul>
-                    <li>Full issue-triage reports</li>
-                    <li>Possible duplicate detection</li>
+                    <li>Continued Maintainer report access</li>
+                    <li>Issue classification</li>
+                    <li>Possible duplicate candidates</li>
                     <li>Missing-information checks</li>
                     <li>Contributor-readiness signals</li>
-                    <li>Suggested labels and first responses</li>
+                    <li>Suggested labels</li>
+                    <li>Neutral suggested first responses</li>
                     <li>Private report history</li>
                 </ul>
+                {% if billing_error %}<div class="error">{{ billing_error }}</div>{% endif %}
                 {% if maintainer_access %}
-                <a class="nav-cta" href="/maintainer/dashboard">Pilot Access Active</a>
-                {% else %}
-                <p class="angle">Continued report access for active maintainers. Billing setup is in progress.</p>
-                {% if not current_user %}
-                <div class="quick-actions">
-                    <a class="nav-cta compact" href="/register?next=/maintainer">Create Account</a>
-                    <a class="nav-outline compact" href="/login?next=/maintainer">Log In</a>
+                <div class="success-card">
+                    <strong>Maintainer Pilot Active</strong>
+                    {% if maintainer_subscription_status %}<p>Subscription status: {{ maintainer_subscription_status | replace('_', ' ') | title }}</p>{% endif %}
                 </div>
-                {% endif %}
+                <div class="quick-actions">
+                    <a class="nav-cta compact" href="/maintainer/dashboard">Open Reports</a>
+                    <a class="nav-outline compact" href="/maintainer/billing/manage">Manage Billing</a>
+                </div>
+                {% elif not current_user %}
+                <p class="angle">Continued report access subject to fair use.</p>
+                <div class="quick-actions">
+                    <a class="nav-cta compact" href="/register?next=/maintainer/pricing">Create Account</a>
+                    <a class="nav-outline compact" href="/login?next=/maintainer/pricing">Log In</a>
+                </div>
+                {% elif not current_user.email_verified %}
+                <a class="nav-cta" href="/login?next=/maintainer/pricing">Verify Email to Upgrade</a>
+                {% elif not maintainer_billing_available %}
+                <div class="angle"><strong>Billing temporarily unavailable</strong><p>Please try again later. Your Free Maintainer access remains available.</p></div>
+                {% else %}
+                <p class="angle">Continued report access subject to fair use.</p>
+                <a class="nav-cta" href="/maintainer/billing/upgrade">Upgrade to Maintainer Pilot &mdash; ${{ pilot_price }}/month</a>
                 {% endif %}
             </div>
         </div>

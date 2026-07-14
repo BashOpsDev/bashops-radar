@@ -7,7 +7,10 @@
         <span class="section-label">Private Reports</span>
         <h1>Maintainer dashboard</h1>
         <p>{% if maintainer_access %}Pilot access active. Create additional read-only reports.{% else %}Your completed trial reports remain available here.{% endif %}</p>
-        <a class="nav-cta compact" href="/maintainer">New Analysis</a>
+        <div class="quick-actions">
+            <a class="nav-cta compact" href="/maintainer">New Analysis</a>
+            {% if maintainer_access %}<a class="nav-outline compact" href="/maintainer/billing/manage">Manage Billing</a>{% endif %}
+        </div>
     </section>
 
     <section class="card-flat">

@@ -7,6 +7,7 @@
         <span class="section-label">Read-only Analysis</span>
         <h1>{{ report.repository.full_name }}</h1>
         <p>{{ report.repository.description }}</p>
+        <a class="nav-outline compact" href="{{ report.repository.url }}" target="_blank" rel="noopener noreferrer">Open repository on GitHub</a>
         <div class="checks"><span>{{ report.issues_reviewed }} issues reviewed</span><span>{{ report.analyzed_at[:10] }}</span><span>No GitHub changes made</span></div>
         {% if anonymous_preview_used %}
         <div class="maintainer-trial-gate">
@@ -38,7 +39,7 @@
     <section class="card-flat">
         <h2>Immediate maintainer attention</h2>
         {% for issue in report.issues if issue.estimated_priority == "High" %}
-        <div class="issue-row"><strong>#{{ issue.number }} {{ issue.title }}</strong><p>Estimated priority: High · {{ issue.suggested_category }}</p><a href="{{ issue.url }}" rel="noopener noreferrer">Open on GitHub</a></div>
+        <div class="issue-row"><strong>#{{ issue.number }} {{ issue.title }}</strong><p>Estimated priority: High · {{ issue.suggested_category }}</p><a href="{{ issue.url }}" target="_blank" rel="noopener noreferrer">Open on GitHub</a></div>
         {% else %}<p>No issues were assigned an estimated high priority.</p>{% endfor %}
     </section>
 
@@ -48,7 +49,7 @@
         <article class="pipeline-card">
             <div class="pipeline-card-top">
                 <div><span class="status-badge">Estimated priority: {{ issue.estimated_priority }}</span><h3>#{{ issue.number }} {{ issue.title }}</h3></div>
-                <a class="nav-outline compact" href="{{ issue.url }}" rel="noopener noreferrer">GitHub</a>
+                <a class="nav-outline compact" href="{{ issue.url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
             </div>
             <p><strong>Suggested category:</strong> {{ issue.suggested_category }} · <strong>Confidence:</strong> {{ issue.confidence }}</p>
             <p><strong>Current labels:</strong> {{ issue.current_labels | join(", ") if issue.current_labels else "None" }}</p>

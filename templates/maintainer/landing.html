@@ -24,7 +24,7 @@
             <a class="nav-cta compact" href="/maintainer/pricing">View Pilot Pricing</a>
             {% elif current_user %}
             <h2>Your Maintainer Free report is complete.</h2>
-            <p>Maintainer Pilot provides continued report access for active maintainers. Billing setup is in progress.</p>
+            <p>Maintainer Pilot provides continued report access subject to fair use.</p>
             <a class="nav-cta compact" href="/maintainer/pricing">View Pilot Pricing</a>
             {% else %}
             <h2>Free Maintainer preview used</h2>
@@ -48,8 +48,14 @@
             <button type="submit">Analyze One Repository Free</button>
         </form>
         {% endif %}
+        {% if not current_user and not trial_blocked %}
+        <div class="maintainer-trial-actions">
+            <a class="nav-cta compact" href="/register?next=/maintainer">Create a BashOps Account</a>
+            <a class="nav-outline compact" href="/login?next=/maintainer">Log In</a>
+        </div>
+        {% endif %}
         {% if not current_user %}
-        <p class="auth-note">Already use BashOps Radar? <a href="/login?next=/maintainer">Log in with the same BashOps account.</a></p>
+        <p class="auth-note">Already use BashOps Radar? Use the same account.</p>
         {% endif %}
         <div class="checks">
             <span>Read-only</span><span>20 recent issues</span><span>No GitHub changes</span><span>Human review required</span>

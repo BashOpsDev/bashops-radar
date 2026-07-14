@@ -23,6 +23,7 @@
                 <a href="/maintainer">Analyze</a>
                 <a href="/maintainer/pricing">Pilot Pricing</a>
                 {% if current_user %}<a href="/maintainer/dashboard">Reports</a>{% endif %}
+                {% if maintainer_access %}<a href="/maintainer/billing/manage">Manage Billing</a>{% endif %}
             </div>
             <div class="nav-right">
                 {% if current_user %}
@@ -73,5 +74,6 @@ document.addEventListener("keydown", function (event) {
     }
 });
 </script>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

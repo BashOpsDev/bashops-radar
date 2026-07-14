@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Login - BashOps Radar{% endblock %}
+{% block title %}{% if is_maintainer_destination %}Continue to BashOps Maintainer{% else %}Login - BashOps Radar{% endif %}{% endblock %}
 {% block extra_head %}
     <meta name="robots" content="noindex">
 {% endblock %}
@@ -10,10 +10,14 @@
             <div class="auth-logo">&gt;_</div>
 
             <span class="section-label">Welcome Back</span>
-            <h1>Continue your <span>Proof-of-Work</span> pipeline</h1>
+            <h1>{% if is_maintainer_destination %}Continue to BashOps <span>Maintainer</span>{% else %}Continue your <span>Proof-of-Work</span> pipeline{% endif %}</h1>
             <p>
+                {% if is_maintainer_destination %}
+                Log in to analyze issue queues, review private reports, and manage Maintainer access.
+                {% else %}
                 Login to continue analyzing repositories, managing your pipeline,
                 and preparing founder outreach.
+                {% endif %}
             </p>
 
             <div class="auth-benefits">
@@ -36,7 +40,7 @@
 
         <div class="auth-card">
             <span class="section-label">Login</span>
-            <h2>Access your workspace</h2>
+            <h2>{% if is_maintainer_destination %}Continue to BashOps Maintainer{% else %}Access your workspace{% endif %}</h2>
             <p class="angle">One BashOps account gives you access to Radar and Maintainer. Paid plans are purchased separately.</p>
 
             {% if registered %}

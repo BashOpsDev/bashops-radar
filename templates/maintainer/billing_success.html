@@ -1,0 +1,17 @@
+{% extends "maintainer/base.html" %}
+{% block title %}Payment Received - BashOps Maintainer{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main>
+    <section class="card">
+        <span class="section-label">Payment</span>
+        <h1>Payment received.</h1>
+        <p class="angle">Maintainer Pilot access will appear after Paddle confirms the subscription.</p>
+        <div class="quick-actions">
+            <a class="nav-cta compact" href="/maintainer/dashboard">Open Maintainer Dashboard</a>
+            <a class="nav-outline compact" href="/maintainer">Analyze Repository</a>
+            <a class="nav-outline compact" href="/maintainer/billing/manage">Manage Billing</a>
+        </div>
+    </section>
+</main>
+{% endblock %}

@@ -29,6 +29,8 @@ class User(Base):
     paddle_subscription_id = Column(String(255), nullable=True, index=True)
     subscription_status = Column(String(50), nullable=True)
     maintainer_pilot_access = Column(Boolean, default=False, nullable=False)
+    maintainer_paddle_subscription_id = Column(String(255), nullable=True, index=True)
+    maintainer_subscription_status = Column(String(50), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

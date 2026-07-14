@@ -1,0 +1,50 @@
+{% extends "maintainer/base.html" %}
+{% block title %}Checkout - BashOps Maintainer{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main>
+    <section class="checkout-shell">
+        <div class="checkout-brand-panel">
+            <div class="nav-logo">&gt;_</div>
+            <span class="section-label">BashOps Maintainer Pilot</span>
+            <h1>Turn issue queues into focused maintainer decisions.</h1>
+            <p>Continue reviewing public repository issue queues with read-only classification, duplicate candidates, and response drafts.</p>
+            <ul>
+                <li>Continued report access subject to fair use</li>
+                <li>Private report history</li>
+                <li>No automatic GitHub changes</li>
+            </ul>
+        </div>
+        <div class="checkout-status-card">
+            <span class="section-label">Checkout</span>
+            <h2>Starting Paddle checkout</h2>
+            <p>Maintainer Pilot activates only after BashOps receives Paddle's verified subscription webhook.</p>
+            <div class="quick-actions">
+                <a class="nav-cta compact" href="/maintainer/pricing">Back to Pricing</a>
+                <a class="nav-outline compact" href="/maintainer/dashboard">Reports</a>
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script>
+{% if paddle_env == "sandbox" %}
+Paddle.Environment.set("sandbox");
+{% endif %}
+Paddle.Initialize({ token: {{ paddle_client_token | tojson }} });
+Paddle.Checkout.open({
+    items: [{ priceId: {{ paddle_price_id | tojson }}, quantity: 1 }],
+    customer: { email: {{ user_email | tojson }} },
+    customData: {
+        user_id: {{ user_id | string | tojson }},
+        product_key: "maintainer"
+    },
+    settings: {
+        successUrl: {{ (site_url ~ "/maintainer/billing/success") | tojson }},
+        displayMode: "overlay"
+    }
+});
+</script>
+{% endblock %}

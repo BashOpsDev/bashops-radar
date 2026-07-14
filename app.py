@@ -324,6 +324,7 @@ def render_login(
             "reset": reset,
             "error": error,
             "next_path": next_path,
+            "is_maintainer_destination": next_path.startswith("/maintainer"),
             "register_url": auth_url("/register", next_path),
             "github_login_url": auth_url("/auth/github/login", next_path),
             "github_oauth_configured": config.github_oauth_configured,
@@ -347,6 +348,7 @@ def render_register(
             "error": error,
             "account_exists": account_exists,
             "next_path": next_path,
+            "is_maintainer_destination": next_path.startswith("/maintainer"),
             "login_url": auth_url("/login", next_path),
             "github_login_url": auth_url("/auth/github/login", next_path),
             "github_oauth_configured": config.github_oauth_configured,
@@ -477,6 +479,10 @@ def maintainer_template_context(request: Request, current_user=None) -> dict:
         **user_context(request, current_user),
         "maintainer_access": has_maintainer_access(current_user),
         "pilot_price": config.MAINTAINER_PILOT_PRICE_USD,
+        "maintainer_billing_available": config.maintainer_paddle_configured,
+        "maintainer_subscription_status": (
+            getattr(current_user, "maintainer_subscription_status", None) if current_user else None
+        ),
         "site_url": config.SITE_URL,
     }
 
@@ -934,8 +940,105 @@ def maintainer_pricing(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="maintainer/pricing.html",
+        context={"billing_error": None, **maintainer_template_context(request, current_user)},
+    )
+
+
+@app.get("/maintainer/billing/upgrade", response_class=HTMLResponse)
+def maintainer_billing_upgrade(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(
+            url=auth_url("/login", "/maintainer/billing/upgrade"),
+            status_code=303,
+        )
+    if not current_user.email_verified:
+        return templates.TemplateResponse(
+            request=request,
+            name="maintainer/pricing.html",
+            context={
+                "billing_error": "Verify your email before upgrading to Maintainer Pilot.",
+                **maintainer_template_context(request, current_user),
+            },
+            status_code=403,
+        )
+    if has_maintainer_access(current_user):
+        return RedirectResponse(url="/maintainer/dashboard", status_code=303)
+    if not config.maintainer_paddle_configured:
+        return templates.TemplateResponse(
+            request=request,
+            name="maintainer/pricing.html",
+            context={
+                "billing_error": "Billing temporarily unavailable. Please try again later.",
+                **maintainer_template_context(request, current_user),
+            },
+            status_code=503,
+        )
+
+    track_event(request, "maintainer_checkout_started", user=current_user)
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/checkout.html",
+        context={
+            "paddle_client_token": config.PADDLE_CLIENT_TOKEN,
+            "paddle_price_id": config.PADDLE_MAINTAINER_PRICE_ID,
+            "paddle_env": config.PADDLE_ENV,
+            "user_email": current_user.email,
+            "user_id": current_user.id,
+            **maintainer_template_context(request, current_user),
+        },
+    )
+
+
+@app.get("/maintainer/billing/success", response_class=HTMLResponse)
+def maintainer_billing_success(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(
+            url=auth_url("/login", "/maintainer/billing/success"),
+            status_code=303,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="maintainer/billing_success.html",
         context={**maintainer_template_context(request, current_user)},
     )
+
+
+@app.get("/maintainer/billing/manage", response_class=HTMLResponse)
+def maintainer_billing_manage(request: Request):
+    require_maintainer_enabled()
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(
+            url=auth_url("/login", "/maintainer/billing/manage"),
+            status_code=303,
+        )
+    if not current_user.paddle_customer_id:
+        return templates.TemplateResponse(
+            request=request,
+            name="maintainer/billing_manage.html",
+            context={
+                "portal_error": "No Paddle billing profile is connected to this account yet.",
+                **maintainer_template_context(request, current_user),
+            },
+        )
+
+    try:
+        portal_url = paddle_billing.create_customer_portal_url(current_user.paddle_customer_id)
+    except (paddle_billing.PaddleBillingNotConfigured, paddle_billing.PaddlePortalError):
+        return templates.TemplateResponse(
+            request=request,
+            name="maintainer/billing_manage.html",
+            context={
+                "portal_error": "The Paddle billing portal is temporarily unavailable. Please try again or contact support.",
+                **maintainer_template_context(request, current_user),
+            },
+            status_code=503,
+        )
+    return RedirectResponse(url=portal_url, status_code=303)
 
 
 @app.get("/tools/github-opportunity-score", response_class=HTMLResponse)
@@ -2487,19 +2590,18 @@ async def paddle_webhook(request: Request):
         return JSONResponse({"error": "invalid payload"}, status_code=400)
 
     try:
-        paddle_billing.handle_paddle_webhook_event(event)
+        handled_products = paddle_billing.handle_paddle_webhook_event(event)
     except Exception as e:
         print(f"[/billing/webhook handler error] {e!r}")
         return JSONResponse({"error": "webhook handling failed"}, status_code=500)
 
-    if event.get("event_type") in {"transaction.completed", "subscription.created", "subscription.updated"}:
+    if handled_products and event.get("event_type") in {"transaction.completed", "subscription.created", "subscription.updated"}:
         track_event(
             request,
             "checkout_completed",
             metadata={
                 "event_type": event.get("event_type"),
-                "customer_id": (event.get("data") or {}).get("customer_id"),
-                "subscription_id": (event.get("data") or {}).get("subscription_id") or (event.get("data") or {}).get("id"),
+                "products": sorted(handled_products),
             },
         )
 

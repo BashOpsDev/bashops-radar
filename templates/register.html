@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Register - BashOps Radar{% endblock %}
+{% block title %}{% if is_maintainer_destination %}Create Account - BashOps Maintainer{% else %}Register - BashOps Radar{% endif %}{% endblock %}
 {% block extra_head %}
     <meta name="robots" content="noindex">
 {% endblock %}
@@ -10,10 +10,14 @@
             <div class="auth-logo">&gt;_</div>
 
             <span class="section-label">Create Account</span>
-            <h1>Join BashOps <span>Radar</span></h1>
+            <h1>Join BashOps <span>{% if is_maintainer_destination %}Maintainer{% else %}Radar{% endif %}</span></h1>
             <p>
+                {% if is_maintainer_destination %}
+                Create one BashOps account to analyze issue queues and keep Maintainer reports private.
+                {% else %}
                 Create your workspace, analyze repositories, track proof-of-work opportunities,
                 and move promising targets toward paid sprints.
+                {% endif %}
             </p>
 
             <div class="auth-benefits">
@@ -36,7 +40,7 @@
 
         <div class="auth-card">
             <span class="section-label">Workspace</span>
-            <h2>Create your account</h2>
+            <h2>{% if is_maintainer_destination %}Create a BashOps account for Maintainer{% else %}Create your account{% endif %}</h2>
             <p class="angle">One BashOps account gives you access to Radar and Maintainer. Paid plans are purchased separately.</p>
 
             {% if account_exists %}

@@ -1,0 +1,17 @@
+{% extends "maintainer/base.html" %}
+{% block title %}Manage Billing - BashOps Maintainer{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main>
+    <section class="card">
+        <span class="section-label">Billing</span>
+        <h1>Manage Maintainer billing</h1>
+        <div class="error">{{ portal_error }}</div>
+        <p class="angle">No subscription changes were made. Use Paddle's hosted portal when it is available, or contact support.</p>
+        <div class="quick-actions">
+            <a class="nav-cta compact" href="/maintainer/pricing">Return to Pricing</a>
+            <a class="nav-outline compact" href="/contact">Contact Support</a>
+        </div>
+    </section>
+</main>
+{% endblock %}
