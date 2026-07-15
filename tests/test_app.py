@@ -936,6 +936,199 @@ def _create_verified_user(email="user@example.com", password="StrongPass1", pass
     db.close()
 
 
+def _configure_github_oauth(monkeypatch, email, github_id=123, verified=True):
+    import app as app_module
+    import config
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    monkeypatch.setattr(config, "GITHUB_CLIENT_ID", "client")
+    monkeypatch.setattr(config, "GITHUB_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(config, "GITHUB_OAUTH_REDIRECT_URI", "https://bashops.site/auth/github/callback")
+    monkeypatch.setattr(config, "github_oauth_configured", True)
+    monkeypatch.setattr(app_module.requests, "post", lambda *args, **kwargs: FakeResponse({"access_token": "token"}))
+
+    def fake_get(url, **kwargs):
+        if url.endswith("/user/emails"):
+            return FakeResponse([{"email": email, "verified": verified, "primary": True}])
+        return FakeResponse({"id": github_id, "login": "github-user", "name": "GitHub User"})
+
+    monkeypatch.setattr(app_module.requests, "get", fake_get)
+
+
+def _complete_github_oauth(client, next_path="/dashboard"):
+    from urllib.parse import parse_qs, urlsplit
+
+    started = client.get(f"/auth/github/login?next={next_path}", follow_redirects=False)
+    state = parse_qs(urlsplit(started.headers["location"]).query)["state"][0]
+    return client.get(f"/auth/github/callback?code=abc&state={state}", follow_redirects=False)
+
+
+def test_github_oauth_invalidates_unverified_account_password(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    register_page = client.get("/register")
+    response = client.post(
+        "/register",
+        data={
+            "name": "Pending User",
+            "email": "victim@example.com",
+            "password": "AttackerPass1",
+            "csrf_token": _csrf_token(register_page.text),
+        },
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    pending_user = db.query(User).filter(User.email == "victim@example.com").one()
+    pending_user.password_reset_token = "pending-reset"
+    pending_user.password_reset_sent_at = datetime.now(timezone.utc)
+    original_user_id = pending_user.id
+    db.commit()
+    db.close()
+
+    _configure_github_oauth(monkeypatch, "victim@example.com", github_id=321)
+    callback = _complete_github_oauth(client)
+    assert callback.status_code == 303
+    assert callback.headers["location"] == "/dashboard"
+    assert client.get("/dashboard").status_code == 200
+
+    db = SessionLocal()
+    linked_user = db.query(User).filter(User.email == "victim@example.com").one()
+    assert db.query(User).count() == 1
+    assert linked_user.id == original_user_id
+    assert linked_user.github_id == "321"
+    assert linked_user.email_verified is True
+    assert linked_user.auth_provider == "github"
+    assert linked_user.password_hash is None
+    assert linked_user.email_verification_token is None
+    assert linked_user.email_verification_sent_at is None
+    assert linked_user.password_reset_token is None
+    assert linked_user.password_reset_sent_at is None
+    db.close()
+
+    client.get("/logout")
+    login_page = client.get("/login")
+    password_login = client.post(
+        "/login",
+        data={
+            "email": "victim@example.com",
+            "password": "AttackerPass1",
+            "csrf_token": _csrf_token(login_page.text),
+        },
+        follow_redirects=False,
+    )
+    assert password_login.status_code == 200
+    assert "Invalid email or password." in password_login.text
+
+    forgot_page = client.get("/forgot-password")
+    forgot_response = client.post(
+        "/forgot-password",
+        data={"email": "victim@example.com", "csrf_token": _csrf_token(forgot_page.text)},
+    )
+    assert "If an account exists, reset instructions have been sent." in forgot_response.text
+    db = SessionLocal()
+    assert db.query(User).filter(User.email == "victim@example.com").one().password_reset_token is None
+    db.close()
+
+
+def test_verified_password_account_keeps_password_when_github_is_linked(client, monkeypatch):
+    from auth import verify_password
+    from database import SessionLocal
+    from models import User
+
+    _create_verified_user(email="verified@example.com", password="LegitimatePass1")
+    _configure_github_oauth(monkeypatch, "verified@example.com", github_id=456)
+
+    callback = _complete_github_oauth(client)
+    assert callback.status_code == 303
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "verified@example.com").one()
+    assert db.query(User).count() == 1
+    assert user.github_id == "456"
+    assert user.auth_provider == "email,github"
+    assert verify_password("LegitimatePass1", user.password_hash)
+    db.close()
+
+    client.get("/logout")
+    login_page = client.get("/login")
+    password_login = client.post(
+        "/login",
+        data={
+            "email": "verified@example.com",
+            "password": "LegitimatePass1",
+            "csrf_token": _csrf_token(login_page.text),
+        },
+        follow_redirects=False,
+    )
+    assert password_login.status_code == 303
+
+
+def test_existing_github_id_is_not_linked_to_second_email_match(client, monkeypatch):
+    from auth import hash_password
+    from database import SessionLocal
+    from models import User
+
+    db = SessionLocal()
+    github_user = User(
+        name="GitHub Owner",
+        email="original@example.com",
+        password_hash=None,
+        email_verified=True,
+        github_id="789",
+        github_username="github-user",
+        auth_provider="github",
+    )
+    email_user = User(
+        name="Email Owner",
+        email="match@example.com",
+        password_hash=hash_password("LegitimatePass1"),
+        email_verified=True,
+        auth_provider="email",
+    )
+    db.add_all([github_user, email_user])
+    db.commit()
+    github_user_id = github_user.id
+    db.close()
+
+    _configure_github_oauth(monkeypatch, "match@example.com", github_id=789)
+    callback = _complete_github_oauth(client)
+    assert callback.status_code == 303
+
+    db = SessionLocal()
+    users = db.query(User).order_by(User.id).all()
+    assert len(users) == 2
+    assert [user.github_id for user in users].count("789") == 1
+    assert db.query(User).filter(User.id == github_user_id).one().github_id == "789"
+    assert db.query(User).filter(User.email == "match@example.com").one().github_id is None
+    db.close()
+    assert "GitHub Owner" in client.get("/dashboard").text
+
+
+def test_github_oauth_rejects_unverified_github_email(client, monkeypatch):
+    from database import SessionLocal
+    from models import User
+
+    _configure_github_oauth(monkeypatch, "unverified@example.com", github_id=987, verified=False)
+    callback = _complete_github_oauth(client)
+
+    assert callback.status_code == 200
+    assert "GitHub did not return a verified email address." in callback.text
+    db = SessionLocal()
+    assert db.query(User).count() == 0
+    db.close()
+
+
 def test_shared_account_copy_appears_on_register_and_login(client):
     shared_copy = "One BashOps account gives you access to Radar and Maintainer. Paid plans are purchased separately."
     assert shared_copy in client.get("/register").text
@@ -1569,6 +1762,33 @@ def test_contact_and_legal_pages_use_public_support_address(client):
         assert response.status_code == 200
         assert "support@bashops.site" in response.text
         assert "bashops1@gmail.com" not in response.text
+
+
+def test_user_facing_templates_advertise_founder_outreach_not_intelligence(client):
+    from pathlib import Path
+
+    template_text = "\n".join(path.read_text(encoding="utf-8") for path in Path("templates").rglob("*.html"))
+    assert "AI Founder Intelligence" not in template_text
+    assert "Founder Intelligence" not in template_text
+    assert "Founder Outreach Strategy" in template_text
+
+    homepage = client.get("/")
+    assert homepage.status_code == 200
+    assert "Founder Outreach Strategy" in homepage.text
+
+    _register_and_login(client)
+    from database import SessionLocal
+    from models import User
+
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == "user@example.com").one()
+    user.plan = "pro"
+    db.commit()
+    db.close()
+
+    dashboard = client.get("/dashboard")
+    assert dashboard.status_code == 200
+    assert "Founder Outreach Strategy" in dashboard.text
 
 
 # --- Paddle webhook -------------------------------------------------------

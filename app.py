@@ -1456,11 +1456,22 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
         if not user:
             user = user_by_email(db, verified_email)
             if user:
+                was_email_verified = bool(user.email_verified)
                 user.github_id = github_id
                 user.github_username = github_username
                 user.email_verified = True
-                if user.auth_provider == "email":
-                    user.auth_provider = "email,github"
+                if was_email_verified:
+                    user.auth_provider = "email,github" if user.password_hash else "github"
+                else:
+                    # The password was chosen before ownership of this email was
+                    # proven. GitHub now proves ownership, so retain the account
+                    # row but remove every outstanding email/password credential.
+                    user.password_hash = None
+                    user.email_verification_token = None
+                    user.email_verification_sent_at = None
+                    user.password_reset_token = None
+                    user.password_reset_sent_at = None
+                    user.auth_provider = "github"
         if not user:
             user = User(
                 name=display_name,
