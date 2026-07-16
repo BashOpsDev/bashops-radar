@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.display_name }} (@{{ profile.github_username }}) Proof-of-Work | BashOps Radar{% endblock %}
+{% block extra_head %}
+{% if is_indexable %}
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{{ profile_public_url }}">
+{% else %}
+<meta name="robots" content="noindex, nofollow">
+{% endif %}
+<meta name="description" content="Public GitHub proof-of-work evidence for {{ profile.display_name }} (@{{ profile.github_username }}), analyzed by BashOps Radar.">
+<meta property="og:title" content="{{ profile.display_name }} (@{{ profile.github_username }}) | BashOps Proof-of-Work">
+<meta property="og:description" content="{{ strengths.narrative }}">
+<meta property="og:type" content="profile">
+<meta property="og:url" content="{{ profile_public_url }}">
+{% if profile.avatar_url %}<meta property="og:image" content="{{ profile.avatar_url }}">{% endif %}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ profile.display_name }} (@{{ profile.github_username }}) | BashOps">
+<meta name="twitter:description" content="Public GitHub contribution evidence analyzed by BashOps Radar.">
+{% endblock %}
+{% block content %}
+<main class="developer-page developer-profile">
+    {% if notice %}<div class="developer-notice" role="status">{{ notice }}</div>{% endif %}
+
+    <header class="developer-profile-header card-flat">
+        <div class="developer-identity">
+            {% if profile.avatar_url %}
+            <img src="{{ profile.avatar_url }}" alt="{{ profile.display_name }} GitHub avatar" width="96" height="96">
+            {% endif %}
+            <div>
+                <span class="section-label">BashOps Proof-of-Work Profile</span>
+                <h1>{{ profile.display_name }}</h1>
+                <p class="developer-username">@{{ profile.github_username }}</p>
+                {% if profile.bio %}<p>{{ profile.bio }}</p>{% endif %}
+                <div class="developer-header-meta">
+                    {% if profile.public_location %}<span>{{ profile.public_location }}</span>{% endif %}
+                    <span>Last analyzed {{ profile.analyzed_at.strftime("%Y-%m-%d") }}</span>
+                    <a href="{{ profile.profile_url }}" target="_blank" rel="noopener noreferrer">Open GitHub profile</a>
+                </div>
+            </div>
+        </div>
+        <div class="developer-ownership">
+            {% if is_owner %}
+                <strong>{{ "Published" if profile.is_public else "Private profile" }}</strong>
+                <span>Only you can publish, refresh, or delete this profile.</span>
+                <div class="developer-owner-actions">
+                    {% if profile.is_public %}
+                    <form method="post" action="/developer/{{ profile.public_slug }}/unpublish">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="nav-outline compact" type="submit">Unpublish</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="/developer/{{ profile.public_slug }}/publish">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="nav-cta compact" type="submit">Publish Profile</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="/developer/{{ profile.public_slug }}/refresh">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="nav-outline compact" type="submit">Refresh</button>
+                    </form>
+                    <form method="post" action="/developer/{{ profile.public_slug }}/delete" onsubmit="return confirm('Delete this stored profile?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button class="nav-outline compact" type="submit">Delete</button>
+                    </form>
+                </div>
+            {% elif can_claim %}
+                <strong>Verified GitHub identity matched</strong>
+                <span>Claiming does not publish the profile.</span>
+                <form method="post" action="/developer/{{ profile.public_slug }}/claim">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="nav-cta compact" type="submit">Claim My Profile</button>
+                </form>
+            {% elif not current_user %}
+                <strong>Is this your GitHub profile?</strong>
+                <span>Log in with GitHub to verify ownership. Username matching alone is never accepted.</span>
+                <a class="nav-outline compact" href="/login?next=/developer/{{ profile.public_slug }}">Log In</a>
+            {% else %}
+                <strong>Public evidence snapshot</strong>
+                <span>This profile has not been verified as yours.</span>
+            {% endif %}
+        </div>
+    </header>
+
+    <p class="developer-disclaimer">{{ activity.api_disclaimer }}</p>
+    {% if activity.is_partial %}
+    <section class="developer-limitations" aria-labelledby="developer-limitations-title">
+        <h2 id="developer-limitations-title">Data limitations</h2>
+        {% for reason in activity.partial_reasons %}<p>{{ reason }}</p>{% endfor %}
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="public-activity-title">
+        <div class="section-heading-row">
+            <div><span class="section-label">Public Activity</span><h2 id="public-activity-title">Records found by BashOps</h2></div>
+        </div>
+        <div class="developer-stat-grid">
+            <article><span>Contribution records analyzed</span><strong>{{ activity.public_contribution_records_analyzed }}</strong></article>
+            <article><span>Merged pull requests found</span><strong>{{ activity.merged_pull_requests_found }}</strong></article>
+            <article><span>Open pull requests found</span><strong>{{ activity.open_pull_requests_found }}</strong></article>
+            <article><span>Public issues found</span><strong>{{ activity.public_issues_found }}</strong></article>
+            <article><span>Repositories contributed to</span><strong>{{ activity.repositories_contributed_to }}</strong></article>
+            <article><span>Public repositories owned</span><strong>{{ activity.public_repositories_owned }}</strong></article>
+        </div>
+    </section>
+
+    <section class="developer-strength-section" aria-labelledby="strength-title">
+        <div class="section-heading-row">
+            <div><span class="section-label">Contribution Strengths</span><h2 id="strength-title">Strongest public contribution signals</h2></div>
+        </div>
+        {% if strengths.categories %}
+        <div class="developer-strength-grid">
+            {% for strength in strengths.categories %}
+            <article>
+                <div><strong>{{ strength.label }}</strong><span>{{ strength.count }} records</span></div>
+                <div class="developer-strength-bar" aria-label="{{ strength.label }}: {{ strength.percentage }} percent of analyzed records">
+                    <span style="width: {{ strength.percentage }}%"></span>
+                </div>
+                <p>
+                    {% if strength.repositories %}Repositories: {{ strength.repositories|join(", ") }}.{% endif %}
+                    {% if strength.languages %} Languages: {{ strength.languages|join(", ") }}.{% endif %}
+                </p>
+                {% if strength.examples %}
+                <ul class="developer-strength-examples">
+                    {% for example in strength.examples %}
+                    <li><a href="{{ example.url }}" target="_blank" rel="noopener noreferrer">{{ example.title }}</a></li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><p>No dominant contribution category was found in the bounded public records.</p></div>
+        {% endif %}
+        {% if strengths.languages %}
+        <div class="developer-language-row" aria-label="Primary repository languages">
+            {% for language in strengths.languages %}<span>{{ language.label }} · {{ language.count }}</span>{% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="developer-summary card-flat" aria-labelledby="proof-summary-title">
+        <span class="section-label">Proof-of-Work Summary</span>
+        <h2 id="proof-summary-title">Evidence-backed public activity</h2>
+        <p>{{ strengths.narrative }}</p>
+        <small>{{ activity.api_disclaimer }}</small>
+    </section>
+
+    <section aria-labelledby="repository-experience-title">
+        <div class="section-heading-row">
+            <div><span class="section-label">Repository Experience</span><h2 id="repository-experience-title">Public contribution examples</h2></div>
+            {% if is_owner and not is_pro_view %}<a href="/pricing" data-profile-action="upgrade_clicked">View deeper Pro history</a>{% endif %}
+        </div>
+        {% if contributions %}
+        <div class="developer-contribution-list">
+            {% for contribution in contributions %}
+            <article>
+                <div class="developer-contribution-top">
+                    <div><span>{{ contribution.kind }} · {{ contribution.status }}</span><h3>{{ contribution.title }}</h3></div>
+                    <span class="plan-chip">{{ contribution.category }}</span>
+                </div>
+                <div class="developer-contribution-meta">
+                    <span>{{ contribution.repository }}</span>
+                    <span>{{ contribution.language }}</span>
+                    <span>{{ contribution.repository_stars }} stars</span>
+                    <span>{{ contribution.date[:10] if contribution.date else "Date unavailable" }}</span>
+                </div>
+                <div class="developer-contribution-actions">
+                    <a href="{{ contribution.url }}" target="_blank" rel="noopener noreferrer">Open contribution</a>
+                    <form method="post" action="/analyze">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="repo_url" value="{{ contribution.repository_url }}">
+                        <button type="submit" class="text-action">Analyze with Radar</button>
+                    </form>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><p>No public contribution examples were available in the bounded API result.</p></div>
+        {% endif %}
+    </section>
+
+    {% if timeline %}
+    <section aria-labelledby="timeline-title">
+        <div class="section-heading-row"><div><span class="section-label">Timeline</span><h2 id="timeline-title">Recent public records</h2></div></div>
+        <ol class="developer-timeline">
+            {% for contribution in timeline %}
+            <li><time>{{ contribution.date[:10] if contribution.date else "Date unavailable" }}</time><div><strong>{{ contribution.repository }}</strong><span>{{ contribution.title }} · {{ contribution.status }}</span></div></li>
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
+
+    <section class="developer-portfolio card-flat" aria-labelledby="portfolio-title">
+        <div>
+            <span class="section-label">Portfolio Summary</span>
+            <h2 id="portfolio-title">Use the evidence in your portfolio</h2>
+            <p>The complete text remains selectable when JavaScript or clipboard access is unavailable.</p>
+        </div>
+        <textarea id="portfolioSummary" readonly rows="9">{{ strengths.portfolio_summary }}</textarea>
+        <button type="button" class="nav-cta compact" data-copy-target="portfolioSummary" data-profile-action="portfolio_copied">Copy portfolio summary</button>
+    </section>
+
+    <section class="developer-opportunities card-flat" aria-labelledby="next-opportunities-title">
+        <div>
+            <span class="section-label">Recommended Next Step</span>
+            <h2 id="next-opportunities-title">Find repositories matching these signals</h2>
+            <p>
+                Use Radar's existing Opportunity Finder to search for contribution targets aligned with
+                {% if strengths.languages %}{{ strengths.languages[:3] | map(attribute="label") | join(", ") }}{% else %}your public repository activity{% endif %}.
+                BashOps does not present these as confirmed jobs.
+            </p>
+        </div>
+        <a class="nav-cta compact" href="/discover" data-profile-action="opportunity_clicked">Open Opportunity Finder</a>
+    </section>
+
+    <section class="developer-share card-flat" aria-labelledby="share-title">
+        <div><span class="section-label">Share</span><h2 id="share-title">Share the public evidence</h2></div>
+        <div class="developer-share-actions">
+            <button type="button" class="nav-outline compact" data-copy-value="{{ profile_public_url }}" data-profile-action="link_copied">Copy profile link</button>
+            <a class="nav-outline compact" href="{{ linkedin_share_url }}" target="_blank" rel="noopener noreferrer" data-profile-action="linkedin">Share on LinkedIn</a>
+            <a class="nav-outline compact" href="{{ x_share_url }}" target="_blank" rel="noopener noreferrer" data-profile-action="x">Share on X</a>
+        </div>
+        {% if not profile.is_public %}<small>This temporary profile is noindex. Only the verified owner can publish it.</small>{% endif %}
+    </section>
+
+    <input type="hidden" id="developerProfileCsrf" value="{{ csrf_token }}">
+</main>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+    const csrf = document.getElementById("developerProfileCsrf");
+    function track(action) {
+        if (!csrf || !action) return;
+        const body = new URLSearchParams({action: action, csrf_token: csrf.value});
+        fetch("/developer/{{ profile.public_slug }}/event", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: body.toString(),
+            credentials: "same-origin"
+        }).catch(function () {});
+    }
+    document.querySelectorAll("[data-profile-action]").forEach(function (element) {
+        element.addEventListener("click", function () { track(element.dataset.profileAction); });
+    });
+    document.querySelectorAll("[data-copy-target], [data-copy-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const target = button.dataset.copyTarget ? document.getElementById(button.dataset.copyTarget) : null;
+            const value = target ? target.value : button.dataset.copyValue;
+            if (navigator.clipboard && value) navigator.clipboard.writeText(value).catch(function () {});
+        });
+    });
+})();
+</script>
+{% endblock %}

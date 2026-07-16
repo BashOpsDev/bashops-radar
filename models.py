@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -36,6 +36,7 @@ class User(Base):
 
     targets = relationship("Target", back_populates="user")
     maintainer_analyses = relationship("MaintainerAnalysis", back_populates="user")
+    developer_profiles = relationship("DeveloperProfile", back_populates="user")
 
 
 class Target(Base):
@@ -113,3 +114,29 @@ class MaintainerAnalysis(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="maintainer_analyses")
+
+
+class DeveloperProfile(Base):
+    __tablename__ = "developer_profiles"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, unique=True, index=True)
+    github_username = Column(String(39), nullable=False, unique=True, index=True)
+    github_user_id = Column(String(255), nullable=False, unique=True, index=True)
+    display_name = Column(String(255), nullable=False)
+    avatar_url = Column(String(500), nullable=True)
+    bio = Column(Text, nullable=True)
+    public_location = Column(String(255), nullable=True)
+    profile_url = Column(String(500), nullable=False)
+    profile_data = Column(JSON, nullable=False)
+    strength_data = Column(JSON, nullable=False)
+    contribution_data = Column(JSON, nullable=False)
+    analyzed_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    is_claimed = Column(Boolean, nullable=False, default=False)
+    is_public = Column(Boolean, nullable=False, default=False)
+    public_slug = Column(String(80), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="developer_profiles")

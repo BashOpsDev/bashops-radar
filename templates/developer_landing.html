@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Developer Proof-of-Work Profile | BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="description" content="Turn public GitHub pull requests and issues into an evidence-based proof-of-work profile.">
+<link rel="canonical" href="{{ site_url }}/developer">
+<meta property="og:title" content="Developer Proof-of-Work Profile | BashOps Radar">
+<meta property="og:description" content="Generate a professional profile from public GitHub contribution evidence.">
+<meta property="og:url" content="{{ site_url }}/developer">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Developer Proof-of-Work Profile | BashOps Radar">
+<meta name="twitter:description" content="Turn public GitHub work into credible proof-of-work.">
+{% endblock %}
+{% block content %}
+<main class="developer-page developer-landing">
+    <section class="developer-entry card-flat">
+        <div>
+            <span class="section-label">Developer Proof-of-Work Profile</span>
+            <h1>Turn public GitHub work into credible proof-of-work.</h1>
+            <p>
+                BashOps reviews bounded public pull request and issue records, identifies recurring
+                contribution signals, and creates a portfolio-ready summary without claiming seniority or employability.
+            </p>
+            <ul class="developer-evidence-list">
+                <li>Public pull requests and issues found</li>
+                <li>Contribution categories with supporting examples</li>
+                <li>Repository languages and collaboration evidence</li>
+                <li>A concise summary you can use in a portfolio</li>
+            </ul>
+        </div>
+        <form method="post" action="/developer" class="developer-entry-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label for="github_username">Public GitHub username</label>
+            <input
+                id="github_username"
+                name="github_username"
+                value="{{ username }}"
+                maxlength="39"
+                pattern="[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
+                placeholder="octocat"
+                autocomplete="off"
+                required
+            >
+            {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+            <button type="submit">Generate my proof-of-work profile</button>
+            <small>Enter a username, not a URL. Only supported public GitHub API data is analyzed.</small>
+        </form>
+    </section>
+
+    <section class="developer-method">
+        <div>
+            <span class="section-label">Evidence, not vanity</span>
+            <h2>What the report means</h2>
+            <p>
+                Counts describe records BashOps found through bounded public API searches. They are not authoritative
+                lifetime contribution totals and do not predict hiring, salary, or job eligibility.
+            </p>
+        </div>
+        <div class="developer-method-grid">
+            <article><strong>Public evidence</strong><span>Links back to public GitHub contributions.</span></article>
+            <article><strong>Deterministic categories</strong><span>Uses titles, labels, repository topics, and languages.</span></article>
+            <article><strong>Private by default</strong><span>Generated profiles remain noindex until the verified owner publishes.</span></article>
+        </div>
+    </section>
+</main>
+{% endblock %}

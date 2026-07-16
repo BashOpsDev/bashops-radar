@@ -3,7 +3,7 @@ import json
 import re
 import secrets
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import unquote, urlencode, urlsplit
 
@@ -15,12 +15,12 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import func
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 import requests
 
 from database import SessionLocal
-from models import Event, MaintainerAnalysis, Target, User
+from models import DeveloperProfile, Event, MaintainerAnalysis, Target, User
 from auth import (
     hash_password,
     verify_password,
@@ -43,6 +43,13 @@ from discovery_service import DiscoveryError, category_options, discover_opportu
 from maintainer_schemas import MaintainerReport
 from maintainer_service import ANALYSIS_VERSION as MAINTAINER_ANALYSIS_VERSION
 from maintainer_service import MaintainerServiceError, build_maintainer_report, parse_repository_url
+from developer_profile_service import (
+    OWNER_REFRESH_HOURS,
+    PROFILE_CACHE_HOURS,
+    DeveloperProfileError,
+    analyze_developer_profile,
+    normalize_github_username,
+)
 import config
 
 try:
@@ -93,6 +100,8 @@ POST_AUTH_NEXT_SESSION_KEY = "post_auth_next"
 GITHUB_OAUTH_NEXT_SESSION_KEY = "github_oauth_next"
 EMAIL_VERIFICATION_MAX_AGE_SECONDS = 24 * 60 * 60
 PASSWORD_RESET_MAX_AGE_SECONDS = 60 * 60
+ANONYMOUS_DEVELOPER_PROFILE_LIMIT = 3
+ANONYMOUS_DEVELOPER_PROFILE_WINDOW_SECONDS = 60 * 60
 
 if GEMINI_API_KEY and genai:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -513,6 +522,96 @@ def maintainer_template_context(request: Request, current_user=None) -> dict:
     }
 
 
+def _aware_utc(value):
+    if value is None:
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def developer_profile_by_username(db: Session, username: str):
+    normalized = (username or "").strip().lower()
+    return (
+        db.query(DeveloperProfile)
+        .filter(
+            (func.lower(DeveloperProfile.github_username) == normalized)
+            | (func.lower(DeveloperProfile.public_slug) == normalized)
+        )
+        .first()
+    )
+
+
+def developer_profile_is_fresh(profile) -> bool:
+    expires_at = _aware_utc(getattr(profile, "expires_at", None))
+    return bool(expires_at and expires_at > now_utc())
+
+
+def developer_profile_is_owner(profile, user) -> bool:
+    return bool(profile and user and profile.user_id == user.id and profile.is_claimed)
+
+
+def developer_profile_can_be_claimed(profile, user) -> bool:
+    providers = {item.strip() for item in (getattr(user, "auth_provider", "") or "").split(",")}
+    return bool(
+        profile
+        and user
+        and "github" in providers
+        and user.github_id
+        and str(user.github_id) == str(profile.github_user_id)
+        and (profile.user_id is None or profile.user_id == user.id)
+    )
+
+
+def consume_anonymous_developer_generation(request: Request) -> bool:
+    now_timestamp = now_utc().timestamp()
+    history = request.session.get("developer_profile_generation_times", [])
+    if not isinstance(history, list):
+        history = []
+    recent = [
+        float(value)
+        for value in history
+        if isinstance(value, (int, float)) and now_timestamp - float(value) < ANONYMOUS_DEVELOPER_PROFILE_WINDOW_SECONDS
+    ]
+    if len(recent) >= ANONYMOUS_DEVELOPER_PROFILE_LIMIT:
+        request.session["developer_profile_generation_times"] = recent
+        return False
+    recent.append(now_timestamp)
+    request.session["developer_profile_generation_times"] = recent
+    return True
+
+
+def apply_developer_profile_analysis(profile, analysis: dict) -> None:
+    analyzed_at = now_utc()
+    profile.github_username = analysis["github_username"]
+    profile.github_user_id = analysis["github_user_id"]
+    profile.display_name = analysis["display_name"]
+    profile.avatar_url = analysis["avatar_url"]
+    profile.bio = analysis["bio"]
+    profile.public_location = analysis["public_location"]
+    profile.profile_url = analysis["profile_url"]
+    profile.profile_data = analysis["profile_data"]
+    profile.strength_data = analysis["strength_data"]
+    profile.contribution_data = analysis["contribution_data"]
+    profile.analyzed_at = analyzed_at
+    profile.expires_at = analyzed_at + timedelta(hours=PROFILE_CACHE_HOURS)
+    profile.public_slug = analysis["github_username"]
+
+
+def render_developer_landing(request: Request, error: str = "", username: str = "", status_code: int = 200):
+    current_user = get_current_user(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="developer_landing.html",
+        context={
+            "error": error,
+            "username": username,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+        status_code=status_code,
+    )
+
+
 @app.exception_handler(StarletteHTTPException)
 async def not_found_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 404:
@@ -569,6 +668,7 @@ def sitemap_xml():
         "/pricing",
         "/tools/github-opportunity-score",
         "/tools/best-first-issue-finder",
+        "/developer",
         "/login",
         "/register",
         "/terms",
@@ -584,6 +684,22 @@ def sitemap_xml():
                 "/tools/github-maintainer-workload-report",
             ]
         )
+    db: Session = SessionLocal()
+    try:
+        public_slugs = (
+            db.query(DeveloperProfile.public_slug)
+            .filter(
+                DeveloperProfile.is_claimed.is_(True),
+                DeveloperProfile.is_public.is_(True),
+            )
+            .order_by(DeveloperProfile.public_slug)
+            .all()
+        )
+        urls.extend(f"/developer/{slug}" for (slug,) in public_slugs)
+    except SQLAlchemyError:
+        pass
+    finally:
+        db.close()
     body = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for path in urls:
         body.append(f"<url><loc>{config.SITE_URL}{path}</loc></url>")
@@ -1164,6 +1280,345 @@ def best_first_issue_finder_tool(request: Request):
             **csrf_context(request),
         },
     )
+
+
+@app.get("/developer", response_class=HTMLResponse)
+def developer_profile_landing(request: Request):
+    return render_developer_landing(request)
+
+
+@app.post("/developer", response_class=HTMLResponse)
+def developer_profile_generate(
+    request: Request,
+    github_username: str = Form(...),
+    csrf_token: str = Form(""),
+):
+    current_user = get_current_user(request)
+    if not check_csrf(request, csrf_token):
+        return render_developer_landing(
+            request,
+            error="Your session expired. Please try again.",
+            username=github_username,
+            status_code=400,
+        )
+    try:
+        normalized_username = normalize_github_username(github_username)
+    except DeveloperProfileError as exc:
+        return render_developer_landing(
+            request,
+            error=exc.message,
+            username=github_username,
+            status_code=400,
+        )
+
+    db: Session = SessionLocal()
+    try:
+        cached_profile = developer_profile_by_username(db, normalized_username)
+        if cached_profile and developer_profile_is_fresh(cached_profile):
+            track_event(request, "developer_profile_cache_hit", user=current_user)
+            return RedirectResponse(url=f"/developer/{cached_profile.public_slug}", status_code=303)
+    finally:
+        db.close()
+
+    if not current_user and not consume_anonymous_developer_generation(request):
+        return render_developer_landing(
+            request,
+            error="Profile generation limit reached. Please create an account or try again later.",
+            username=normalized_username,
+            status_code=429,
+        )
+
+    track_event(request, "developer_profile_started", user=current_user)
+    try:
+        analysis = analyze_developer_profile(normalized_username)
+    except DeveloperProfileError as exc:
+        track_event(request, "developer_profile_failed", user=current_user, metadata={"reason": exc.code})
+        db = SessionLocal()
+        try:
+            stale_profile = developer_profile_by_username(db, normalized_username)
+            if stale_profile:
+                request.session["developer_profile_notice"] = (
+                    "GitHub could not refresh this profile. The previous public snapshot is still available."
+                )
+                return RedirectResponse(url=f"/developer/{stale_profile.public_slug}", status_code=303)
+        finally:
+            db.close()
+        status_code = {
+            "invalid_username": 400,
+            "github_user_not_found": 404,
+            "github_organization": 400,
+            "github_rate_limit": 429,
+        }.get(exc.code, 503)
+        return render_developer_landing(
+            request,
+            error=exc.message,
+            username=normalized_username,
+            status_code=status_code,
+        )
+
+    db = SessionLocal()
+    try:
+        profile = db.query(DeveloperProfile).filter(DeveloperProfile.github_user_id == analysis["github_user_id"]).first()
+        username_profile = developer_profile_by_username(db, analysis["github_username"])
+        if username_profile and username_profile is not profile:
+            if username_profile.is_claimed:
+                return render_developer_landing(
+                    request,
+                    error="This GitHub username changed recently. The profile cannot be replaced automatically.",
+                    username=normalized_username,
+                    status_code=409,
+                )
+            db.delete(username_profile)
+            db.flush()
+        if profile is None:
+            profile = DeveloperProfile()
+            db.add(profile)
+        apply_developer_profile_analysis(profile, analysis)
+        db.commit()
+        db.refresh(profile)
+        profile_slug = profile.public_slug
+    except IntegrityError:
+        db.rollback()
+        return render_developer_landing(
+            request,
+            error="This GitHub profile changed while it was being analyzed. Please try again.",
+            username=normalized_username,
+            status_code=409,
+        )
+    finally:
+        db.close()
+
+    track_event(request, "developer_profile_generated", user=current_user)
+    return RedirectResponse(url=f"/developer/{profile_slug}", status_code=303)
+
+
+@app.get("/developer/{github_username}", response_class=HTMLResponse)
+def developer_profile_view(request: Request, github_username: str):
+    try:
+        normalized_username = normalize_github_username(github_username)
+    except DeveloperProfileError:
+        return render_developer_landing(request, error="That developer profile was not found.", status_code=404)
+
+    current_user = get_current_user(request)
+    db: Session = SessionLocal()
+    try:
+        profile = developer_profile_by_username(db, normalized_username)
+        if not profile:
+            return render_developer_landing(
+                request,
+                error="That profile has not been generated yet.",
+                username=normalized_username,
+                status_code=404,
+            )
+        is_owner = developer_profile_is_owner(profile, current_user)
+        can_claim = developer_profile_can_be_claimed(profile, current_user)
+        is_indexable = bool(profile.is_claimed and profile.is_public)
+        pro_view = bool(is_owner and has_pro_access(current_user))
+        contribution_limit = 30 if pro_view else 12
+        contribution_data = list(profile.contribution_data or [])
+        profile_context = {
+            "profile": profile,
+            "activity": profile.profile_data or {},
+            "strengths": profile.strength_data or {},
+            "contributions": contribution_data[:contribution_limit],
+            "timeline": contribution_data[: 20 if pro_view else 8],
+            "is_owner": is_owner,
+            "can_claim": can_claim,
+            "is_indexable": is_indexable,
+            "is_pro_view": pro_view,
+            "profile_public_url": f"{config.SITE_URL.rstrip('/')}/developer/{profile.public_slug}",
+            "notice": request.session.pop("developer_profile_notice", ""),
+            "site_url": config.SITE_URL,
+        }
+        profile_context["linkedin_share_url"] = "https://www.linkedin.com/sharing/share-offsite/?" + urlencode(
+            {"url": profile_context["profile_public_url"]}
+        )
+        profile_context["x_share_url"] = "https://twitter.com/intent/tweet?" + urlencode(
+            {
+                "url": profile_context["profile_public_url"],
+                "text": "My public GitHub proof-of-work profile, generated with BashOps Radar.",
+            }
+        )
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="developer_profile.html",
+        context={
+            **profile_context,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+def _developer_profile_action_context(request: Request, github_username: str, csrf_token: str):
+    current_user = get_current_user(request)
+    if not current_user:
+        return None, None, RedirectResponse(
+            url=auth_url("/login", f"/developer/{github_username}"),
+            status_code=303,
+        )
+    if not check_csrf(request, csrf_token):
+        return None, None, HTMLResponse("Your session expired. Please try again.", status_code=403)
+    db: Session = SessionLocal()
+    profile = developer_profile_by_username(db, github_username)
+    if not profile:
+        db.close()
+        return None, None, HTMLResponse("Developer profile not found.", status_code=404)
+    return current_user, (db, profile), None
+
+
+@app.post("/developer/{github_username}/claim")
+def developer_profile_claim(request: Request, github_username: str, csrf_token: str = Form("")):
+    current_user, profile_state, response = _developer_profile_action_context(request, github_username, csrf_token)
+    if response:
+        return response
+    db, profile = profile_state
+    profile_slug = profile.public_slug
+    try:
+        if not developer_profile_can_be_claimed(profile, current_user):
+            return HTMLResponse("Profile ownership could not be verified through GitHub.", status_code=403)
+        profile.user_id = current_user.id
+        profile.is_claimed = True
+        profile.is_public = False
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return HTMLResponse("This BashOps account already owns a developer profile.", status_code=409)
+    finally:
+        db.close()
+    track_event(request, "developer_profile_claimed", user=current_user)
+    return RedirectResponse(url=f"/developer/{profile_slug}", status_code=303)
+
+
+def _set_developer_profile_publication(request: Request, github_username: str, csrf_token: str, is_public: bool):
+    current_user, profile_state, response = _developer_profile_action_context(request, github_username, csrf_token)
+    if response:
+        return response
+    db, profile = profile_state
+    profile_slug = profile.public_slug
+    try:
+        if not developer_profile_is_owner(profile, current_user):
+            return HTMLResponse("Only the verified profile owner can change publication.", status_code=403)
+        profile.is_public = is_public
+        db.commit()
+    finally:
+        db.close()
+    track_event(
+        request,
+        "developer_profile_published" if is_public else "developer_profile_unpublished",
+        user=current_user,
+    )
+    return RedirectResponse(url=f"/developer/{profile_slug}", status_code=303)
+
+
+@app.post("/developer/{github_username}/publish")
+def developer_profile_publish(request: Request, github_username: str, csrf_token: str = Form("")):
+    return _set_developer_profile_publication(request, github_username, csrf_token, True)
+
+
+@app.post("/developer/{github_username}/unpublish")
+def developer_profile_unpublish(request: Request, github_username: str, csrf_token: str = Form("")):
+    return _set_developer_profile_publication(request, github_username, csrf_token, False)
+
+
+@app.post("/developer/{github_username}/refresh")
+def developer_profile_refresh(request: Request, github_username: str, csrf_token: str = Form("")):
+    current_user, profile_state, response = _developer_profile_action_context(request, github_username, csrf_token)
+    if response:
+        return response
+    db, profile = profile_state
+    profile_id = profile.id
+    profile_slug = profile.public_slug
+    lookup_username = current_user.github_username or profile.github_username
+    analyzed_at = _aware_utc(profile.analyzed_at)
+    if not developer_profile_is_owner(profile, current_user):
+        db.close()
+        return HTMLResponse("Only the verified profile owner can refresh this profile.", status_code=403)
+    if analyzed_at and analyzed_at > now_utc() - timedelta(hours=OWNER_REFRESH_HOURS):
+        db.close()
+        request.session["developer_profile_notice"] = (
+            f"This profile was refreshed recently. Owner refresh is available every {OWNER_REFRESH_HOURS} hours."
+        )
+        return RedirectResponse(url=f"/developer/{profile_slug}", status_code=303)
+    db.close()
+
+    try:
+        analysis = analyze_developer_profile(lookup_username)
+    except DeveloperProfileError as exc:
+        request.session["developer_profile_notice"] = (
+            "GitHub could not refresh this profile. The existing public snapshot was preserved."
+        )
+        track_event(request, "developer_profile_failed", user=current_user, metadata={"reason": exc.code})
+        return RedirectResponse(url=f"/developer/{profile_slug}", status_code=303)
+
+    db = SessionLocal()
+    refresh_succeeded = False
+    try:
+        profile = db.query(DeveloperProfile).filter(DeveloperProfile.id == profile_id).first()
+        if not profile or not developer_profile_is_owner(profile, current_user):
+            return HTMLResponse("Developer profile not found.", status_code=404)
+        apply_developer_profile_analysis(profile, analysis)
+        db.commit()
+        profile_slug = profile.public_slug
+        refresh_succeeded = True
+    except IntegrityError:
+        db.rollback()
+        request.session["developer_profile_notice"] = "The refreshed GitHub username conflicts with another profile."
+    finally:
+        db.close()
+    if refresh_succeeded:
+        track_event(request, "developer_profile_refreshed", user=current_user)
+    return RedirectResponse(url=f"/developer/{profile_slug}", status_code=303)
+
+
+@app.post("/developer/{github_username}/delete")
+def developer_profile_delete(request: Request, github_username: str, csrf_token: str = Form("")):
+    current_user, profile_state, response = _developer_profile_action_context(request, github_username, csrf_token)
+    if response:
+        return response
+    db, profile = profile_state
+    try:
+        if not developer_profile_is_owner(profile, current_user):
+            return HTMLResponse("Only the verified profile owner can delete this profile.", status_code=403)
+        db.delete(profile)
+        db.commit()
+    finally:
+        db.close()
+    track_event(request, "developer_profile_deleted", user=current_user)
+    return RedirectResponse(url="/developer", status_code=303)
+
+
+@app.post("/developer/{github_username}/event")
+def developer_profile_event(
+    request: Request,
+    github_username: str,
+    action: str = Form(...),
+    csrf_token: str = Form(""),
+):
+    if not check_csrf(request, csrf_token):
+        return JSONResponse({"error": "invalid session"}, status_code=403)
+    allowed_events = {
+        "linkedin": "developer_profile_shared_linkedin",
+        "x": "developer_profile_shared_x",
+        "link_copied": "developer_profile_link_copied",
+        "portfolio_copied": "developer_portfolio_summary_copied",
+        "opportunity_clicked": "developer_profile_opportunity_clicked",
+        "upgrade_clicked": "developer_profile_upgrade_clicked",
+    }
+    event_name = allowed_events.get(action)
+    if not event_name:
+        return JSONResponse({"error": "invalid action"}, status_code=400)
+    db: Session = SessionLocal()
+    try:
+        if not developer_profile_by_username(db, github_username):
+            return JSONResponse({"error": "profile not found"}, status_code=404)
+    finally:
+        db.close()
+    track_event(request, event_name, user=get_current_user(request))
+    return JSONResponse({"ok": True})
 
 
 @app.get("/discover", response_class=HTMLResponse)
