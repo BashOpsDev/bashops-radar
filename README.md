@@ -232,6 +232,12 @@ Then start the app with:
 uvicorn app:app --host 0.0.0.0 --port $PORT
 ```
 
+The daily opportunity cache can later be refreshed from a Railway Cron service with:
+
+```bash
+python -m scripts.refresh_opportunity_feed
+```
+
 Use Railway environment variables for all secrets. Do not commit `.env`.
 
 ## GitHub Repository Metadata

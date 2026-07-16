@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -37,6 +37,7 @@ class User(Base):
     targets = relationship("Target", back_populates="user")
     maintainer_analyses = relationship("MaintainerAnalysis", back_populates="user")
     developer_profiles = relationship("DeveloperProfile", back_populates="user")
+    opportunity_interactions = relationship("UserOpportunityInteraction", back_populates="user")
 
 
 class Target(Base):
@@ -140,3 +141,56 @@ class DeveloperProfile(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="developer_profiles")
+
+
+class OpportunityFeedItem(Base):
+    __tablename__ = "opportunity_feed_items"
+
+    id = Column(Integer, primary_key=True)
+    repository_full_name = Column(String(255), nullable=False, unique=True, index=True)
+    repository_url = Column(String(500), nullable=False)
+    repository_owner = Column(String(100), nullable=False)
+    repository_name = Column(String(155), nullable=False)
+    description = Column(Text, nullable=True)
+    primary_language = Column(String(100), nullable=True)
+    categories = Column(JSON, nullable=False)
+    topics = Column(JSON, nullable=False)
+    radar_score = Column(Float, nullable=False)
+    decision = Column(String(255), nullable=False)
+    best_issue_number = Column(Integer, nullable=True)
+    best_issue_title = Column(String(500), nullable=True)
+    best_issue_url = Column(String(500), nullable=True)
+    difficulty = Column(String(100), nullable=True)
+    merge_probability = Column(String(100), nullable=True)
+    maintainer_activity_signal = Column(String(255), nullable=True)
+    recent_activity_signal = Column(String(255), nullable=True)
+    commercial_signal = Column(String(255), nullable=True)
+    paid_sprint_signal = Column(String(255), nullable=True)
+    public_reason = Column(String(500), nullable=False)
+    source_snapshot = Column(JSON, nullable=False)
+    analyzed_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    first_seen_at = Column(DateTime(timezone=True), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    interactions = relationship("UserOpportunityInteraction", back_populates="feed_item")
+
+
+class UserOpportunityInteraction(Base):
+    __tablename__ = "user_opportunity_interactions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "feed_item_id", "action", name="uq_user_feed_item_action"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    feed_item_id = Column(Integer, ForeignKey("opportunity_feed_items.id"), nullable=False, index=True)
+    action = Column(String(50), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="opportunity_interactions")
+    feed_item = relationship("OpportunityFeedItem", back_populates="interactions")

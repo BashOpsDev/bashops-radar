@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Daily Opportunities | BashOps Radar{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex,nofollow">{% endblock %}
+{% block content %}
+<main class="daily-page opportunity-dashboard-page">
+    <section class="daily-hero">
+        <div>
+            <span class="section-label">Daily Decision Dashboard</span>
+            <h1>What deserves your attention today?</h1>
+            <p>A small ranked set of proof-of-work opportunities, separated from your private Radar pipeline.</p>
+        </div>
+        <form method="post" action="/dashboard/opportunities/refresh" class="daily-refresh-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="nav-outline compact">Refresh Opportunities</button>
+            <small>{{ "6-hour" if has_pro_access else "24-hour" }} manual refresh window</small>
+        </form>
+    </section>
+
+    {% if notice %}<p class="form-error">{{ notice }}</p>{% endif %}
+    {% if freshness.is_stale or refresh_status in ["stale", "unavailable"] %}
+    <p class="daily-disclaimer">The latest cached opportunities are shown because fresh GitHub data is temporarily unavailable.</p>
+    {% endif %}
+
+    {% if not profile %}
+    <section class="daily-profile-cta">
+        <div>
+            <span class="section-label">Generic Ranking</span>
+            <h2>Generate your Developer Profile to personalize these recommendations.</h2>
+            <p>Profile matching uses only deterministic public language and contribution-category evidence.</p>
+        </div>
+        <a href="/developer?source=today" class="nav-cta compact">Generate Developer Profile</a>
+    </section>
+    {% endif %}
+
+    <section class="daily-board">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">Today's Best Matches</span>
+                <h2>{{ recommendation_limit }} focused recommendations</h2>
+            </div>
+            {% if not has_pro_access %}<a href="/pricing?source=opportunity" class="secondary-link">See more with Pro</a>{% endif %}
+        </div>
+        {% if recommendations %}
+        <div class="daily-opportunity-list">
+            {% set show_user_actions = true %}
+            {% for rec in recommendations %}{% include "components/opportunity_card.html" %}{% endfor %}
+        </div>
+        {% else %}
+        <div class="daily-empty"><h2>No active matches are available.</h2><p>Dismissed items cool down for {{ 14 }} days. Try again after the next refresh.</p></div>
+        {% endif %}
+    </section>
+
+    {% if new_since_visit %}
+    <section class="daily-compact-section">
+        <span class="section-label">New Since Your Last Visit</span>
+        <div class="daily-compact-list">
+            {% for rec in new_since_visit %}<a href="{{ rec.item.repository_url }}" target="_blank" rel="noopener noreferrer">{{ rec.item.repository_full_name }} <span>{{ rec.item.radar_score|int }}/100 Radar</span></a>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if saved_items %}
+    <section class="daily-compact-section">
+        <span class="section-label">Saved Opportunities</span>
+        <div class="daily-compact-list">
+            {% for item in saved_items %}<a href="{{ item.repository_url }}" target="_blank" rel="noopener noreferrer">{{ item.repository_full_name }} <span>{{ item.radar_score|int }}/100 Radar</span></a>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if recently_viewed %}
+    <section class="daily-compact-section">
+        <span class="section-label">Recently Viewed</span>
+        <div class="daily-compact-list">
+            {% for item in recently_viewed %}<a href="{{ item.repository_url }}" target="_blank" rel="noopener noreferrer">{{ item.repository_full_name }} <span>{{ item.primary_language }}</span></a>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+document.querySelectorAll("[data-opportunity-action]").forEach(function (element) {
+    element.addEventListener("click", function () {
+        const body = new URLSearchParams({
+            action: element.dataset.opportunityAction,
+            csrf_token: {{ csrf_token | tojson }}
+        });
+        fetch(element.dataset.opportunityUrl, {
+            method: "POST",
+            body: body,
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            credentials: "same-origin",
+            keepalive: true
+        }).catch(function () {});
+    });
+});
+</script>
+{% endblock %}

@@ -313,3 +313,37 @@ def discover_opportunities(category_value: str, limit: int = 8):
         "category": category,
         "results": results,
     }
+
+
+def discover_candidate_repositories(category_values=None, limit: int = 12):
+    """Return a bounded repository candidate pool without assigning a Radar score.
+
+    The daily feed uses this as its cheap discovery stage, then runs the existing
+    canonical Radar analysis only for the small set it chooses to persist.
+    """
+    requested = list(category_values or [item["value"] for item in DISCOVERY_CATEGORIES[:4]])
+    selected = [_category_by_value(value) for value in requested[:4]]
+    limit = max(1, min(int(limit or 12), 20))
+    per_category = max(2, (limit + len(selected) - 1) // max(len(selected), 1))
+    candidates = []
+    seen = set()
+
+    for category in selected:
+        for issue in _search_issues(category, limit=per_category):
+            full_name = _repo_full_name(issue)
+            normalized = full_name.casefold()
+            if not full_name or normalized in seen:
+                continue
+            seen.add(normalized)
+            candidates.append(
+                {
+                    "repository_full_name": full_name,
+                    "repository_url": f"https://github.com/{full_name}",
+                    "source_category": category["value"],
+                    "source_issue_url": issue.get("html_url") or "",
+                }
+            )
+            if len(candidates) >= limit:
+                return candidates
+
+    return candidates

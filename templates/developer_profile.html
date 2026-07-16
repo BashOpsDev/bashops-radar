@@ -204,15 +204,29 @@
 
     <section class="developer-opportunities card-flat" aria-labelledby="next-opportunities-title">
         <div>
-            <span class="section-label">Recommended Next Step</span>
+            <span class="section-label">Recommended Next Opportunities</span>
             <h2 id="next-opportunities-title">Find repositories matching these signals</h2>
-            <p>
-                Use Radar's existing Opportunity Finder to search for contribution targets aligned with
-                {% if strengths.languages %}{{ strengths.languages[:3] | map(attribute="label") | join(", ") }}{% else %}your public repository activity{% endif %}.
-                BashOps does not present these as confirmed jobs.
-            </p>
+            <p>Recommendations are deterministic contribution matches, not confirmed jobs, contracts, or payments.</p>
         </div>
+        {% if opportunity_recommendations %}
+        <div class="developer-feed-recommendations">
+            {% for rec in opportunity_recommendations %}
+            <article>
+                <div><strong>{{ rec.item.repository_full_name }}</strong><span>{{ rec.item.radar_score|int }}/100 Radar</span></div>
+                {% if rec.match_score is not none %}<small>{{ rec.match_score }}/100 profile match signal</small>{% endif %}
+                {% if rec.match_reasons %}<p>{{ rec.match_reasons | join(" · ") }}</p>{% endif %}
+                <a href="/dashboard/opportunities" data-profile-action="opportunity_clicked">Review opportunity</a>
+            </article>
+            {% endfor %}
+        </div>
+        <a class="nav-cta compact" href="/dashboard/opportunities" data-profile-action="opportunity_clicked">Open Daily Opportunities</a>
+        {% else %}
+        <p>
+            Use Radar's existing Opportunity Finder to search for contribution targets aligned with
+            {% if strengths.languages %}{{ strengths.languages[:3] | map(attribute="label") | join(", ") }}{% else %}your public repository activity{% endif %}.
+        </p>
         <a class="nav-cta compact" href="/discover" data-profile-action="opportunity_clicked">Open Opportunity Finder</a>
+        {% endif %}
     </section>
 
     <section class="developer-share card-flat" aria-labelledby="share-title">

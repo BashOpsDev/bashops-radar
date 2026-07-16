@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Today's GitHub Opportunities | BashOps Radar{% endblock %}
+{% block extra_head %}
+    <meta name="description" content="A bounded daily report of public GitHub repositories with current proof-of-work, maintainer-activity, and contribution signals.">
+    <link rel="canonical" href="{{ site_url }}/today">
+    <meta property="og:title" content="Today's GitHub Opportunities | BashOps Radar">
+    <meta property="og:description" content="Review a small daily set of evidence-backed public GitHub contribution opportunities.">
+    <meta property="og:url" content="{{ site_url }}/today">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Today's GitHub Opportunities | BashOps Radar">
+    <meta name="twitter:description" content="Evidence-backed public GitHub contribution opportunities, refreshed from a bounded candidate pool.">
+{% endblock %}
+{% block content %}
+<main class="daily-page">
+    <section class="daily-hero">
+        <div>
+            <span class="section-label">Daily Opportunity Report</span>
+            <h1>Today's GitHub Opportunities</h1>
+            <p>A focused set of public repositories where current activity and issue signals may support stronger proof-of-work.</p>
+        </div>
+        <div class="daily-freshness">
+            <span>{{ today.strftime('%B %d, %Y') }}</span>
+            <strong>
+                {% if freshness.last_updated %}Updated {{ freshness.last_updated.strftime('%H:%M UTC') }}{% else %}Waiting for the first refresh{% endif %}
+            </strong>
+            {% if freshness.is_stale or refresh_status in ["stale", "unavailable"] %}
+            <small>GitHub is temporarily unavailable. The latest cached report is shown.</small>
+            {% endif %}
+        </div>
+    </section>
+
+    <p class="daily-disclaimer">These are contribution signals and estimates, not confirmed jobs, contracts, merges, payments, or maintainer responses.</p>
+
+    <section class="daily-summary" aria-label="Daily opportunity summary">
+        <div><span>Opportunities</span><strong>{{ summary.opportunity_count }}</strong></div>
+        <div><span>Languages</span><strong>{{ summary.language_count }}</strong></div>
+        <div><span>Active-maintenance signals</span><strong>{{ summary.active_maintenance_count }}</strong></div>
+        <div><span>Beginner-friendly signals</span><strong>{{ summary.beginner_friendly_count }}</strong></div>
+        <div><span>Commercial metadata signals</span><strong>{{ summary.commercial_signal_count }}</strong></div>
+    </section>
+
+    <section class="daily-board">
+        <div class="section-heading-row">
+            <div>
+                <span class="section-label">Featured Opportunities</span>
+                <h2>What deserves attention today</h2>
+            </div>
+        </div>
+        {% if recommendations %}
+        <div class="daily-opportunity-list">
+            {% set show_user_actions = false %}
+            {% for rec in recommendations %}{% include "components/opportunity_card.html" %}{% endfor %}
+        </div>
+        {% else %}
+        <div class="daily-empty">
+            <h2>The daily candidate pool is being refreshed.</h2>
+            <p>No safe public opportunities are cached yet. You can still analyze a repository directly with Radar.</p>
+            <a href="/" class="nav-cta compact">Analyze a Repository</a>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="daily-cta">
+        <div>
+            <span class="section-label">Personalize the Signal</span>
+            <h2>Match opportunities to your public contribution evidence.</h2>
+            <p>Generate a Developer Profile or create an account for deterministic language and contribution-category matching.</p>
+        </div>
+        <div class="daily-cta-actions">
+            <a href="/developer?source=today" class="nav-cta compact">Generate Developer Profile</a>
+            {% if current_user %}
+            <a href="/dashboard/opportunities" class="nav-outline compact">Open My Matches</a>
+            {% else %}
+            <a href="/register?next=/dashboard/opportunities" class="nav-outline compact">Create Account</a>
+            {% endif %}
+            <a href="/pricing?source=opportunity" class="secondary-link">Explore Radar Pro</a>
+        </div>
+    </section>
+</main>
+{% endblock %}

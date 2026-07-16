@@ -1,0 +1,95 @@
+{% set item = rec.item %}
+<article class="daily-opportunity-card">
+    <div class="daily-opportunity-heading">
+        <div>
+            <span class="status-badge">{{ item.primary_language or "Language unavailable" }}</span>
+            <h3>{{ item.repository_full_name }}</h3>
+        </div>
+        <div class="daily-score-group">
+            <span class="daily-score"><strong>{{ item.radar_score|int }}</strong><small>/100 Radar</small></span>
+            {% if rec.match_score is not none %}
+            <span class="daily-match"><strong>{{ rec.match_score }}</strong><small>/100 match signal</small></span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if item.description %}<p class="daily-description">{{ item.description }}</p>{% endif %}
+
+    <div class="daily-signal-grid">
+        <div>
+            <span>Why today</span>
+            <strong>{{ item.public_reason }}</strong>
+        </div>
+        <div>
+            <span>Maintenance</span>
+            <strong>{{ item.maintainer_activity_signal }}</strong>
+        </div>
+        <div>
+            <span>Merge estimate</span>
+            <strong>{{ item.merge_probability or "Unavailable" }}</strong>
+        </div>
+        <div>
+            <span>Difficulty estimate</span>
+            <strong>{{ item.difficulty or "Unavailable" }}</strong>
+        </div>
+    </div>
+
+    {% if rec.match_reasons %}
+    <div class="daily-reasons">
+        <span>Why this matches you</span>
+        <ul>
+            {% for reason in rec.match_reasons %}<li>{{ reason }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if rec.changes %}
+    <div class="daily-change-list">
+        <span>Recently changed</span>
+        {% for change in rec.changes %}<small>{{ change }}</small>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if item.best_issue_title %}
+    <div class="daily-best-issue">
+        <span>Recommended issue</span>
+        <strong>#{{ item.best_issue_number }} {{ item.best_issue_title }}</strong>
+    </div>
+    {% else %}
+    <p class="daily-unavailable">A ranked public issue was not available in the latest analysis.</p>
+    {% endif %}
+
+    <p class="daily-commercial">{{ item.paid_sprint_signal }}</p>
+
+    <div class="daily-opportunity-actions">
+        <a href="{{ item.repository_url }}" target="_blank" rel="noopener noreferrer"
+           {% if current_user %}data-opportunity-action="repository_opened" data-opportunity-url="/dashboard/opportunities/{{ item.id }}/view"{% endif %}>
+            Open repository
+        </a>
+        {% if item.best_issue_url %}
+        <a href="{{ item.best_issue_url }}" target="_blank" rel="noopener noreferrer"
+           {% if current_user %}data-opportunity-action="issue_opened" data-opportunity-url="/dashboard/opportunities/{{ item.id }}/view"{% endif %}>
+            Open issue
+        </a>
+        {% endif %}
+        <form method="post" action="/analyze">
+            <input type="hidden" name="repo_url" value="{{ item.repository_url }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="link-button"
+                    {% if current_user %}data-opportunity-action="analyzed" data-opportunity-url="/dashboard/opportunities/{{ item.id }}/view"{% endif %}>
+                Analyze with Radar
+            </button>
+        </form>
+        {% if show_user_actions %}
+        <form method="post" action="/dashboard/opportunities/{{ item.id }}/save">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="link-button">Save</button>
+        </form>
+        <form method="post" action="/dashboard/opportunities/{{ item.id }}/dismiss">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="link-button muted">Dismiss</button>
+        </form>
+        {% endif %}
+    </div>
+    <small class="daily-analyzed-at">Last analyzed {{ item.analyzed_at.strftime('%Y-%m-%d %H:%M UTC') if item.analyzed_at else "Unavailable" }}</small>
+</article>

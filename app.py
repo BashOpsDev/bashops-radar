@@ -20,7 +20,14 @@ from sqlalchemy.orm import Session
 import requests
 
 from database import SessionLocal
-from models import DeveloperProfile, Event, MaintainerAnalysis, Target, User
+from models import (
+    DeveloperProfile,
+    Event,
+    MaintainerAnalysis,
+    OpportunityFeedItem,
+    Target,
+    User,
+)
 from auth import (
     hash_password,
     verify_password,
@@ -49,6 +56,22 @@ from developer_profile_service import (
     DeveloperProfileError,
     analyze_developer_profile,
     normalize_github_username,
+)
+from opportunity_service import (
+    DISMISS_COOLDOWN_DAYS,
+    FREE_RECOMMENDATION_LIMIT,
+    PRO_RECOMMENDATION_LIMIT,
+    PUBLIC_RECOMMENDATION_LIMIT,
+    OpportunityFeedError,
+    can_save_more,
+    feed_freshness,
+    interaction_ids,
+    load_feed_items,
+    ranked_recommendations,
+    recently_viewed_items,
+    refresh_opportunity_feed,
+    saved_items,
+    upsert_interaction,
 )
 import config
 
@@ -669,6 +692,7 @@ def sitemap_xml():
         "/tools/github-opportunity-score",
         "/tools/best-first-issue-finder",
         "/developer",
+        "/today",
         "/login",
         "/register",
         "/terms",
@@ -762,9 +786,11 @@ def export_pipeline(request: Request):
 
 
 @app.get("/pricing", response_class=HTMLResponse)
-def pricing(request: Request):
+def pricing(request: Request, source: str = ""):
     current_user = get_current_user(request)
     track_event(request, "pricing_view", user=current_user)
+    if source == "opportunity":
+        track_event(request, "opportunity_upgrade_clicked", user=current_user)
     return templates.TemplateResponse(
         request=request,
         name="pricing.html",
@@ -1283,7 +1309,9 @@ def best_first_issue_finder_tool(request: Request):
 
 
 @app.get("/developer", response_class=HTMLResponse)
-def developer_profile_landing(request: Request):
+def developer_profile_landing(request: Request, source: str = ""):
+    if source == "today":
+        track_event(request, "opportunity_profile_cta_clicked", user=get_current_user(request))
     return render_developer_landing(request)
 
 
@@ -1429,6 +1457,11 @@ def developer_profile_view(request: Request, github_username: str):
             "profile_public_url": f"{config.SITE_URL.rstrip('/')}/developer/{profile.public_slug}",
             "notice": request.session.pop("developer_profile_notice", ""),
             "site_url": config.SITE_URL,
+            "opportunity_recommendations": ranked_recommendations(
+                load_feed_items(db),
+                profile,
+                limit=3,
+            ),
         }
         profile_context["linkedin_share_url"] = "https://www.linkedin.com/sharing/share-offsite/?" + urlencode(
             {"url": profile_context["profile_public_url"]}
@@ -1619,6 +1652,237 @@ def developer_profile_event(
         db.close()
     track_event(request, event_name, user=get_current_user(request))
     return JSONResponse({"ok": True})
+
+
+def _opportunity_refresh_status():
+    try:
+        return refresh_opportunity_feed(force=False)
+    except Exception:
+        return {"status": "unavailable", "updated": 0, "failed": 0}
+
+
+@app.get("/today", response_class=HTMLResponse)
+def public_opportunities_today(request: Request):
+    current_user = get_current_user(request)
+    refresh_status = _opportunity_refresh_status()
+    db: Session = SessionLocal()
+    try:
+        items = load_feed_items(db)
+        recommendations = ranked_recommendations(items, limit=PUBLIC_RECOMMENDATION_LIMIT)
+        freshness = feed_freshness(items)
+    finally:
+        db.close()
+
+    languages = sorted(
+        {value["item"].primary_language for value in recommendations if value["item"].primary_language}
+    )
+    summary = {
+        "opportunity_count": len(recommendations),
+        "language_count": len(languages),
+        "active_maintenance_count": sum(
+            "High" in (value["item"].maintainer_activity_signal or "")
+            for value in recommendations
+        ),
+        "beginner_friendly_count": sum(
+            "Good First Issue" in (value["item"].categories or [])
+            for value in recommendations
+        ),
+        "commercial_signal_count": sum(
+            (value["item"].paid_sprint_signal or "").startswith("Potential")
+            for value in recommendations
+        ),
+    }
+    track_event(request, "public_today_viewed", user=current_user, metadata={"result_count": len(recommendations)})
+    return templates.TemplateResponse(
+        request=request,
+        name="today.html",
+        context={
+            "recommendations": recommendations,
+            "summary": summary,
+            "languages": languages,
+            "freshness": freshness,
+            "refresh_status": refresh_status["status"],
+            "today": now_utc().date(),
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.get("/dashboard/opportunities", response_class=HTMLResponse)
+def opportunity_dashboard(request: Request, refresh: str = ""):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url=auth_url("/login", "/dashboard/opportunities"), status_code=303)
+
+    refresh_status = _opportunity_refresh_status()
+    db: Session = SessionLocal()
+    try:
+        profile = db.query(DeveloperProfile).filter(DeveloperProfile.user_id == current_user.id).first()
+        items = load_feed_items(db)
+        dismissed = interaction_ids(
+            db,
+            current_user.id,
+            "dismissed",
+            since=now_utc() - timedelta(days=DISMISS_COOLDOWN_DAYS),
+        )
+        limit = PRO_RECOMMENDATION_LIMIT if has_pro_access(current_user) else FREE_RECOMMENDATION_LIMIT
+        recommendations = ranked_recommendations(items, profile, limit=limit, dismissed_ids=dismissed)
+        saved = saved_items(db, current_user.id, limit=limit)
+        recently_viewed = recently_viewed_items(db, current_user.id)
+        freshness = feed_freshness(items)
+    finally:
+        db.close()
+
+    previous_visit = request.session.get("opportunity_dashboard_last_visit")
+    previous_visit_at = None
+    try:
+        previous_visit_at = datetime.fromisoformat(previous_visit) if previous_visit else None
+        if previous_visit_at and previous_visit_at.tzinfo is None:
+            previous_visit_at = previous_visit_at.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        previous_visit_at = None
+    new_since_visit = [
+        value for value in recommendations
+        if previous_visit_at is None or _aware_utc(value["item"].first_seen_at) > previous_visit_at
+    ]
+    request.session["opportunity_dashboard_last_visit"] = now_utc().isoformat()
+    notice = request.session.pop("opportunity_dashboard_notice", "")
+    track_event(
+        request,
+        "opportunity_dashboard_viewed",
+        user=current_user,
+        metadata={"result_count": len(recommendations), "personalized": bool(profile)},
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="opportunity_dashboard.html",
+        context={
+            "recommendations": recommendations,
+            "new_since_visit": new_since_visit[:5],
+            "saved_items": saved,
+            "recently_viewed": recently_viewed,
+            "profile": profile,
+            "freshness": freshness,
+            "refresh_status": refresh or refresh_status["status"],
+            "notice": notice,
+            "recommendation_limit": limit,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+def _opportunity_action_context(request: Request, item_id: int, csrf_token: str):
+    current_user = get_current_user(request)
+    if not current_user:
+        return None, None, RedirectResponse(url=auth_url("/login", "/dashboard/opportunities"), status_code=303)
+    if not check_csrf(request, csrf_token):
+        return None, None, HTMLResponse("Your session expired. Please try again.", status_code=403)
+    db: Session = SessionLocal()
+    item = db.query(OpportunityFeedItem).filter(OpportunityFeedItem.id == item_id).first()
+    if not item:
+        db.close()
+        return None, None, HTMLResponse("That opportunity is no longer available.", status_code=404)
+    return current_user, (db, item), None
+
+
+@app.post("/dashboard/opportunities/{item_id}/save")
+def opportunity_save(request: Request, item_id: int, csrf_token: str = Form("")):
+    current_user, state, response = _opportunity_action_context(request, item_id, csrf_token)
+    if response:
+        return response
+    db, item = state
+    try:
+        if not can_save_more(db, current_user.id, has_pro_access(current_user)):
+            request.session["opportunity_dashboard_notice"] = "Your saved opportunity limit is reached."
+        else:
+            upsert_interaction(db, current_user.id, item.id, "saved")
+            track_event(request, "opportunity_saved", user=current_user, metadata={"item_id": item.id})
+    finally:
+        db.close()
+    return RedirectResponse(url="/dashboard/opportunities", status_code=303)
+
+
+@app.post("/dashboard/opportunities/{item_id}/dismiss")
+def opportunity_dismiss(request: Request, item_id: int, csrf_token: str = Form("")):
+    current_user, state, response = _opportunity_action_context(request, item_id, csrf_token)
+    if response:
+        return response
+    db, item = state
+    try:
+        upsert_interaction(db, current_user.id, item.id, "dismissed")
+        track_event(request, "opportunity_dismissed", user=current_user, metadata={"item_id": item.id})
+    finally:
+        db.close()
+    return RedirectResponse(url="/dashboard/opportunities", status_code=303)
+
+
+@app.post("/dashboard/opportunities/{item_id}/view")
+def opportunity_view(
+    request: Request,
+    item_id: int,
+    action: str = Form("viewed"),
+    csrf_token: str = Form(""),
+):
+    current_user, state, response = _opportunity_action_context(request, item_id, csrf_token)
+    if response:
+        return response
+    action_events = {
+        "viewed": "opportunity_item_viewed",
+        "repository_opened": "opportunity_repository_opened",
+        "issue_opened": "opportunity_issue_opened",
+        "analyzed": "opportunity_analyze_clicked",
+    }
+    event_name = action_events.get(action)
+    if not event_name:
+        state[0].close()
+        return JSONResponse({"error": "invalid action"}, status_code=400)
+    db, item = state
+    try:
+        upsert_interaction(db, current_user.id, item.id, action)
+        track_event(request, event_name, user=current_user, metadata={"item_id": item.id})
+    finally:
+        db.close()
+    return JSONResponse({"ok": True})
+
+
+@app.post("/dashboard/opportunities/refresh")
+def opportunity_refresh(request: Request, csrf_token: str = Form("")):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url=auth_url("/login", "/dashboard/opportunities"), status_code=303)
+    if not check_csrf(request, csrf_token):
+        return HTMLResponse("Your session expired. Please try again.", status_code=403)
+    cooldown_hours = 6 if has_pro_access(current_user) else 24
+    last_refresh = request.session.get("opportunity_refresh_requested_at")
+    try:
+        last_refresh_at = datetime.fromisoformat(last_refresh) if last_refresh else None
+        if last_refresh_at and last_refresh_at.tzinfo is None:
+            last_refresh_at = last_refresh_at.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        last_refresh_at = None
+    if last_refresh_at and last_refresh_at > now_utc() - timedelta(hours=cooldown_hours):
+        request.session["opportunity_dashboard_notice"] = (
+            f"A manual refresh is available every {cooldown_hours} hours on your current plan."
+        )
+        return RedirectResponse(url="/dashboard/opportunities?refresh=rate_limited", status_code=303)
+
+    request.session["opportunity_refresh_requested_at"] = now_utc().isoformat()
+    track_event(request, "opportunity_refresh_requested", user=current_user)
+    try:
+        result = refresh_opportunity_feed(force=True)
+    except Exception:
+        result = {"status": "unavailable", "updated": 0, "failed": 0}
+    event_name = "opportunity_refresh_completed" if result["status"] == "refreshed" else "opportunity_refresh_failed"
+    track_event(
+        request,
+        event_name,
+        user=current_user,
+        metadata={"status": result["status"], "updated": result["updated"]},
+    )
+    return RedirectResponse(url=f"/dashboard/opportunities?refresh={result['status']}", status_code=303)
 
 
 @app.get("/discover", response_class=HTMLResponse)
