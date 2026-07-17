@@ -12,10 +12,11 @@
 <meta property="og:description" content="{{ strengths.narrative }}">
 <meta property="og:type" content="profile">
 <meta property="og:url" content="{{ profile_public_url }}">
-{% if profile.avatar_url %}<meta property="og:image" content="{{ profile.avatar_url }}">{% endif %}
-<meta name="twitter:card" content="summary">
+{% if is_indexable %}<meta property="og:image" content="{{ profile_card_url }}">{% elif profile.avatar_url %}<meta property="og:image" content="{{ profile.avatar_url }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ profile.display_name }} (@{{ profile.github_username }}) | BashOps">
 <meta name="twitter:description" content="Public GitHub contribution evidence analyzed by BashOps Radar.">
+{% if is_indexable %}<meta name="twitter:image" content="{{ profile_card_url }}">{% endif %}
 {% endblock %}
 {% block content %}
 <main class="developer-page developer-profile">
@@ -219,22 +220,41 @@
             </article>
             {% endfor %}
         </div>
-        <a class="nav-cta compact" href="/dashboard/opportunities" data-profile-action="opportunity_clicked">Open Daily Opportunities</a>
+        {% if is_indexable %}
+        <div class="share-card-preview">
+            <img src="/developer/{{ profile.public_slug }}/recommendation-card" alt="Top repository recommendation share card" width="1200" height="630">
+            <div class="developer-share-actions">
+                <a class="nav-outline compact" href="/developer/{{ profile.public_slug }}/recommendation-card?download=true">Download recommendation SVG</a>
+                <button type="button" class="nav-outline compact" data-copy-value="{{ profile_recommendation_card_url }}" data-public-event="share_copy">Copy recommendation image URL</button>
+            </div>
+        </div>
+        {% endif %}
+        <a class="nav-cta compact" href="/dashboard/opportunities" data-profile-action="opportunity_clicked">Find My Next Repository</a>
         {% else %}
         <p>
             Use Radar's existing Opportunity Finder to search for contribution targets aligned with
             {% if strengths.languages %}{{ strengths.languages[:3] | map(attribute="label") | join(", ") }}{% else %}your public repository activity{% endif %}.
         </p>
-        <a class="nav-cta compact" href="/discover" data-profile-action="opportunity_clicked">Open Opportunity Finder</a>
+        <a class="nav-cta compact" href="/dashboard/opportunities" data-profile-action="opportunity_clicked">Find My Next Repository</a>
         {% endif %}
     </section>
 
     <section class="developer-share card-flat" aria-labelledby="share-title">
         <div><span class="section-label">Share</span><h2 id="share-title">Share the public evidence</h2></div>
+        {% if is_indexable %}
+        <div class="share-card-preview">
+            <img src="/developer/{{ profile.public_slug }}/card" alt="{{ profile.display_name }} proof-of-work share card" width="1200" height="630">
+        </div>
+        {% endif %}
         <div class="developer-share-actions">
             <button type="button" class="nav-outline compact" data-copy-value="{{ profile_public_url }}" data-profile-action="link_copied">Copy profile link</button>
-            <a class="nav-outline compact" href="{{ linkedin_share_url }}" target="_blank" rel="noopener noreferrer" data-profile-action="linkedin">Share on LinkedIn</a>
-            <a class="nav-outline compact" href="{{ x_share_url }}" target="_blank" rel="noopener noreferrer" data-profile-action="x">Share on X</a>
+            {% if is_indexable %}<a class="nav-cta compact" href="/developer/{{ profile.public_slug }}">View Live Profile</a>{% endif %}
+            {% if is_indexable %}
+            <a class="nav-outline compact" href="/developer/{{ profile.public_slug }}/card?download=true">Download profile SVG</a>
+            <button type="button" class="nav-outline compact" data-copy-value="{{ profile_card_url }}" data-public-event="share_copy">Copy image URL</button>
+            {% endif %}
+            <a class="nav-outline compact" href="{{ linkedin_share_url }}" target="_blank" rel="noopener noreferrer" data-public-event="share_linkedin">Share on LinkedIn</a>
+            <a class="nav-outline compact" href="{{ x_share_url }}" target="_blank" rel="noopener noreferrer" data-public-event="share_x">Share on X</a>
         </div>
         {% if not profile.is_public %}<small>This temporary profile is noindex. Only the verified owner can publish it.</small>{% endif %}
     </section>
@@ -256,8 +276,21 @@
             credentials: "same-origin"
         }).catch(function () {});
     }
+    function trackPublic(action) {
+        if (!csrf || !action) return;
+        const body = new URLSearchParams({action: action, surface: "profile", csrf_token: csrf.value});
+        fetch("/public/event", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: body.toString(),
+            credentials: "same-origin"
+        }).catch(function () {});
+    }
     document.querySelectorAll("[data-profile-action]").forEach(function (element) {
         element.addEventListener("click", function () { track(element.dataset.profileAction); });
+    });
+    document.querySelectorAll("[data-public-event]").forEach(function (element) {
+        element.addEventListener("click", function () { trackPublic(element.dataset.publicEvent); });
     });
     document.querySelectorAll("[data-copy-target], [data-copy-value]").forEach(function (button) {
         button.addEventListener("click", function () {

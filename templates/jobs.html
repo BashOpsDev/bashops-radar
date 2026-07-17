@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Today's Open Source Jobs and Paid OSS Opportunities | BashOps Radar{% endblock %}
+{% block extra_head %}
+<meta name="description" content="Explore evidence-backed open-source contribution opportunities with signals for paid sprints, founder conversations, freelance work, and strong first issues.">
+<link rel="canonical" href="{{ site_url }}/jobs">
+<meta property="og:title" content="Today's Open Source Jobs | BashOps Radar">
+<meta property="og:description" content="A curated daily view of GitHub repositories with evidence-backed proof-of-work and paid-sprint potential signals.">
+<meta property="og:url" content="{{ site_url }}/jobs">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Today's Open Source Jobs | BashOps Radar">
+<meta name="twitter:description" content="Research open-source freelance opportunities, GitHub sprint opportunities, and repositories worth contributing to.">
+<script type="application/ld+json">{{ jobs_json_ld | tojson }}</script>
+{% endblock %}
+{% block content %}
+<main class="jobs-page">
+    <header class="jobs-hero">
+        <div>
+            <span class="section-label">Daily OSS Opportunity Briefing</span>
+            <h1>Today's Open Source Jobs</h1>
+            <p>Scan the strongest current GitHub opportunities by paid-sprint potential, merge probability, contributor fit, and technical category.</p>
+        </div>
+        <div class="jobs-freshness">
+            <strong>{{ result_count }} cached {% if result_count == 1 %}opportunity{% else %}opportunities{% endif %}</strong>
+            <span>{% if freshness.last_updated %}Last refreshed {{ freshness.last_updated.strftime('%Y-%m-%d at %H:%M UTC') }}{% else %}Waiting for the first feed refresh{% endif %}</span>
+            {% if freshness.is_stale or refresh_status in ["stale", "unavailable"] %}<small>The latest safe cached results are shown.</small>{% endif %}
+        </div>
+    </header>
+
+    <p class="jobs-disclaimer">These are contribution and opportunity signals, not confirmed jobs, contracts, payments, merge outcomes, or maintainer intent.</p>
+
+    {% if sections %}
+    <nav class="jobs-category-nav" aria-label="Opportunity categories">
+        {% for section in sections %}
+        <a href="#{{ section.key }}" data-public-event="jobs_category" data-event-detail="{{ section.key }}">{{ section.title }}</a>
+        {% endfor %}
+    </nav>
+
+    {% for section in sections %}
+    <section class="jobs-section" id="{{ section.key }}" aria-labelledby="{{ section.key }}-title">
+        <div class="section-heading-row">
+            <div><span class="section-label">Open Source Opportunities</span><h2 id="{{ section.key }}-title">{{ section.title }}</h2></div>
+            <span>{{ section["items"] | length }} {% if section["items"] | length == 1 %}repository{% else %}repositories{% endif %}</span>
+        </div>
+        <div class="jobs-grid">
+            {% for item in section["items"] %}
+            <article class="jobs-card">
+                <div class="jobs-card-heading">
+                    <div><span>{{ item.language }}</span><h3>{{ item.repository }}</h3></div>
+                    <strong>{{ item.radar_score }}/100</strong>
+                </div>
+                <p>{{ item.reason }}</p>
+                <dl class="jobs-metrics">
+                    <div><dt>Difficulty</dt><dd>{{ item.difficulty }}</dd></div>
+                    <div><dt>Merge probability</dt><dd>{{ item.merge_probability }}</dd></div>
+                    <div><dt>Contract potential</dt><dd>{{ item.contract_potential }}</dd></div>
+                    <div><dt>Updated</dt><dd>{{ item.analyzed_at[:10] if item.analyzed_at else "Unavailable" }}</dd></div>
+                </dl>
+                {% if item.best_issue %}
+                <div class="jobs-issue"><span>Best first issue</span><a href="{{ item.best_issue.url }}" target="_blank" rel="noopener noreferrer" data-public-event="jobs_repository" data-event-detail="{{ item.repository }}">#{{ item.best_issue.number }} {{ item.best_issue.title }}</a></div>
+                {% endif %}
+                <div class="jobs-actions">
+                    <form method="post" action="/analyze" data-public-event="jobs_analyze" data-event-detail="{{ item.repository }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" name="repo_url" value="{{ item.repository_url }}">
+                        <button type="submit" class="nav-cta compact">View Opportunity Analysis</button>
+                    </form>
+                    <a href="{{ item.repository_url }}" target="_blank" rel="noopener noreferrer" data-public-event="jobs_repository" data-event-detail="{{ item.repository }}">Open repository</a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+    {% else %}
+    <section class="daily-empty">
+        <h2>The opportunity cache is being refreshed.</h2>
+        <p>Analyze a repository directly while the bounded public feed becomes available.</p>
+        <a class="nav-cta compact" href="/">Analyze a Repository</a>
+    </section>
+    {% endif %}
+
+    <section class="jobs-profile-cta card-flat">
+        <div><span class="section-label">Personalize the Feed</span><h2>Match opportunities to your GitHub proof-of-work.</h2><p>A Developer Profile adds deterministic language and contribution-category match reasons.</p></div>
+        <a class="nav-cta compact" href="/developer?source=jobs" data-public-event="jobs_profile">Generate Developer Profile</a>
+    </section>
+</main>
+<input type="hidden" id="jobsEventCsrf" value="{{ csrf_token }}">
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+    const csrf = document.getElementById("jobsEventCsrf");
+    document.querySelectorAll("[data-public-event]").forEach(function (element) {
+        element.addEventListener("click", function () {
+            if (!csrf) return;
+            const body = new URLSearchParams({
+                action: element.dataset.publicEvent,
+                surface: "jobs",
+                detail: element.dataset.eventDetail || "",
+                csrf_token: csrf.value
+            });
+            fetch("/public/event", {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: body.toString(),
+                credentials: "same-origin",
+                keepalive: true
+            }).catch(function () {});
+        });
+    });
+})();
+</script>
+{% endblock %}

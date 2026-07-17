@@ -73,8 +73,9 @@ def test_homepage_links_to_free_developer_tools(client):
     assert "Free Developer Tools" in r.text
     assert 'href="/tools/github-opportunity-score"' in r.text
     assert 'href="/tools/best-first-issue-finder"' in r.text
-    assert "Repository Health Checker" in r.text
-    assert "Should I Contribute Here?" in r.text
+    assert 'href="/developer"' in r.text
+    assert 'href="/jobs"' in r.text
+    assert "Chrome Extension" in r.text
 
 
 def test_radar_product_navigation_and_maintainer_promotion_follow_feature_flag(client, monkeypatch):

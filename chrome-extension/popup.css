@@ -1,0 +1,39 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f5f7fa;
+  background: #071018;
+}
+
+* { box-sizing: border-box; }
+body { width: 360px; margin: 0; background: #071018; }
+main { padding: 16px; }
+header { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid #2d3946; }
+header > div { display: grid; gap: 2px; }
+header small, p, dt, .stale { color: #9eb0c0; }
+.logo { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #ff9800; border-radius: 50%; color: #ff9800; font-weight: 700; }
+.state, #summary { padding-top: 16px; }
+h1 { margin: 5px 0 10px; font-size: 19px; overflow-wrap: anywhere; }
+p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; }
+.eyebrow { color: #ffad2f; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.repo-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.repo-heading > strong { flex: 0 0 auto; padding: 8px; border: 1px solid #ff9800; border-radius: 6px; color: #ffad2f; }
+.decision { color: #dce6ee; }
+.decision span { color: #9eb0c0; font-size: 11px; text-transform: uppercase; }
+.decision p { margin: 4px 0 0; color: #dce6ee; }
+.why { margin-top: 12px; padding: 10px; border-left: 3px solid #ff9800; background: #0c151f; }
+.why > span { color: #9eb0c0; font-size: 11px; text-transform: uppercase; }
+.why ul { display: grid; gap: 5px; margin: 7px 0 0; padding-left: 18px; color: #dce6ee; font-size: 13px; line-height: 1.4; }
+dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+dl div { padding: 10px; border: 1px solid #2d3946; border-radius: 6px; background: #0c151f; }
+dt { font-size: 11px; text-transform: uppercase; }
+dd { margin: 4px 0 0; font-size: 14px; font-weight: 700; }
+.issue { display: grid; gap: 4px; margin: 12px 0; padding: 10px; border-left: 3px solid #ff9800; background: #0c151f; }
+.issue span { color: #9eb0c0; font-size: 11px; text-transform: uppercase; }
+.issue a { color: #f5f7fa; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.primary, .secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 700; text-decoration: none; }
+.primary { color: #071018; background: #ff9800; }
+.secondary { color: #f5f7fa; border: 1px solid #2d3946; }
+.stale { display: block; margin-top: 10px; font-size: 11px; }
+[hidden] { display: none !important; }

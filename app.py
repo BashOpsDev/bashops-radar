@@ -8,6 +8,7 @@ from typing import Optional
 from urllib.parse import unquote, urlencode, urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -45,7 +46,7 @@ from analytics import (
 )
 import paddle_billing
 import email_utils
-from analysis_service import build_analysis_result, to_public_api_payload
+from analysis_service import build_analysis_result, contract_potential, to_public_api_payload
 from discovery_service import DiscoveryError, category_options, discover_opportunities
 from maintainer_schemas import MaintainerReport
 from maintainer_service import ANALYSIS_VERSION as MAINTAINER_ANALYSIS_VERSION
@@ -64,15 +65,19 @@ from opportunity_service import (
     PUBLIC_RECOMMENDATION_LIMIT,
     OpportunityFeedError,
     can_save_more,
+    curated_opportunity_sections,
     feed_freshness,
     interaction_ids,
     load_feed_items,
+    normalize_repository_full_name,
     ranked_recommendations,
+    public_opportunity_payload,
     recently_viewed_items,
     refresh_opportunity_feed,
     saved_items,
     upsert_interaction,
 )
+from share_card_service import render_developer_profile_card, render_opportunity_card
 import config
 
 try:
@@ -94,6 +99,14 @@ if not SECRET_KEY:
     )
 
 app = FastAPI(title="BashOps Radar")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^chrome-extension://[a-p]{32}$",
+    allow_credentials=False,
+    allow_methods=["GET"],
+    allow_headers=["Accept"],
+)
 
 
 def session_cookie_https_only(site_url: str) -> bool:
@@ -693,6 +706,7 @@ def sitemap_xml():
         "/tools/best-first-issue-finder",
         "/developer",
         "/today",
+        "/jobs",
         "/login",
         "/register",
         "/terms",
@@ -732,10 +746,12 @@ def sitemap_xml():
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, source: str = "", vscode_interest: str = ""):
+def home(request: Request, source: str = "", vscode_interest: str = "", repo_url: str = ""):
     current_user = get_current_user(request)
     if source == "maintainer":
         track_event(request, "maintainer_to_radar_clicked", user=current_user)
+    elif source == "extension-analyze":
+        track_event(request, "extension_analyze_click", user=current_user)
     track_event(request, "landing_view", user=current_user)
     return templates.TemplateResponse(
         request=request,
@@ -745,6 +761,7 @@ def home(request: Request, source: str = "", vscode_interest: str = ""):
             "error": None,
             "limit_reached": False,
             "site_url": config.SITE_URL,
+            "repo_url": repo_url if source == "extension-analyze" else "",
             "pro_price": config.PRO_PRICE_USD,
             "vscode_interest_status": vscode_interest if vscode_interest in {"joined", "already", "error"} else "",
             "has_vscode_interest": user_has_vscode_interest(current_user),
@@ -1455,6 +1472,8 @@ def developer_profile_view(request: Request, github_username: str):
             "is_indexable": is_indexable,
             "is_pro_view": pro_view,
             "profile_public_url": f"{config.SITE_URL.rstrip('/')}/developer/{profile.public_slug}",
+            "profile_card_url": f"{config.SITE_URL.rstrip('/')}/developer/{profile.public_slug}/card",
+            "profile_recommendation_card_url": f"{config.SITE_URL.rstrip('/')}/developer/{profile.public_slug}/recommendation-card",
             "notice": request.session.pop("developer_profile_notice", ""),
             "site_url": config.SITE_URL,
             "opportunity_recommendations": ranked_recommendations(
@@ -1484,6 +1503,62 @@ def developer_profile_view(request: Request, github_username: str):
             **csrf_context(request),
         },
     )
+
+
+def _svg_card_response(content: str, filename: str, download: bool) -> Response:
+    headers = {"Cache-Control": "public, max-age=900"}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return Response(content=content, media_type="image/svg+xml", headers=headers)
+
+
+@app.get("/developer/{github_username}/card")
+def developer_profile_card(request: Request, github_username: str, download: bool = False):
+    try:
+        normalized_username = normalize_github_username(github_username)
+    except DeveloperProfileError:
+        raise HTTPException(status_code=404, detail="Developer profile not found.")
+    db: Session = SessionLocal()
+    try:
+        profile = developer_profile_by_username(db, normalized_username)
+        if not profile or not profile.is_claimed or not profile.is_public:
+            raise HTTPException(status_code=404, detail="Developer profile not found.")
+        card = render_developer_profile_card(profile)
+        filename = f"bashops-{profile.public_slug}-profile.svg"
+    finally:
+        db.close()
+    track_event(request, "share_download" if download else "share_card_generated", user=get_current_user(request))
+    return _svg_card_response(card, filename, download)
+
+
+@app.get("/developer/{github_username}/recommendation-card")
+def developer_profile_recommendation_card(request: Request, github_username: str, download: bool = False):
+    try:
+        normalized_username = normalize_github_username(github_username)
+    except DeveloperProfileError:
+        raise HTTPException(status_code=404, detail="Developer profile not found.")
+    db: Session = SessionLocal()
+    try:
+        profile = developer_profile_by_username(db, normalized_username)
+        if not profile or not profile.is_claimed or not profile.is_public:
+            raise HTTPException(status_code=404, detail="Developer profile not found.")
+        recommendations = ranked_recommendations(load_feed_items(db), profile, limit=1)
+        if not recommendations:
+            raise HTTPException(status_code=404, detail="No cached recommendation is available.")
+        recommendation = recommendations[0]
+        item = recommendation["item"]
+        card = render_opportunity_card(
+            item,
+            contract_potential=contract_potential(int(round(item.radar_score))),
+            heading="Your Next OSS Opportunity",
+            reason=" | ".join(recommendation.get("match_reasons") or [item.public_reason]),
+            destination=f"bashops.site/developer/{profile.public_slug}",
+        )
+        filename = f"bashops-{profile.public_slug}-recommendation.svg"
+    finally:
+        db.close()
+    track_event(request, "share_download" if download else "share_card_generated", user=get_current_user(request))
+    return _svg_card_response(card, filename, download)
 
 
 def _developer_profile_action_context(request: Request, github_username: str, csrf_token: str):
@@ -1662,8 +1737,10 @@ def _opportunity_refresh_status():
 
 
 @app.get("/today", response_class=HTMLResponse)
-def public_opportunities_today(request: Request):
+def public_opportunities_today(request: Request, source: str = ""):
     current_user = get_current_user(request)
+    if source == "extension":
+        track_event(request, "extension_open_radar", user=current_user)
     refresh_status = _opportunity_refresh_status()
     db: Session = SessionLocal()
     try:
@@ -1704,10 +1781,169 @@ def public_opportunities_today(request: Request):
             "refresh_status": refresh_status["status"],
             "today": now_utc().date(),
             "site_url": config.SITE_URL,
+            "today_card_url": f"{config.SITE_URL.rstrip('/')}/today/card",
+            "today_linkedin_share_url": "https://www.linkedin.com/sharing/share-offsite/?" + urlencode(
+                {"url": f"{config.SITE_URL.rstrip('/')}/today"}
+            ),
+            "today_x_share_url": "https://twitter.com/intent/tweet?" + urlencode(
+                {
+                    "url": f"{config.SITE_URL.rstrip('/')}/today",
+                    "text": "Today's evidence-backed open-source opportunities from BashOps Radar.",
+                }
+            ),
             **user_context(request, current_user),
             **csrf_context(request),
         },
     )
+
+
+@app.get("/today/card")
+def public_opportunities_today_card(request: Request, download: bool = False):
+    db: Session = SessionLocal()
+    try:
+        recommendations = ranked_recommendations(load_feed_items(db), limit=1)
+        if not recommendations:
+            raise HTTPException(status_code=404, detail="No cached opportunity is available.")
+        item = recommendations[0]["item"]
+        card = render_opportunity_card(
+            item,
+            contract_potential=contract_potential(int(round(item.radar_score))),
+            potential_label="Paid Sprint Potential",
+            destination="bashops.site/today",
+        )
+    finally:
+        db.close()
+    track_event(request, "share_download" if download else "share_card_generated", user=get_current_user(request))
+    return _svg_card_response(card, "bashops-today-opportunity.svg", download)
+
+
+@app.get("/api/public/repository-summary")
+def public_repository_summary(request: Request, owner: str, repo: str):
+    track_event(request, "extension_open", user=get_current_user(request))
+    try:
+        full_name = normalize_repository_full_name(f"{owner}/{repo}")
+    except OpportunityFeedError:
+        return JSONResponse({"available": False, "error": "invalid repository"}, status_code=400)
+    track_event(request, "extension_repository", user=get_current_user(request), metadata={"repository": full_name})
+    db: Session = SessionLocal()
+    try:
+        item = (
+            db.query(OpportunityFeedItem)
+            .filter(
+                OpportunityFeedItem.is_active.is_(True),
+                func.lower(OpportunityFeedItem.repository_full_name) == full_name.casefold(),
+            )
+            .first()
+        )
+        if not item:
+            analyze_url = f"{config.SITE_URL.rstrip('/')}/?" + urlencode(
+                {"source": "extension-analyze", "repo_url": f"https://github.com/{full_name}"}
+            )
+            return JSONResponse(
+                {"available": False, "repository": full_name, "analyze_url": analyze_url},
+                status_code=404,
+                headers={"Cache-Control": "public, max-age=60"},
+            )
+        payload = public_opportunity_payload(item)
+    finally:
+        db.close()
+    payload.update(
+        {
+            "available": True,
+            "open_radar_url": f"{config.SITE_URL.rstrip('/')}/today?source=extension",
+            "analyze_url": f"{config.SITE_URL.rstrip('/')}/?" + urlencode(
+                {"source": "extension-analyze", "repo_url": f"https://github.com/{full_name}"}
+            ),
+        }
+    )
+    return JSONResponse(payload, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/jobs", response_class=HTMLResponse)
+def public_oss_opportunities(request: Request):
+    current_user = get_current_user(request)
+    refresh_status = _opportunity_refresh_status()
+    db: Session = SessionLocal()
+    try:
+        items = load_feed_items(db)
+        sections = [
+            {
+                "key": section["key"],
+                "title": section["title"],
+                "items": [public_opportunity_payload(item) for item in section["items"]],
+            }
+            for section in curated_opportunity_sections(items)
+        ]
+        freshness = feed_freshness(items)
+    finally:
+        db.close()
+    result_count = len({item["repository"] for section in sections for item in section["items"]})
+    track_event(request, "jobs_view", user=current_user, metadata={"result_count": result_count})
+    jobs_json_ld = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "Today's Open Source Opportunities",
+        "description": "Evidence-backed GitHub repositories for proof-of-work, paid sprint, and founder conversation research.",
+        "numberOfItems": result_count,
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": index,
+                "name": item["repository"],
+                "url": item["repository_url"],
+            }
+            for index, item in enumerate(
+                next((section["items"] for section in sections if section["key"] == "trending"), []),
+                start=1,
+            )
+        ],
+    }
+    return templates.TemplateResponse(
+        request=request,
+        name="jobs.html",
+        context={
+            "sections": sections,
+            "freshness": freshness,
+            "refresh_status": refresh_status["status"],
+            "result_count": result_count,
+            "jobs_json_ld": jobs_json_ld,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+            **csrf_context(request),
+        },
+    )
+
+
+@app.post("/public/event")
+def public_distribution_event(
+    request: Request,
+    action: str = Form(...),
+    surface: str = Form(""),
+    detail: str = Form(""),
+    csrf_token: str = Form(""),
+):
+    if not check_csrf(request, csrf_token):
+        return JSONResponse({"error": "invalid session"}, status_code=403)
+    allowed_events = {
+        "share_linkedin": "share_linkedin",
+        "share_x": "share_x",
+        "share_copy": "share_copy",
+        "jobs_category": "jobs_category",
+        "jobs_repository": "jobs_repository",
+        "jobs_analyze": "jobs_analyze",
+        "jobs_profile": "jobs_profile",
+    }
+    event_name = allowed_events.get(action)
+    if not event_name or surface not in {"profile", "today", "jobs"}:
+        return JSONResponse({"error": "invalid action"}, status_code=400)
+    safe_detail = detail[:100] if re.fullmatch(r"[A-Za-z0-9_. /-]{0,100}", detail or "") else ""
+    track_event(
+        request,
+        event_name,
+        user=get_current_user(request),
+        metadata={"surface": surface, "detail": safe_detail},
+    )
+    return JSONResponse({"ok": True})
 
 
 @app.get("/dashboard/opportunities", response_class=HTMLResponse)

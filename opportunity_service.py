@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func
 
-from analysis_service import build_analysis_result
+from analysis_service import build_analysis_result, contract_potential
 from database import SessionLocal
 from discovery_service import DiscoveryError, discover_candidate_repositories
 from models import OpportunityFeedItem, Target, UserOpportunityInteraction
@@ -364,6 +364,92 @@ def feed_freshness(items: list[OpportunityFeedItem], reference_time=None) -> dic
     latest = max((aware_utc(item.analyzed_at) for item in items if item.analyzed_at), default=None)
     stale = bool(items) and not any(aware_utc(item.expires_at) > reference_time for item in items)
     return {"last_updated": latest, "is_stale": stale}
+
+
+def public_opportunity_payload(item: OpportunityFeedItem, reference_time=None) -> dict:
+    """Expose the bounded cached summary used by public distribution surfaces."""
+    reference_time = reference_time or now_utc()
+    expires_at = aware_utc(item.expires_at)
+    analyzed_at = aware_utc(item.analyzed_at)
+    return {
+        "repository": item.repository_full_name,
+        "repository_url": item.repository_url,
+        "language": item.primary_language or "Unavailable",
+        "radar_score": int(round(item.radar_score)),
+        "decision": item.decision,
+        "best_issue": {
+            "number": item.best_issue_number,
+            "title": item.best_issue_title,
+            "url": item.best_issue_url,
+        } if item.best_issue_number else None,
+        "difficulty": item.difficulty or "Unavailable",
+        "merge_probability": item.merge_probability or "Unavailable",
+        "contract_potential": contract_potential(int(round(item.radar_score))),
+        "maintainer_activity": item.maintainer_activity_signal or "Unavailable",
+        "reason": item.public_reason,
+        "categories": list(item.categories or []),
+        "topics": list(item.topics or []),
+        "analyzed_at": analyzed_at.isoformat() if analyzed_at else None,
+        "is_stale": bool(expires_at and expires_at <= reference_time),
+    }
+
+
+def curated_opportunity_sections(items, limit=5) -> list[dict]:
+    """Group the existing ranked feed for acquisition pages without rescoring it."""
+    limit = max(1, min(int(limit or 5), 5))
+
+    def searchable(item):
+        values = [item.primary_language, *(item.categories or []), *(item.topics or [])]
+        return " ".join(str(value or "") for value in values).casefold()
+
+    def matches(item, *terms):
+        text = searchable(item)
+        return any(
+            re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", text)
+            for term in terms
+        )
+
+    def selected(predicate):
+        return [item for item in items if predicate(item)][:limit]
+
+    definitions = [
+        ("trending", "Today's Best Opportunities", lambda item: True),
+        (
+            "paid-sprint",
+            "Highest Paid Sprint Potential",
+            lambda item: contract_potential(int(round(item.radar_score))) == "High"
+            or (item.paid_sprint_signal or "").startswith("Potential"),
+        ),
+        (
+            "founder-friendly",
+            "Founder Friendly",
+            lambda item: "high" in (item.maintainer_activity_signal or "").casefold()
+            and "unavailable" not in (item.commercial_signal or "").casefold(),
+        ),
+        (
+            "fast-merge",
+            "Fast Merge Opportunities",
+            lambda item: (item.merge_probability or "").casefold() == "high",
+        ),
+        (
+            "great-first-contribution",
+            "Great First Contribution",
+            lambda item: (item.difficulty or "").casefold() in {"easy", "low"}
+            or matches(item, "good first issue"),
+        ),
+        ("ai", "AI", lambda item: matches(item, "ai", "machine learning")),
+        ("backend", "Backend", lambda item: matches(item, "backend", "api", "fastapi")),
+        ("devops", "DevOps", lambda item: matches(item, "devops", "ci/cd", "ci", "deployment")),
+        ("infrastructure", "Infrastructure", lambda item: matches(item, "infrastructure", "cloud", "kubernetes", "docker")),
+        ("python", "Python", lambda item: (item.primary_language or "").casefold() == "python"),
+        ("frontend", "Frontend", lambda item: matches(item, "frontend", "react", "typescript", "javascript")),
+    ]
+    sections = []
+    for key, title, predicate in definitions:
+        section_items = selected(predicate)
+        if section_items:
+            sections.append({"key": key, "title": title, "items": section_items})
+    return sections
 
 
 def profile_match(item: OpportunityFeedItem, profile) -> tuple[int | None, list[str]]:

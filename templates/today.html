@@ -7,9 +7,11 @@
     <meta property="og:description" content="Review a small daily set of evidence-backed public GitHub contribution opportunities.">
     <meta property="og:url" content="{{ site_url }}/today">
     <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary">
+    <meta property="og:image" content="{{ today_card_url }}">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Today's GitHub Opportunities | BashOps Radar">
     <meta name="twitter:description" content="Evidence-backed public GitHub contribution opportunities, refreshed from a bounded candidate pool.">
+    <meta name="twitter:image" content="{{ today_card_url }}">
 {% endblock %}
 {% block content %}
 <main class="daily-page">
@@ -29,6 +31,24 @@
             {% endif %}
         </div>
     </section>
+
+    {% if recommendations %}
+    <section class="daily-share card-flat" aria-labelledby="daily-share-title">
+        <div>
+            <span class="section-label">Share Today's Signal</span>
+            <h2 id="daily-share-title">Send the top cached opportunity to your network.</h2>
+        </div>
+        <div class="share-card-preview">
+            <img src="/today/card" alt="Today's top BashOps Radar opportunity share card" width="1200" height="630">
+        </div>
+        <div class="developer-share-actions">
+            <a class="nav-outline compact" href="/today/card?download=true">Download SVG</a>
+            <button type="button" class="nav-outline compact" data-copy-value="{{ today_card_url }}" data-public-event="share_copy">Copy image URL</button>
+            <a class="nav-outline compact" href="{{ today_linkedin_share_url }}" target="_blank" rel="noopener noreferrer" data-public-event="share_linkedin">Share on LinkedIn</a>
+            <a class="nav-outline compact" href="{{ today_x_share_url }}" target="_blank" rel="noopener noreferrer" data-public-event="share_x">Share on X</a>
+        </div>
+    </section>
+    {% endif %}
 
     <p class="daily-disclaimer">These are contribution signals and estimates, not confirmed jobs, contracts, merges, payments, or maintainer responses.</p>
 
@@ -78,4 +98,30 @@
         </div>
     </section>
 </main>
+<input type="hidden" id="todayShareCsrf" value="{{ csrf_token }}">
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+    const csrf = document.getElementById("todayShareCsrf");
+    function track(action) {
+        if (!csrf || !action) return;
+        const body = new URLSearchParams({action: action, surface: "today", csrf_token: csrf.value});
+        fetch("/public/event", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: body.toString(),
+            credentials: "same-origin"
+        }).catch(function () {});
+    }
+    document.querySelectorAll("[data-public-event]").forEach(function (element) {
+        element.addEventListener("click", function () { track(element.dataset.publicEvent); });
+    });
+    document.querySelectorAll("[data-copy-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            if (navigator.clipboard) navigator.clipboard.writeText(button.dataset.copyValue).catch(function () {});
+        });
+    });
+})();
+</script>
 {% endblock %}

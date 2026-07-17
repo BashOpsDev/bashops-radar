@@ -28,7 +28,7 @@
 
             <form id="analyze" method="post" action="/analyze">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input name="repo_url" placeholder="Paste GitHub repo URL..." required>
+                <input name="repo_url" value="{{ repo_url or '' }}" placeholder="Paste GitHub repo URL..." required>
                 <button type="submit">Find My Next Opportunity</button>
             </form>
         </div>
@@ -89,6 +89,21 @@
                 <span>Find the strongest issue to start with in a repository you already know.</span>
                 <em>Open Tool</em>
             </a>
+            <a class="tool-card" href="/developer">
+                <strong>Developer Proof-of-Work</strong>
+                <span>Turn public GitHub activity into a shareable evidence-based developer profile.</span>
+                <em>Build Profile</em>
+            </a>
+            <a class="tool-card" href="/jobs">
+                <strong>Daily OSS Jobs</strong>
+                <span>Scan current repositories by paid-sprint potential, merge probability, and contributor fit.</span>
+                <em>View Opportunities</em>
+            </a>
+            <a class="tool-card" href="https://github.com/BashOpsDev/bashops-radar/tree/main/chrome-extension" target="_blank" rel="noopener noreferrer">
+                <strong>Chrome Extension</strong>
+                <span>Check cached opportunity signals while viewing a public GitHub repository.</span>
+                <em>Developer Preview</em>
+            </a>
             {% if maintainer_enabled %}
             <a class="tool-card" href="/tools/github-maintainer-workload-report">
                 <strong>GitHub Maintainer Workload Report</strong>
@@ -96,16 +111,6 @@
                 <em>Open Tool</em>
             </a>
             {% endif %}
-            <div class="tool-card muted">
-                <strong>Repository Health Checker</strong>
-                <span>Coming soon: review activity, issue quality, and maintainer signals before contributing.</span>
-                <em>Coming Soon</em>
-            </div>
-            <div class="tool-card muted">
-                <strong>Should I Contribute Here?</strong>
-                <span>Coming soon: get a practical yes/no read before investing time in a repository.</span>
-                <em>Coming Soon</em>
-            </div>
         </div>
     </section>
 

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BashOps Radar</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header><span class="logo">&gt;_</span><div><strong>BashOps Radar</strong><small>Cached repository intelligence</small></div></header>
+    <section id="loading" class="state" aria-live="polite">Checking this GitHub repository...</section>
+    <section id="unsupported" class="state" hidden>
+      <h1>Open a repository</h1>
+      <p>BashOps Radar works on public GitHub repository pages such as <code>github.com/org/repo</code>.</p>
+      <a class="secondary" href="https://bashops.site/today?source=extension" target="_blank" rel="noopener noreferrer">Open Today's Opportunities</a>
+    </section>
+    <section id="unavailable" class="state" hidden>
+      <span class="eyebrow">Not cached yet</span>
+      <h1 id="unavailableRepo">Repository</h1>
+      <p>Run the full analysis on BashOps Radar to generate current opportunity signals.</p>
+      <div class="actions"><a id="analyzeUnavailable" class="primary" target="_blank" rel="noopener noreferrer">Analyze on BashOps Radar</a><a class="secondary" href="https://bashops.site/today?source=extension" target="_blank" rel="noopener noreferrer">Today's Opportunities</a></div>
+    </section>
+    <section id="summary" hidden>
+      <div class="repo-heading"><div><span class="eyebrow">Cached Radar summary</span><h1 id="repository">Repository</h1></div><strong id="score">--</strong></div>
+      <div class="decision"><span>Worth contributing?</span><p id="decision"></p></div>
+      <div class="why"><span>Why?</span><ul id="whyList"></ul></div>
+      <dl>
+        <div><dt>Difficulty</dt><dd id="difficulty">--</dd></div>
+        <div><dt>Merge probability</dt><dd id="mergeProbability">--</dd></div>
+      </dl>
+      <div id="bestIssue" class="issue" hidden><span>Best first issue</span><a id="bestIssueLink" target="_blank" rel="noopener noreferrer"></a></div>
+      <div class="actions"><a id="analyze" class="primary" target="_blank" rel="noopener noreferrer">Analyze</a><a id="openRadar" class="secondary" target="_blank" rel="noopener noreferrer">Open Today's Opportunities</a></div>
+      <small id="stale" class="stale" hidden>This cached summary may be stale.</small>
+    </section>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

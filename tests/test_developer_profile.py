@@ -540,8 +540,8 @@ def test_profile_portfolio_fallback_recommendation_and_free_pro_boundaries(clien
     free_page = client.get("/developer/dev-user")
     assert "Open-source contribution summary" in free_page.text
     assert "Copy portfolio summary" in free_page.text
-    assert 'href="/discover"' in free_page.text
-    assert "Open Opportunity Finder" in free_page.text
+    assert 'href="/dashboard/opportunities"' in free_page.text
+    assert "Find My Next Repository" in free_page.text
     assert "View deeper Pro history" in free_page.text
     assert free_page.text.count("Open contribution") == 12
 

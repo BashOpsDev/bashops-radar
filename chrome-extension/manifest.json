@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "BashOps Radar",
+  "version": "0.1.0",
+  "description": "View cached BashOps Radar opportunity signals while browsing a GitHub repository.",
+  "host_permissions": [
+    "https://github.com/*",
+    "https://bashops.site/*"
+  ],
+  "action": {
+    "default_title": "BashOps Radar",
+    "default_popup": "popup.html"
+  }
+}
