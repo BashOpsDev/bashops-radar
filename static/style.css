@@ -4613,7 +4613,7 @@ button:focus-visible {
     outline-offset: 3px;
 }
 
-@media (min-width: 1181px) {
+@media (min-width: 1421px) {
     .nav-page-links,
     .nav-right {
         flex-wrap: nowrap;
@@ -4629,7 +4629,7 @@ button:focus-visible {
     }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1420px) {
     .nav-toggle {
         display: block;
     }
@@ -4680,6 +4680,38 @@ button:focus-visible {
     .maintainer-trial-actions > a {
         flex: 1 1 150px;
         text-align: center;
+    }
+}
+
+@media (min-width: 861px) and (max-width: 1420px) {
+    .nav-inner {
+        position: relative;
+        flex-wrap: nowrap;
+    }
+
+    .nav-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 24px;
+        width: min(360px, calc(100vw - 48px));
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: rgba(7, 9, 13, 0.98);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.38);
+    }
+
+    .nav-menu.open {
+        gap: 12px;
+    }
+
+    .nav-page-links {
+        gap: 2px;
+    }
+
+    .nav-page-links > a {
+        padding: 7px 10px;
+        border-radius: 6px;
     }
 }
 

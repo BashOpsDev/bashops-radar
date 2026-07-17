@@ -1,5 +1,6 @@
 import json
 import re
+import tomllib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -233,6 +234,16 @@ def test_extension_manifest_is_minimal_and_has_no_background_tracking():
     assert "Maintainers active" in popup
     assert "Open Today's Opportunities" in popup_html
     assert "localStorage" not in popup
+
+
+def test_railway_runs_migrations_before_deploy_and_laptop_nav_is_collapsed():
+    root = Path(__file__).resolve().parents[1]
+    railway_config = tomllib.loads((root / "railway.toml").read_text(encoding="utf-8"))
+    stylesheet = (root / "static" / "style.css").read_text(encoding="utf-8")
+    assert railway_config["deploy"]["preDeployCommand"] == ["alembic upgrade head"]
+    assert "@media (max-width: 1420px)" in stylesheet
+    assert "@media (min-width: 1421px)" in stylesheet
+    assert "@media (min-width: 861px) and (max-width: 1420px)" in stylesheet
 
 
 def test_extension_clickthrough_sources_are_tracked(client, monkeypatch):
