@@ -440,6 +440,9 @@ def test_dashboard_and_pricing_use_lifetime_trial_wording(client, monkeypatch):
 
     r = client.get("/pricing")
     assert "2 free analyses included" in r.text
+    assert "$29" in r.text
+    assert "$290" in r.text
+    assert "Save $58 annually" in r.text
     assert "2 analyses/day" not in r.text
 
 
@@ -1604,6 +1607,7 @@ def test_navbar_hides_admin_link_for_regular_users(client):
         ("free@example.com", "free", False, False),
         ("maintainer@example.com", "free", True, False),
         ("pro@example.com", "pro", False, True),
+        ("radar-pro@example.com", "radar_pro", False, True),
         ("bashops1@gmail.com", "free", False, True),
     ],
 )
@@ -1632,7 +1636,7 @@ def test_pipeline_csv_export_uses_radar_pro_entitlement(
         assert response.status_code == 303
         assert response.headers["location"] == "/pricing"
         pricing = client.get(response.headers["location"])
-        assert 'href="/billing/upgrade"' in pricing.text
+        assert 'href="/billing/upgrade?billing_period=monthly"' in pricing.text
 
 
 def test_pipeline_displays_twenty_newest_targets(client):
@@ -1809,12 +1813,12 @@ def test_webhook_rejects_bad_signature(client):
 
 
 def test_webhook_transaction_completed_upgrades_user(client, monkeypatch):
-    import config
+    import pricing
     from database import SessionLocal
     from models import User
 
-    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
-    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
+    monkeypatch.setattr(pricing, "PADDLE_RADAR_MONTHLY_PRICE_ID", "pri_radar")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_MONTHLY_PRICE_ID", "pri_maintainer")
 
     _register_and_login(client)
 
@@ -1840,18 +1844,18 @@ def test_webhook_transaction_completed_upgrades_user(client, monkeypatch):
 
     db = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
-    assert user.plan == "pro"
+    assert user.plan == "radar_pro"
     assert user.paddle_customer_id == "ctm_x"
     db.close()
 
 
 def test_webhook_subscription_canceled_downgrades_user(client, monkeypatch):
-    import config
+    import pricing
     from database import SessionLocal
     from models import User
 
-    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
-    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
+    monkeypatch.setattr(pricing, "PADDLE_RADAR_MONTHLY_PRICE_ID", "pri_radar")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_MONTHLY_PRICE_ID", "pri_maintainer")
 
     _register_and_login(client)
 
@@ -1883,17 +1887,23 @@ def test_webhook_subscription_canceled_downgrades_user(client, monkeypatch):
 
 def test_radar_checkout_keeps_radar_price_when_maintainer_price_is_configured(client, monkeypatch):
     import config
+    import pricing
 
     monkeypatch.setattr(config, "PADDLE_CLIENT_TOKEN", "test_client_token")
-    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
-    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
-    monkeypatch.setattr(config, "paddle_configured", True)
+    monkeypatch.setattr(pricing, "PADDLE_RADAR_MONTHLY_PRICE_ID", "pri_radar_monthly")
+    monkeypatch.setattr(pricing, "PADDLE_RADAR_ANNUAL_PRICE_ID", "pri_radar_annual")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_MONTHLY_PRICE_ID", "pri_maintainer_monthly")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_ANNUAL_PRICE_ID", "pri_maintainer_annual")
     _register_and_login(client)
 
-    response = client.get("/billing/upgrade")
-    assert response.status_code == 200
-    assert "pri_radar" in response.text
-    assert "pri_maintainer" not in response.text
+    monthly = client.get("/billing/upgrade?billing_period=monthly")
+    annual = client.get("/billing/upgrade?billing_period=annual")
+    assert monthly.status_code == 200
+    assert annual.status_code == 200
+    assert "pri_radar_monthly" in monthly.text
+    assert "pri_radar_annual" in annual.text
+    assert "pri_maintainer" not in monthly.text + annual.text
+    assert 'product_key: "radar"' in monthly.text
 
 
 # --- Error pages -----------------------------------------------------

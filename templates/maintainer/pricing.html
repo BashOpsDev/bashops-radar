@@ -1,19 +1,20 @@
 {% extends "maintainer/base.html" %}
-{% block title %}Maintainer Pilot Pricing - BashOps Maintainer{% endblock %}
+{% block title %}Maintainer Pro Pricing - BashOps Maintainer{% endblock %}
 {% block extra_head %}
-<meta name="description" content="BashOps Maintainer Pilot pricing for active open-source teams testing a faster issue-triage workflow.">
+<meta name="description" content="BashOps Maintainer Pro pricing for active open-source teams using a faster issue-triage workflow.">
 <link rel="canonical" href="{{ site_url }}/maintainer/pricing">
 {% endblock %}
 {% block content %}
 <main>
     <section class="pricing">
-        <span class="section-label">Validation Pilot</span>
-        <h1>Maintainer Pilot</h1>
+        <span class="section-label">Pricing</span>
+        <h1>Maintainer Pro</h1>
         <p>For active open-source teams testing a faster issue-triage workflow.</p>
         <div class="pricing-grid">
             <div class="pro">
-                <h2>Maintainer Pilot</h2>
-                <p class="price">${{ pilot_price }}<small>/month</small></p>
+                <h2>Maintainer Pro</h2>
+                <p class="price">${{ maintainer_monthly_price }}<small>/month</small></p>
+                <p class="angle">Or ${{ maintainer_annual_price }}/year. Save ${{ maintainer_annual_savings }} annually.</p>
                 <ul>
                     <li>Continued Maintainer report access</li>
                     <li>Issue classification</li>
@@ -27,7 +28,7 @@
                 {% if billing_error %}<div class="error">{{ billing_error }}</div>{% endif %}
                 {% if maintainer_access %}
                 <div class="success-card">
-                    <strong>Maintainer Pilot Active</strong>
+                    <strong>Maintainer Pro Active</strong>
                     {% if maintainer_subscription_status %}<p>Subscription status: {{ maintainer_subscription_status | replace('_', ' ') | title }}</p>{% endif %}
                 </div>
                 <div class="quick-actions">
@@ -46,11 +47,14 @@
                 <div class="angle"><strong>Billing temporarily unavailable</strong><p>Please try again later. Your Free Maintainer access remains available.</p></div>
                 {% else %}
                 <p class="angle">Continued report access subject to fair use.</p>
-                <a class="nav-cta" href="/maintainer/billing/upgrade">Upgrade to Maintainer Pilot &mdash; ${{ pilot_price }}/month</a>
+                <div class="quick-actions">
+                    <a class="nav-cta compact" href="/maintainer/billing/upgrade?billing_period=monthly">Monthly &mdash; ${{ maintainer_monthly_price }}</a>
+                    <a class="nav-outline compact" href="/maintainer/billing/upgrade?billing_period=annual">Annual &mdash; ${{ maintainer_annual_price }}</a>
+                </div>
                 {% endif %}
             </div>
         </div>
-        <div class="angle">Maintainer Pilot - ${{ pilot_price }}/month. No automatic GitHub actions or repository changes are included.</div>
+        <div class="angle">Maintainer Pro starts at ${{ maintainer_monthly_price }}/month. No automatic GitHub actions or repository changes are included.</div>
     </section>
 </main>
 {% endblock %}

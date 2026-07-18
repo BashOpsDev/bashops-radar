@@ -10,6 +10,7 @@ import requests
 from sqlalchemy import func
 
 import config
+import pricing
 from database import SessionLocal
 from models import User
 
@@ -166,19 +167,10 @@ def _price_ids(data: dict) -> set[str]:
 
 def _matched_products(data: dict) -> set[str]:
     price_ids = _price_ids(data)
-    known_prices = {
-        "radar": config.PADDLE_PRICE_ID,
-        "maintainer": config.PADDLE_MAINTAINER_PRICE_ID,
-    }
-    duplicate_prices = {
-        price_id
-        for price_id in known_prices.values()
-        if price_id and list(known_prices.values()).count(price_id) > 1
-    }
     return {
         product
-        for product, price_id in known_prices.items()
-        if price_id and price_id not in duplicate_prices and price_id in price_ids
+        for price_id, product in pricing.configured_price_products().items()
+        if price_id in price_ids
     }
 
 
@@ -210,9 +202,9 @@ def _apply_product_state(user: User, product: str, event_type: str, data: dict) 
         if status:
             user.subscription_status = status
         if grants_access:
-            user.plan = "pro"
+            user.plan = pricing.RADAR_PRO_PLAN
         elif removes_access:
-            user.plan = "free"
+            user.plan = pricing.FREE_PLAN
         return
 
     if subscription_id:

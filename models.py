@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from database import Base
+import pricing
 
 
 class User(Base):
@@ -12,7 +13,7 @@ class User(Base):
     name = Column(String(100))
     email = Column(String(255), unique=True, index=True)
     password_hash = Column(String(255))
-    plan = Column(String(50), default="free")
+    plan = Column(String(50), default=pricing.FREE_PLAN)
 
     email_verified = Column(Boolean, default=False, nullable=False)
     email_verification_token = Column(String(255), nullable=True, index=True)

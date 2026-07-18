@@ -14,8 +14,9 @@
     </div>
 
     <div class="pro">
-        <h2>Pro</h2>
-        <p class="price">${{ pro_price }}/month</p>
+        <h2>Radar Pro</h2>
+        <p class="price">${{ radar_monthly_price }}<small>/month</small></p>
+        <p class="angle">Or ${{ radar_annual_price }}/year. Save ${{ radar_annual_savings }} annually.</p>
         <p>Land paid developer contracts faster.</p>
         <ul>
             <li>Unlimited analyses</li>
@@ -29,7 +30,10 @@
         <a class="nav-cta compact" href="/dashboard">Open Dashboard</a>
         <a class="nav-outline compact" href="/billing/manage">Manage Billing</a>
         {% else %}
-        <a class="nav-cta compact" href="/billing/upgrade">Upgrade to Pro</a>
+        <div class="quick-actions">
+            <a class="nav-cta compact" href="/billing/upgrade?billing_period=monthly">Choose Monthly</a>
+            <a class="nav-outline compact" href="/billing/upgrade?billing_period=annual">Choose Annual</a>
+        </div>
         {% endif %}
     </div>
 

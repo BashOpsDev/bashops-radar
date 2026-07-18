@@ -20,8 +20,8 @@
 
         <div class="checkout-status-card">
             <span class="section-label">Checkout</span>
-            <h2>Starting Paddle checkout</h2>
-            <p>Complete checkout to start BashOps Radar Pro. Your plan activates after Paddle confirms payment.</p>
+            <h2>Starting {{ billing_period }} Paddle checkout</h2>
+            <p>Complete checkout for {% if billing_period == "annual" %}${{ radar_annual_price }}/year{% else %}${{ radar_monthly_price }}/month{% endif %}. Your plan activates after Paddle confirms payment.</p>
             <div class="quick-actions">
                 <a class="nav-cta compact" href="/pricing">Back to Pricing</a>
                 <a class="nav-outline compact" href="/dashboard">Dashboard</a>
@@ -40,7 +40,11 @@ Paddle.Initialize({ token: "{{ paddle_client_token }}" });
 Paddle.Checkout.open({
     items: [{ priceId: "{{ paddle_price_id }}", quantity: 1 }],
     customer: { email: {{ user_email | tojson }} },
-    customData: { user_id: {{ user_id | string | tojson }} },
+    customData: {
+        user_id: {{ user_id | string | tojson }},
+        product_key: "radar",
+        billing_period: {{ billing_period | tojson }}
+    },
     settings: {
         successUrl: {{ (site_url ~ "/billing/success") | tojson }},
         displayMode: "overlay"

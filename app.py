@@ -46,6 +46,7 @@ from analytics import (
 )
 import paddle_billing
 import email_utils
+import pricing
 from analysis_service import build_analysis_result, contract_potential, to_public_api_payload
 from discovery_service import DiscoveryError, category_options, discover_opportunities
 from maintainer_schemas import MaintainerReport
@@ -246,7 +247,13 @@ def has_owner_pro_override(user) -> bool:
 
 
 def has_pro_access(user) -> bool:
-    return bool(user and (user.plan == "pro" or has_owner_pro_override(user)))
+    return bool(
+        user
+        and (
+            user.plan in {pricing.RADAR_PRO_PLAN, pricing.LEGACY_RADAR_PRO_PLAN}
+            or has_owner_pro_override(user)
+        )
+    )
 
 
 def require_admin_or_redirect(request: Request, current_user):
@@ -270,7 +277,7 @@ def user_context(request: Request, current_user=None) -> dict:
         "current_user": current_user,
         "is_admin": is_admin(current_user),
         "has_pro_access": pro_access,
-        "effective_plan": "pro" if pro_access else "free",
+        "effective_plan": pricing.RADAR_PRO_PLAN if pro_access else pricing.FREE_PLAN,
         "maintainer_enabled": config.MAINTAINER_ENABLED,
     }
 
@@ -546,11 +553,21 @@ def maintainer_plan_context(user) -> str:
 def maintainer_template_context(request: Request, current_user=None) -> dict:
     if current_user is None:
         current_user = get_current_user(request)
+    maintainer_access = has_maintainer_access(current_user)
     return {
         **user_context(request, current_user),
-        "maintainer_access": has_maintainer_access(current_user),
-        "pilot_price": config.MAINTAINER_PILOT_PRICE_USD,
-        "maintainer_billing_available": config.maintainer_paddle_configured,
+        "maintainer_access": maintainer_access,
+        "maintainer_effective_plan": (
+            pricing.MAINTAINER_PRO_PLAN if maintainer_access else pricing.FREE_PLAN
+        ),
+        **pricing.template_context(),
+        "maintainer_billing_available": bool(
+            config.PADDLE_CLIENT_TOKEN
+            and (
+                pricing.PADDLE_MAINTAINER_MONTHLY_PRICE_ID
+                or pricing.PADDLE_MAINTAINER_ANNUAL_PRICE_ID
+            )
+        ),
         "maintainer_subscription_status": (
             getattr(current_user, "maintainer_subscription_status", None) if current_user else None
         ),
@@ -762,7 +779,7 @@ def home(request: Request, source: str = "", vscode_interest: str = "", repo_url
             "limit_reached": False,
             "site_url": config.SITE_URL,
             "repo_url": repo_url if source == "extension-analyze" else "",
-            "pro_price": config.PRO_PRICE_USD,
+            **pricing.template_context(),
             "vscode_interest_status": vscode_interest if vscode_interest in {"joined", "already", "error"} else "",
             "has_vscode_interest": user_has_vscode_interest(current_user),
             **user_context(request, current_user),
@@ -803,7 +820,7 @@ def export_pipeline(request: Request):
 
 
 @app.get("/pricing", response_class=HTMLResponse)
-def pricing(request: Request, source: str = ""):
+def pricing_page(request: Request, source: str = ""):
     current_user = get_current_user(request)
     track_event(request, "pricing_view", user=current_user)
     if source == "opportunity":
@@ -815,7 +832,7 @@ def pricing(request: Request, source: str = ""):
             "result": None,
             "error": None,
             "limit_reached": False,
-            "pro_price": config.PRO_PRICE_USD,
+            **pricing.template_context(),
             "billing_error": None,
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
@@ -1155,7 +1172,7 @@ def maintainer_pricing(request: Request):
 
 
 @app.get("/maintainer/billing/upgrade", response_class=HTMLResponse)
-def maintainer_billing_upgrade(request: Request):
+def maintainer_billing_upgrade(request: Request, billing_period: str = "monthly"):
     require_maintainer_enabled()
     current_user = get_current_user(request)
     if not current_user:
@@ -1168,14 +1185,16 @@ def maintainer_billing_upgrade(request: Request):
             request=request,
             name="maintainer/pricing.html",
             context={
-                "billing_error": "Verify your email before upgrading to Maintainer Pilot.",
+                "billing_error": "Verify your email before upgrading to Maintainer Pro.",
                 **maintainer_template_context(request, current_user),
             },
             status_code=403,
         )
     if has_maintainer_access(current_user):
         return RedirectResponse(url="/maintainer/dashboard", status_code=303)
-    if not config.maintainer_paddle_configured:
+    billing_period = billing_period if billing_period in {"monthly", "annual"} else "monthly"
+    paddle_price_id = pricing.price_id("maintainer", billing_period)
+    if not config.PADDLE_CLIENT_TOKEN or not paddle_price_id:
         return templates.TemplateResponse(
             request=request,
             name="maintainer/pricing.html",
@@ -1192,8 +1211,9 @@ def maintainer_billing_upgrade(request: Request):
         name="maintainer/checkout.html",
         context={
             "paddle_client_token": config.PADDLE_CLIENT_TOKEN,
-            "paddle_price_id": config.PADDLE_MAINTAINER_PRICE_ID,
+            "paddle_price_id": paddle_price_id,
             "paddle_env": config.PADDLE_ENV,
+            "billing_period": billing_period,
             "user_email": current_user.email,
             "user_id": current_user.id,
             **maintainer_template_context(request, current_user),
@@ -1262,7 +1282,7 @@ def github_opportunity_score_tool(request: Request):
         name="tool_github_opportunity_score.html",
         context={
             "site_url": config.SITE_URL,
-            "pro_price": config.PRO_PRICE_USD,
+            **pricing.template_context(),
             **user_context(request, current_user),
             **csrf_context(request),
         },
@@ -1318,7 +1338,7 @@ def best_first_issue_finder_tool(request: Request):
         name="tool_best_first_issue_finder.html",
         context={
             "site_url": config.SITE_URL,
-            "pro_price": config.PRO_PRICE_USD,
+            **pricing.template_context(),
             **user_context(request, current_user),
             **csrf_context(request),
         },
@@ -2800,8 +2820,18 @@ def admin_event_summary() -> dict:
                 {"label": "Upgrade Clicks Today", "value": 0},
                 {"label": "Checkout Starts Today", "value": 0},
                 {"label": "Checkout Completions Today", "value": 0},
-                {"label": "Free Users", "value": safe_count(db.query(User).filter(User.plan == "free"))},
-                {"label": "Pro Users", "value": safe_count(db.query(User).filter(User.plan == "pro"))},
+                {
+                    "label": "Free Users",
+                    "value": safe_count(db.query(User).filter(User.plan == pricing.FREE_PLAN)),
+                },
+                {
+                    "label": "Pro Users",
+                    "value": safe_count(
+                        db.query(User).filter(
+                            User.plan.in_([pricing.RADAR_PRO_PLAN, pricing.LEGACY_RADAR_PRO_PLAN])
+                        )
+                    ),
+                },
             ],
             "recent_events": [],
             "top_events": [],
@@ -2856,8 +2886,16 @@ def admin_event_summary() -> dict:
                 {"label": "Upgrade Clicks Today", "value": count_today("upgrade_clicked")},
                 {"label": "Checkout Starts Today", "value": count_today("checkout_started")},
                 {"label": "Checkout Completions Today", "value": count_today("checkout_completed")},
-                {"label": "Free Users", "value": db.query(User).filter(User.plan == "free").count()},
-                {"label": "Pro Users", "value": db.query(User).filter(User.plan == "pro").count()},
+                {
+                    "label": "Free Users",
+                    "value": db.query(User).filter(User.plan == pricing.FREE_PLAN).count(),
+                },
+                {
+                    "label": "Pro Users",
+                    "value": db.query(User)
+                    .filter(User.plan.in_([pricing.RADAR_PRO_PLAN, pricing.LEGACY_RADAR_PRO_PLAN]))
+                    .count(),
+                },
             ],
             "recent_events": [
                 {
@@ -2910,8 +2948,10 @@ def admin_users(request: Request):
         total_users = db.query(User).count()
         verified_users = db.query(User).filter(User.email_verified.is_(True)).count()
         marketing_users = db.query(User).filter(User.marketing_opt_in.is_(True)).count()
-        free_users = db.query(User).filter(User.plan == "free").count()
-        pro_users = db.query(User).filter(User.plan == "pro").count()
+        free_users = db.query(User).filter(User.plan == pricing.FREE_PLAN).count()
+        pro_users = db.query(User).filter(
+            User.plan.in_([pricing.RADAR_PRO_PLAN, pricing.LEGACY_RADAR_PRO_PLAN])
+        ).count()
         recent_signups = (
             db.query(User)
             .order_by(User.created_at.desc())
@@ -2992,7 +3032,7 @@ def saved_analysis(request: Request, target_id: int):
                 "limit_reached": False,
                 "from_discover": False,
                 "site_url": config.SITE_URL,
-                "pro_price": config.PRO_PRICE_USD,
+                **pricing.template_context(),
                 **user_context(request, current_user),
                 **csrf_context(request),
             },
@@ -3008,7 +3048,7 @@ def saved_analysis(request: Request, target_id: int):
                 "limit_reached": False,
                 "from_discover": False,
                 "site_url": config.SITE_URL,
-                "pro_price": config.PRO_PRICE_USD,
+                **pricing.template_context(),
                 **user_context(request, current_user),
                 **csrf_context(request),
             },
@@ -3185,7 +3225,7 @@ def analyze(
                     "limit_reached": False,
                     "from_discover": source == "discover",
                     "site_url": config.SITE_URL,
-                    "pro_price": config.PRO_PRICE_USD,
+                    **pricing.template_context(),
                     **user_context(request, current_user),
                     **csrf_context(request),
                 },
@@ -3216,7 +3256,7 @@ def analyze(
                     "verification_required": True,
                     "from_discover": source == "discover",
                     "site_url": config.SITE_URL,
-                    "pro_price": config.PRO_PRICE_USD,
+                    **pricing.template_context(),
                     **user_context(request, current_user),
                     **csrf_context(request),
                 },
@@ -3247,7 +3287,7 @@ def analyze(
                     "limit_type": limit_type,
                     "from_discover": source == "discover",
                     "site_url": config.SITE_URL,
-                    "pro_price": config.PRO_PRICE_USD,
+                    **pricing.template_context(),
                     **user_context(request, current_user),
                     **csrf_context(request),
                 },
@@ -3325,7 +3365,7 @@ def analyze(
                 "limit_reached": False,
                 "from_discover": source == "discover",
                 "site_url": config.SITE_URL,
-                "pro_price": config.PRO_PRICE_USD,
+                **pricing.template_context(),
                 **user_context(request, current_user),
                 **csrf_context(request),
             },
@@ -3358,7 +3398,7 @@ def analyze(
                 "limit_reached": False,
                 "from_discover": source == "discover",
                 "site_url": config.SITE_URL,
-                "pro_price": config.PRO_PRICE_USD,
+                **pricing.template_context(),
                 **user_context(request, current_user),
                 **csrf_context(request),
             },
@@ -3478,6 +3518,7 @@ def dashboard(request: Request):
             "free_analysis_limit": FREE_ANALYSIS_LIMIT,
             "analyses_used_total": analyses_used_total,
             "analyses_remaining": analyses_remaining,
+            **pricing.template_context(),
             **user_context(request, current_user),
             **csrf_context(request),
         },
@@ -3554,23 +3595,25 @@ def pitch_preview(
 
 # --- Billing (Paddle) ------------------------------------------------------
 @app.get("/billing/upgrade")
-def billing_upgrade(request: Request):
+def billing_upgrade(request: Request, billing_period: str = "monthly"):
     current_user = get_current_user(request)
     if not current_user:
         return RedirectResponse(url="/register", status_code=303)
 
     track_event(request, "upgrade_clicked", user=current_user)
 
-    if current_user.plan == "pro":
+    if has_pro_access(current_user):
         return RedirectResponse(url="/dashboard", status_code=303)
 
-    if not config.paddle_configured:
+    billing_period = billing_period if billing_period in {"monthly", "annual"} else "monthly"
+    paddle_price_id = pricing.price_id("radar", billing_period)
+    if not config.PADDLE_CLIENT_TOKEN or not paddle_price_id:
         return templates.TemplateResponse(
             request=request,
             name="pricing.html",
             context={
                 "billing_error": "Billing is not configured yet. Set Paddle environment variables before accepting payments.",
-                "pro_price": config.PRO_PRICE_USD,
+                **pricing.template_context(),
                 "site_url": config.SITE_URL,
                 **user_context(request, current_user),
             },
@@ -3582,8 +3625,9 @@ def billing_upgrade(request: Request):
         name="checkout.html",
         context={
             "paddle_client_token": config.PADDLE_CLIENT_TOKEN,
-            "paddle_price_id": config.PADDLE_PRICE_ID,
+            "paddle_price_id": paddle_price_id,
             "paddle_env": config.PADDLE_ENV,
+            "billing_period": billing_period,
             "user_email": current_user.email,
             "user_id": current_user.id,
             "site_url": config.SITE_URL,

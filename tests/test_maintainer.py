@@ -11,6 +11,7 @@ from pydantic import ValidationError
 import config
 import maintainer_service
 import paddle_billing
+import pricing
 from maintainer_schemas import MaintainerAIOutput
 
 
@@ -132,8 +133,10 @@ def _signed_webhook_request(client, event: dict, secret="paddle_test_secret"):
 
 
 def _set_billing_prices(monkeypatch):
-    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
-    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
+    monkeypatch.setattr(pricing, "PADDLE_RADAR_MONTHLY_PRICE_ID", "pri_radar")
+    monkeypatch.setattr(pricing, "PADDLE_RADAR_ANNUAL_PRICE_ID", "pri_radar_annual")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_MONTHLY_PRICE_ID", "pri_maintainer")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_ANNUAL_PRICE_ID", "pri_maintainer_annual")
 
 
 def test_maintainer_landing_loads(client):
@@ -216,8 +219,9 @@ def test_maintainer_report_renders_v1_workload_and_transparent_gaps(client, monk
 def test_maintainer_pricing_has_shared_account_actions_when_logged_out(client):
     response = client.get("/maintainer/pricing")
     assert response.status_code == 200
-    assert "Maintainer Pilot" in response.text
-    assert "$49" in response.text
+    assert "Maintainer Pro" in response.text
+    assert "$99" in response.text
+    assert "$990" in response.text
     assert "Billing setup is in progress" not in response.text
     assert "Request Pilot Access" not in response.text
     assert "activated manually" not in response.text
@@ -947,16 +951,17 @@ def test_maintainer_billing_account_routes_require_login(client, path):
 def test_maintainer_checkout_uses_only_maintainer_price_and_custom_data(client, monkeypatch):
     _login(client)
     monkeypatch.setattr(config, "PADDLE_CLIENT_TOKEN", "test_client_token")
-    monkeypatch.setattr(config, "PADDLE_MAINTAINER_PRICE_ID", "pri_maintainer")
-    monkeypatch.setattr(config, "PADDLE_PRICE_ID", "pri_radar")
-    monkeypatch.setattr(config, "maintainer_paddle_configured", True)
+    _set_billing_prices(monkeypatch)
 
-    response = client.get("/maintainer/billing/upgrade")
-    assert response.status_code == 200
-    assert 'priceId: "pri_maintainer"' in response.text
-    assert "pri_radar" not in response.text
-    assert 'product_key: "maintainer"' in response.text
-    assert "Maintainer Pilot activates only after" in response.text
+    monthly = client.get("/maintainer/billing/upgrade?billing_period=monthly")
+    annual = client.get("/maintainer/billing/upgrade?billing_period=annual")
+    assert monthly.status_code == 200
+    assert annual.status_code == 200
+    assert 'priceId: "pri_maintainer"' in monthly.text
+    assert 'priceId: "pri_maintainer_annual"' in annual.text
+    assert "pri_radar" not in monthly.text + annual.text
+    assert 'product_key: "maintainer"' in monthly.text
+    assert "Maintainer Pro activates only after" in monthly.text
 
 
 def test_maintainer_upgrade_requires_verified_email(client, monkeypatch):
@@ -978,7 +983,6 @@ def test_maintainer_upgrade_requires_verified_email(client, monkeypatch):
 
 def test_active_maintainer_does_not_start_duplicate_checkout(client, monkeypatch):
     _login(client, pilot=True)
-    monkeypatch.setattr(config, "maintainer_paddle_configured", True)
     response = client.get("/maintainer/billing/upgrade", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/maintainer/dashboard"
@@ -986,7 +990,9 @@ def test_active_maintainer_does_not_start_duplicate_checkout(client, monkeypatch
 
 def test_missing_maintainer_price_shows_safe_unavailable_state(client, monkeypatch):
     _login(client)
-    monkeypatch.setattr(config, "maintainer_paddle_configured", False)
+    monkeypatch.setattr(config, "PADDLE_CLIENT_TOKEN", "test_client_token")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_MONTHLY_PRICE_ID", "")
+    monkeypatch.setattr(pricing, "PADDLE_MAINTAINER_ANNUAL_PRICE_ID", "")
     response = client.get("/maintainer/billing/upgrade")
     assert response.status_code == 503
     assert "Billing temporarily unavailable" in response.text
@@ -1000,7 +1006,7 @@ def test_maintainer_success_route_grants_nothing(client):
     _login(client)
     response = client.get("/maintainer/billing/success")
     assert response.status_code == 200
-    assert "Maintainer Pilot access will appear after Paddle confirms" in response.text
+    assert "Maintainer Pro access will appear after Paddle confirms" in response.text
 
     db = SessionLocal()
     user = db.query(User).filter(User.email == "maintainer@example.com").first()
@@ -1014,9 +1020,12 @@ def test_maintainer_pricing_states(client, monkeypatch):
     from models import User
 
     _login(client)
-    monkeypatch.setattr(config, "maintainer_paddle_configured", True)
+    monkeypatch.setattr(config, "PADDLE_CLIENT_TOKEN", "test_client_token")
+    _set_billing_prices(monkeypatch)
     configured = client.get("/maintainer/pricing")
-    assert "Upgrade to Maintainer Pilot &mdash; $49/month" in configured.text
+    assert "Monthly &mdash; $99" in configured.text
+    assert "Annual &mdash; $990" in configured.text
+    assert "Save $198 annually" in configured.text
     assert "Billing setup is in progress" not in configured.text
 
     db = SessionLocal()
@@ -1027,7 +1036,7 @@ def test_maintainer_pricing_states(client, monkeypatch):
     db.close()
 
     active = client.get("/maintainer/pricing")
-    assert "Maintainer Pilot Active" in active.text
+    assert "Maintainer Pro Active" in active.text
     assert "Manage Billing" in active.text
     assert "Subscription status: Active" in active.text
 
@@ -1134,14 +1143,14 @@ def test_price_aware_webhooks_allow_both_independent_subscriptions(client, monke
             "customer_id": "ctm_shared",
             "subscription_id": "sub_radar",
             "status": "completed",
-            "items": [{"price": {"id": "pri_radar"}}],
+            "items": [{"price": {"id": "pri_radar_annual"}}],
         },
     }
     assert _signed_webhook_request(client, radar_event).status_code == 200
 
     db = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
-    assert user.plan == "pro"
+    assert user.plan == "radar_pro"
     assert user.maintainer_pilot_access is False
     assert user.paddle_subscription_id == "sub_radar"
     assert user.maintainer_paddle_subscription_id is None
@@ -1159,14 +1168,14 @@ def test_price_aware_webhooks_allow_both_independent_subscriptions(client, monke
             "custom_data": {"user_id": str(user_id), "product_key": "maintainer"},
             "customer_id": "ctm_shared",
             "status": "active",
-            "items": [{"price": {"id": "pri_maintainer"}}],
+            "items": [{"price": {"id": "pri_maintainer_annual"}}],
         },
     }
     assert _signed_webhook_request(client, maintainer_event).status_code == 200
 
     db = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
-    assert user.plan == "pro"
+    assert user.plan == "radar_pro"
     assert user.maintainer_pilot_access is True
     assert user.paddle_subscription_id == "sub_radar"
     assert user.maintainer_paddle_subscription_id == "sub_maintainer"
@@ -1380,7 +1389,7 @@ def test_multiple_price_items_map_both_products_idempotently(client, monkeypatch
 
     db = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
-    assert user.plan == "pro"
+    assert user.plan == "radar_pro"
     assert user.maintainer_pilot_access is True
     assert user.paddle_subscription_id == "sub_bundle"
     assert user.maintainer_paddle_subscription_id == "sub_bundle"
