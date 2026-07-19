@@ -4,6 +4,7 @@ from radar import (
     estimate_time as estimate_issue_time,
     get_analysis,
     merge_probability as estimate_issue_merge_probability,
+    recommendation,
     recommend_angle,
     score_repo_signal_report,
 )
@@ -41,9 +42,9 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
 
     selected_issue = _select_issue(issue_rankings, issue_number)
     best_issue = None
-    difficulty = "Medium"
-    estimated_time = "2-4 hours" if repo_score >= 85 else "4-8 hours"
-    merge_probability = contract_potential(repo_score)
+    difficulty = "Unavailable"
+    estimated_time = "Unavailable"
+    merge_probability = "Unavailable"
     if selected_issue:
         score, issue_type, issue = selected_issue
         best_issue = {
@@ -57,20 +58,41 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
         estimated_time = estimate_issue_time(issue_type)
         merge_probability = estimate_issue_merge_probability(score, repo_score)
 
-    recommended_action = "Analyze another repository"
-    if best_issue:
-        recommended_action = f"Start with #{best_issue['number']} - {best_issue['title']}"
-
     angle = recommend_angle(languages)
     score_transparency = score_repo_signal_report(
         repo,
         [issue for _score, _issue_type, issue in issue_rankings],
         languages,
     )
+    # Keep the displayed score and its component explanation on one source of
+    # truth even when callers provide precomputed analysis data.
+    repo_score = score_transparency["score"]
+    if selected_issue:
+        merge_probability = estimate_issue_merge_probability(selected_issue[0], repo_score)
     repository_intelligence = build_repository_intelligence(
         repo,
         [issue for _score, _issue_type, issue in issue_rankings],
     )
+    recommendation_result = recommendation(
+        repo_score,
+        best_issue=best_issue,
+        confidence=score_transparency["confidence"],
+    )
+    if recommendation_result["decision"] == "Contribute Now":
+        recommended_action = f"Start with #{best_issue['number']} - {best_issue['title']}"
+    elif best_issue and recommendation_result["decision"] == "Inspect Carefully":
+        recommended_action = f"Review the scope of #{best_issue['number']} before starting work"
+    elif recommendation_result["decision"] == "Inspect Repository":
+        recommended_action = "Inspect the repository issue queue before choosing work"
+    else:
+        recommended_action = "Prioritize a repository with stronger public evidence"
+
+    outcome_by_recommendation = {
+        "Contribute Now": "Use one focused contribution to test maintainer fit before considering outreach.",
+        "Inspect Carefully": "Verify issue scope and maintainer activity before deciding whether to contribute.",
+        "Inspect Repository": "Find a current, scoped issue before deciding whether to contribute.",
+        "Skip": "Spend time on a repository with stronger and more complete public evidence.",
+    }
 
     return {
         "repo": f"{owner}/{repo_name}",
@@ -88,7 +110,9 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
         "last_push": repo.get("pushed_at"),
         "score": repo_score,
         "score_label": (
-            "Excellent"
+            "Exceptional"
+            if repo_score >= 98
+            else "Excellent"
             if repo_score >= 90
             else "Strong"
             if repo_score >= 80
@@ -96,21 +120,21 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
             if repo_score >= 60
             else "Weak"
         ),
-        "score_action": (
-            "CONTRIBUTE NOW"
-            if repo_score >= 85
-            else "INSPECT MANUALLY"
-            if repo_score >= 60
-            else "SKIP FOR NOW"
-        ),
+        "score_action": recommendation_result["label"],
+        "recommendation_explanation": recommendation_result["explanation"],
+        "contract_potential": contract_potential(repo_score),
         "merge_probability": merge_probability,
         "estimated_time": estimated_time,
         "difficulty": difficulty,
-        "decision": decision(repo_score),
+        "decision": decision(
+            repo_score,
+            best_issue=best_issue,
+            confidence=score_transparency["confidence"],
+        ),
         "angle": angle,
         "best_issue": best_issue,
         "recommended_action": recommended_action,
-        "recommended_outcome": "Submit one focused PR, build trust, then pitch a 48-hour sprint.",
+        "recommended_outcome": outcome_by_recommendation[recommendation_result["decision"]],
         "issues": issue_rankings[:8],
         "languages": languages,
         "score_transparency": score_transparency,
@@ -128,7 +152,7 @@ def to_public_api_payload(result: dict, site_url: str) -> dict:
         "repository": result.get("repo", ""),
         "opportunity_score": result.get("score", 0),
         "decision": result.get("decision", ""),
-        "chance_of_getting_noticed": f"{result.get('score', 0)}%",
+        "chance_of_getting_noticed": "Unavailable - maintainer attention is not measured",
         "contract_potential": contract_potential(int(result.get("score") or 0)),
         "merge_probability": result.get("merge_probability", ""),
         "estimated_time": result.get("estimated_time", ""),

@@ -17,6 +17,7 @@ from radar import (
     estimate_difficulty,
     parse_github_url,
     primary_language,
+    recommendation,
     recommend_angle,
     score_issue,
     score_repo,
@@ -187,8 +188,50 @@ def test_score_repo_signal_report_matches_numeric_score():
 
     assert report["score"] == score_repo(repo, [issue], languages)
     assert any(item["label"] == "Recently maintained" for item in report["reasons"])
-    assert any(item["label"] == "Good contributor fit" for item in report["reasons"])
+    assert any(item["label"] == "Language profile available" for item in report["reasons"])
     assert any(signal["label"] == "Repository Activity" for signal in report["signals_used"])
+    assert report["score"] == sum(item["earned"] for item in report["components"])
+
+
+def test_large_backlog_and_stars_cannot_create_a_perfect_score_without_issue_evidence():
+    repo = {
+        **_repo(open_issues=500, stars=50_000, forks=2_000, pushed_days_ago=1),
+        "owner": {"type": "Organization"},
+        "homepage": "https://example.com",
+    }
+
+    report = score_repo_signal_report(repo, [], {"Python": 1000})
+
+    assert report["score"] < 90
+    assert report["confidence"] != "High"
+    assert "No ranked issue was available" in report["confidence_unknowns"]
+
+
+def test_exceptional_scores_require_complete_independent_evidence():
+    now = datetime.now(timezone.utc).isoformat()
+    issues = [
+        {
+            "title": f"good first issue: fix API failure {index}",
+            "labels": [{"name": "good first issue"}],
+            "comments": 2,
+            "updated_at": now,
+            "created_at": now,
+            "user": {"login": f"contributor-{index}"},
+        }
+        for index in range(5)
+    ]
+    repo = {
+        **_repo(open_issues=20, stars=2_000, forks=200, pushed_days_ago=1),
+        "owner": {"type": "Organization"},
+        "homepage": "https://example.com",
+        "has_sponsors": True,
+        "description": "A production API platform",
+    }
+
+    report = score_repo_signal_report(repo, issues, {"Python": 1000})
+
+    assert 98 <= report["score"] <= 100
+    assert report["confidence"] == "High"
 
 
 def test_repository_intelligence_is_deterministic_and_marks_unavailable_data():
@@ -245,10 +288,17 @@ def test_issue_difficulty_estimator_varies_by_issue_type():
 
 @pytest.mark.parametrize(
     "score,expected_prefix",
-    [(95, "YES"), (80, "YES"), (70, "MAYBE"), (60, "MAYBE"), (30, "NO"), (0, "NO")],
+    [(95, "Contribute Now"), (80, "Inspect Carefully"), (70, "Inspect Carefully"), (60, "Skip"), (30, "Skip"), (0, "Skip")],
 )
 def test_decision_thresholds(score, expected_prefix):
     assert decision(score).startswith(expected_prefix)
+
+
+def test_missing_ranked_issue_overrides_high_score_recommendation():
+    result = recommendation(95, best_issue=None, confidence="High")
+
+    assert result["label"] == "INSPECT REPOSITORY"
+    assert "No ranked open issue" in result["explanation"]
 
 
 # --- primary_language / recommend_angle -----------------------------------

@@ -201,6 +201,43 @@ def test_category_matching_does_not_treat_maintainer_as_ai(client):
     assert "ai" not in sections
 
 
+def test_curated_categories_use_distinct_ranking_signals():
+    from database import SessionLocal
+    from models import OpportunityFeedItem
+    from opportunity_service import curated_opportunity_sections, load_feed_items
+
+    high_score_id = _feed_item(full_name="example/commercial", score=96)
+    fast_issue_id = _feed_item(full_name="example/fast-fix", score=84)
+    personal_id = _feed_item(full_name="student/demo", score=70)
+    db = SessionLocal()
+    high_score = db.query(OpportunityFeedItem).filter(OpportunityFeedItem.id == high_score_id).one()
+    high_score.merge_probability = "Medium"
+    high_score.difficulty = "Medium"
+    fast_issue = db.query(OpportunityFeedItem).filter(OpportunityFeedItem.id == fast_issue_id).one()
+    fast_issue.merge_probability = "High"
+    fast_issue.difficulty = "Low"
+    fast_issue.categories = ["Good First Issue"]
+    personal = db.query(OpportunityFeedItem).filter(OpportunityFeedItem.id == personal_id).one()
+    personal.commercial_signal = "Repository metadata alone does not show a commercial signal."
+    personal.paid_sprint_signal = "Paid-sprint potential not established from available metadata"
+    personal.maintainer_activity_signal = "Maintenance activity signal: High"
+    personal.merge_probability = "High"
+    personal.difficulty = "Low"
+    personal.categories = ["Good First Issue"]
+    db.commit()
+
+    sections = {section["key"]: section for section in curated_opportunity_sections(load_feed_items(db))}
+    db.close()
+
+    assert sections["trending"]["items"][0].repository_full_name == "example/commercial"
+    assert sections["fast-merge"]["items"][0].repository_full_name == "example/fast-fix"
+    assert sections["great-first-contribution"]["items"][0].repository_full_name == "example/fast-fix"
+    assert all(item.repository_full_name != "student/demo" for item in sections["paid-sprint"]["items"])
+    assert all(item.repository_full_name != "student/demo" for item in sections["founder-friendly"]["items"])
+    assert any(item.repository_full_name == "student/demo" for item in sections["fast-merge"]["items"])
+    assert any(item.repository_full_name == "student/demo" for item in sections["great-first-contribution"]["items"])
+
+
 def test_public_distribution_events_are_csrf_protected_and_allowlisted(client, monkeypatch):
     import app as app_module
     from database import SessionLocal

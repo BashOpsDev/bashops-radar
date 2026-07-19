@@ -235,7 +235,7 @@ def apply_analysis_to_feed_item(item: OpportunityFeedItem, result: dict, analyze
     item.categories = categories
     item.topics = topics
     item.radar_score = float(result.get("score") or 0)
-    item.decision = str(result.get("decision") or "Inspect manually")[:255]
+    item.decision = str(result.get("decision") or "Recommendation unavailable")[:255]
     item.best_issue_number = best_issue_number
     item.best_issue_title = str(best_issue.get("title") or "")[:500] or None
     item.best_issue_url = (
@@ -395,7 +395,7 @@ def public_opportunity_payload(item: OpportunityFeedItem, reference_time=None) -
 
 
 def curated_opportunity_sections(items, limit=5) -> list[dict]:
-    """Group the existing ranked feed for acquisition pages without rescoring it."""
+    """Group cached results with category-specific, deterministic ranking."""
     limit = max(1, min(int(limit or 5), 5))
 
     def searchable(item):
@@ -409,44 +409,77 @@ def curated_opportunity_sections(items, limit=5) -> list[dict]:
             for term in terms
         )
 
-    def selected(predicate):
-        return [item for item in items if predicate(item)][:limit]
+    def selected(predicate, ranker):
+        matching = [item for item in items if predicate(item)]
+        return sorted(matching, key=ranker, reverse=True)[:limit]
+
+    def score(item):
+        return float(item.radar_score or 0)
+
+    def commercial_present(item):
+        value = (item.commercial_signal or "").casefold()
+        return bool(value) and not any(
+            marker in value
+            for marker in ("unavailable", "not detected", "does not show a commercial signal")
+        )
+
+    def paid_sprint_rank(item):
+        commercial = commercial_present(item)
+        explicit = (item.paid_sprint_signal or "").startswith("Potential")
+        return (int(explicit), int(commercial), score(item))
+
+    def founder_rank(item):
+        activity = (item.maintainer_activity_signal or "").casefold()
+        commercial = commercial_present(item)
+        return (int("high" in activity), int(commercial), score(item))
+
+    def fast_merge_rank(item):
+        probability = (item.merge_probability or "").casefold()
+        difficulty = (item.difficulty or "").casefold()
+        return (int(probability == "high"), int(difficulty in {"low", "easy"}), int(bool(item.best_issue_url)), score(item))
+
+    def first_contribution_rank(item):
+        difficulty = (item.difficulty or "").casefold()
+        return (int(matches(item, "good first issue")), int(difficulty in {"low", "easy"}), int(bool(item.best_issue_url)), score(item))
 
     definitions = [
-        ("trending", "Today's Best Opportunities", lambda item: True),
+        ("trending", "Today's Best Opportunities", lambda item: True, score),
         (
             "paid-sprint",
             "Highest Paid Sprint Potential",
-            lambda item: contract_potential(int(round(item.radar_score))) == "High"
-            or (item.paid_sprint_signal or "").startswith("Potential"),
+            lambda item: (item.paid_sprint_signal or "").startswith("Potential"),
+            paid_sprint_rank,
         ),
         (
             "founder-friendly",
             "Founder Friendly",
             lambda item: "high" in (item.maintainer_activity_signal or "").casefold()
-            and "unavailable" not in (item.commercial_signal or "").casefold(),
+            and commercial_present(item),
+            founder_rank,
         ),
         (
             "fast-merge",
             "Fast Merge Opportunities",
             lambda item: (item.merge_probability or "").casefold() == "high",
+            fast_merge_rank,
         ),
         (
             "great-first-contribution",
             "Great First Contribution",
             lambda item: (item.difficulty or "").casefold() in {"easy", "low"}
             or matches(item, "good first issue"),
+            first_contribution_rank,
         ),
-        ("ai", "AI", lambda item: matches(item, "ai", "machine learning")),
-        ("backend", "Backend", lambda item: matches(item, "backend", "api", "fastapi")),
-        ("devops", "DevOps", lambda item: matches(item, "devops", "ci/cd", "ci", "deployment")),
-        ("infrastructure", "Infrastructure", lambda item: matches(item, "infrastructure", "cloud", "kubernetes", "docker")),
-        ("python", "Python", lambda item: (item.primary_language or "").casefold() == "python"),
-        ("frontend", "Frontend", lambda item: matches(item, "frontend", "react", "typescript", "javascript")),
+        ("ai", "AI", lambda item: matches(item, "ai", "machine learning"), score),
+        ("backend", "Backend", lambda item: matches(item, "backend", "api", "fastapi"), score),
+        ("devops", "DevOps", lambda item: matches(item, "devops", "ci/cd", "ci", "deployment"), score),
+        ("infrastructure", "Infrastructure", lambda item: matches(item, "infrastructure", "cloud", "kubernetes", "docker"), score),
+        ("python", "Python", lambda item: (item.primary_language or "").casefold() == "python", score),
+        ("frontend", "Frontend", lambda item: matches(item, "frontend", "react", "typescript", "javascript"), score),
     ]
     sections = []
-    for key, title, predicate in definitions:
-        section_items = selected(predicate)
+    for key, title, predicate, ranker in definitions:
+        section_items = selected(predicate, ranker)
         if section_items:
             sections.append({"key": key, "title": title, "items": section_items})
     return sections

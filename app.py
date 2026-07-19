@@ -48,6 +48,7 @@ import paddle_billing
 import email_utils
 import pricing
 from analysis_service import build_analysis_result, contract_potential, to_public_api_payload
+from radar import OPPORTUNITY_SCORE_COMPONENTS, RECOMMENDATION_RULES
 from discovery_service import DiscoveryError, category_options, discover_opportunities
 from maintainer_schemas import MaintainerReport
 from maintainer_service import ANALYSIS_VERSION as MAINTAINER_ANALYSIS_VERSION
@@ -157,13 +158,33 @@ def clean_ai_summary_text(text: str) -> str:
     cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
     cleaned = cleaned.replace("**", "").replace("__", "")
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-    return cleaned.strip() or "AI summary temporarily unavailable."
+    unsafe_outcome = re.compile(
+        r"\b(?:will|would|guaranteed?|definitely|certainly|ensures?)\b"
+        r"[^.!?]{0,100}\b(?:merge|accept|hire|job|contract|pay|paid|notice|attention|respond|reply)\w*",
+        flags=re.IGNORECASE,
+    )
+    safe_sentences = [
+        sentence
+        for sentence in re.split(r"(?<=[.!?])\s+", cleaned.strip())
+        if sentence and not unsafe_outcome.search(sentence)
+    ]
+    return " ".join(safe_sentences).strip() or "AI interpretation temporarily unavailable."
 
 
-def generate_ai_summary(repo_full_name, repo, best_issue, repo_score, angle):
+def generate_ai_summary(
+    repo_full_name,
+    repo,
+    best_issue,
+    repo_score,
+    angle,
+    languages=None,
+    repository_intelligence=None,
+    confidence=None,
+    recommendation_label=None,
+):
     if not GEMINI_API_KEY or not genai:
         return {
-            "text": "AI summary is not enabled yet. Add GEMINI_API_KEY to enable Gemini analysis.",
+            "text": "AI interpretation is temporarily unavailable. Deterministic repository analysis remains available.",
             "status": "unavailable",
         }
 
@@ -174,37 +195,53 @@ def generate_ai_summary(repo_full_name, repo, best_issue, repo_score, angle):
             f"({best_issue['type']}, score {best_issue['score']}/100)"
         )
 
+    intelligence = {item.get("key"): item for item in (repository_intelligence or [])}
+    commercial = intelligence.get("commercial") or {}
+    friendliness = intelligence.get("friendliness") or {}
+    language_names = ", ".join(list((languages or {}).keys())[:4]) or "Unavailable"
+    purpose = repo.get("description") or "Repository purpose unavailable"
+    activity = repo.get("pushed_at") or "Unavailable"
+
     prompt = f"""
 You are BashOps Radar, an AI opportunity analyst for developers.
 
-Analyze this GitHub repository as a proof-of-work opportunity.
+Interpret the deterministic public evidence below as a proof-of-work opportunity.
+Do not repeat the numeric score or recommendation. Do not invent missing facts.
 
 Repository: {repo_full_name}
-Description: {repo.get("description")}
+Repository purpose: {purpose}
+Languages: {language_names}
 Stars: {repo.get("stargazers_count")}
 Forks: {repo.get("forks_count")}
 Open Issues: {repo.get("open_issues_count")}
+Last push: {activity}
 Opportunity Score: {repo_score}/100
+Confidence: {confidence or "Unavailable"}
+Deterministic recommendation: {recommendation_label or "Unavailable"}
 Best Issue: {issue_text}
 Proof-of-Work Angle: {angle}
+Contributor friendliness: {friendliness.get("value") or "Unavailable"} - {friendliness.get("detail") or "No sampled signal"}
+Commercial context: {commercial.get("value") or "Unavailable"} - {commercial.get("detail") or "No public metadata signal"}
 
-Write a concise plain-text analysis that covers:
-Why this repo is worth or not worth contributing to.
-Why the best issue is a good first target.
-How the developer should approach the PR.
-Whether this could lead to a paid sprint.
+Write one or two concise plain-text paragraphs that add project-specific interpretation:
+- connect the repository purpose and language to the named issue category and title;
+- state what the developer should verify before beginning;
+- describe a focused contribution approach;
+- mention paid-work potential only as a conditional possibility after maintainer trust is established.
 
-Keep it practical, direct, and under 180 words.
+If the repository purpose or best issue is unavailable, use one short paragraph and state the limitation.
+Never promise attention, merge, employment, a contract, or maintainer response.
+Keep it practical, direct, and under 120 words.
 Do not use Markdown, headings, bold markers, bullets, numbered lists, or code formatting.
 """
 
     try:
         model = genai.GenerativeModel("gemini-2.5-flash-lite")
         response = model.generate_content(prompt)
-
+        cleaned_summary = clean_ai_summary_text(response.text if response.text else "")
         return {
-            "text": clean_ai_summary_text(response.text) if response.text else "AI summary temporarily unavailable.",
-            "status": "available",
+            "text": cleaned_summary,
+            "status": "unavailable" if cleaned_summary == "AI interpretation temporarily unavailable." else "available",
         }
 
     except Exception as e:
@@ -719,6 +756,7 @@ def sitemap_xml():
     urls = [
         "/",
         "/pricing",
+        "/methodology",
         "/tools/github-opportunity-score",
         "/tools/best-first-issue-finder",
         "/developer",
@@ -834,6 +872,22 @@ def pricing_page(request: Request, source: str = ""):
             "limit_reached": False,
             **pricing.template_context(),
             "billing_error": None,
+            "site_url": config.SITE_URL,
+            **user_context(request, current_user),
+        },
+    )
+
+
+@app.get("/methodology", response_class=HTMLResponse)
+def methodology_page(request: Request):
+    """Public technical documentation for Radar's deterministic score."""
+    current_user = get_current_user(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="methodology.html",
+        context={
+            "score_components": OPPORTUNITY_SCORE_COMPONENTS,
+            "recommendation_rules": RECOMMENDATION_RULES,
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
         },
@@ -3019,6 +3073,10 @@ def saved_analysis(request: Request, target_id: int):
             best_issue=best_issue,
             repo_score=result["score"],
             angle=result["angle"],
+            languages=result.get("languages"),
+            repository_intelligence=result.get("repository_intelligence"),
+            confidence=(result.get("score_transparency") or {}).get("confidence"),
+            recommendation_label=result.get("score_action"),
         )
         result["ai_summary"] = ai_summary["text"]
         result["ai_status"] = ai_summary["status"]
@@ -3303,6 +3361,10 @@ def analyze(
             best_issue=best_issue,
             repo_score=result["score"],
             angle=result["angle"],
+            languages=result.get("languages"),
+            repository_intelligence=result.get("repository_intelligence"),
+            confidence=(result.get("score_transparency") or {}).get("confidence"),
+            recommendation_label=result.get("score_action"),
         )
 
         result["ai_summary"] = ai_summary["text"]

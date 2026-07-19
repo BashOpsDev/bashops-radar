@@ -67,7 +67,6 @@
     {% elif result %}
     <section class="analysis-shell">
         <div class="analysis-main-card">
-            {% set contract_potential = "High" if result.score >= 85 else "Medium" if result.score >= 60 else "Low" %}
             <div class="analysis-header">
                 <div>
                     <span class="repo-label">Opportunity Report</span>
@@ -77,36 +76,44 @@
                 <div class="score-panel compact-score-panel">
                     <div class="score-number">{{ result.score }}<small>/100</small></div>
                     <div class="score-label">{{ result.score_label }}</div>
-                    <div class="score-action">{{ result.score_action }}</div>
                     <div class="score-meter">
                         <div class="score-fill" style="width: {{ result.score }}%;"></div>
                     </div>
                     <div class="score-card-meta">
                         <div>
-                            <span>Estimated Contract Potential</span>
-                            <strong>{{ contract_potential }}</strong>
+                            <span>Evidence Confidence</span>
+                            <strong>{{ result.score_transparency.confidence }}</strong>
                         </div>
                         <div>
-                            <span>Recommendation</span>
-                            <strong>{{ result.score_action }}</strong>
+                            <span>Score Basis</span>
+                            <strong>Public Signals</strong>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <div class="success-card">
+                <strong>{{ result.score_action }}</strong>
+                <span>{{ result.recommendation_explanation }}</span>
+            </div>
+
+            <span class="section-label">Secondary Estimates</span>
             <div class="analysis-metrics">
-                <div><strong>{{ result.decision }}</strong><span>Decision</span></div>
                 <div><strong>{{ result.merge_probability }}</strong><span>Estimated Merge Probability</span></div>
                 <div><strong>{{ result.estimated_time }}</strong><span>Estimated Implementation Time</span></div>
                 <div><strong>{{ result.difficulty }}</strong><span>Estimated Difficulty</span></div>
+                <div><strong>{{ result.contract_potential }}</strong><span>Estimated Contract Potential</span></div>
+            </div>
+            <p class="analysis-retry-note">Estimates are heuristic bands derived from public metadata and are not guarantees.</p>
+            <span class="section-label">Public Repository Facts</span>
+            <div class="analysis-metrics">
                 <div><strong>{{ result.stars }}</strong><span>Stars</span></div>
                 <div><strong>{{ result.open_issues }}</strong><span>Open Issues</span></div>
             </div>
-
             <section class="score-explainer">
                 <div class="score-explainer-header">
                     <div>
-                        <span class="section-label">Score Transparency</span>
+                        <span class="section-label">Deterministic Signals</span>
                         <h2>
                             {% if result.score >= 70 %}
                             Why this repository scored well
@@ -117,21 +124,11 @@
                             {% endif %}
                         </h2>
                     </div>
-                    <div class="decision-pill">
-                        <span>Recommendation</span>
-                        <strong>{{ result.score_action }}</strong>
-                    </div>
                 </div>
 
                 <div class="score-reasons">
                     {% for item in result.score_transparency.reasons %}
                     <div>
-                        <strong>{{ item.label }}</strong>
-                        <span>{{ item.detail }}</span>
-                    </div>
-                    {% endfor %}
-                    {% for item in result.score_transparency.warnings %}
-                    <div class="warning">
                         <strong>{{ item.label }}</strong>
                         <span>{{ item.detail }}</span>
                     </div>
@@ -158,8 +155,26 @@
                             <li>{{ reason }}</li>
                             {% endfor %}
                         </ul>
+                        {% if result.score_transparency.confidence_unknowns %}
+                        <span>Reduced by:</span>
+                        <ul>
+                            {% for unknown in result.score_transparency.confidence_unknowns %}
+                            <li>{{ unknown }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
                     </div>
                 </div>
+
+                <div class="score-reasons">
+                    {% for item in result.score_transparency.warnings %}
+                    <div class="warning">
+                        <strong>{{ item.label }}</strong>
+                        <span>{{ item.detail }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <p class="analysis-retry-note"><a href="/methodology">Read the scoring methodology and known limitations.</a></p>
             </section>
 
             {% if result.repository_intelligence %}
@@ -194,28 +209,6 @@
             </div>
             {% endif %}
 
-            {% if not has_pro_access %}
-            <div class="upgrade-card inline-upgrade">
-                <span class="section-label">Pro Opportunity</span>
-                {% if result.score >= 70 %}
-                    <h2>This repository scored {{ result.score }}.</h2>
-                    <p>Pro helps you discover more repositories with similar signals, prepare founder outreach, save opportunities, and analyze without trial limits.</p>
-                {% elif result.score >= 50 %}
-                    <h2>This repository scored {{ result.score }}.</h2>
-                    <p>This opportunity needs manual review. Pro helps you discover stronger repositories, prepare outreach, save opportunities, and analyze without trial limits.</p>
-                {% else %}
-                    <h2>This repository may not be worth your time.</h2>
-                    <p>This repository scored {{ result.score }}. Pro helps you discover stronger opportunities before spending time on weak targets.</p>
-                {% endif %}
-                <div class="upgrade-actions">
-                    <a href="/billing/upgrade" class="nav-cta compact">Unlock BashOps Pro</a>
-                    <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
-                </div>
-            </div>
-            {% elif has_pro_access %}
-            <div class="success-card">Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.</div>
-            {% endif %}
-
             <div class="analysis-grid">
                 <section class="analysis-section">
                     <h2>Best First Issue</h2>
@@ -230,15 +223,16 @@
                     {% endif %}
 
                     <div class="ai-summary-header">
-                        <span class="section-label">AI Opportunity Summary</span>
+                        <span class="section-label">AI Interpretation</span>
                         {% if result.ai_status == "available" %}
-                        <span class="ai-status available">AI Available</span>
+                        <span class="ai-status available">Interpretation Available</span>
                         {% else %}
-                        <span class="ai-status unavailable">AI Temporarily Unavailable</span>
+                        <span class="ai-status unavailable">Interpretation Unavailable</span>
                         {% endif %}
                     </div>
                     <div class="ai-summary-box">
                         <p>{{ result.ai_summary }}</p>
+                        <p class="analysis-retry-note">This interpretation uses the deterministic evidence above and does not alter the score or recommendation.</p>
                         {% if result.ai_status == "unavailable" %}
                         <p class="analysis-retry-note">AI summary unavailable. The repository analysis remains available.</p>
                         {% endif %}
@@ -266,6 +260,28 @@
                     {% endfor %}
                 </section>
             </div>
+
+            {% if not has_pro_access %}
+            <div class="upgrade-card inline-upgrade">
+                <span class="section-label">Pro Opportunity</span>
+                {% if result.score >= 70 %}
+                    <h2>This repository scored {{ result.score }}.</h2>
+                    <p>Pro helps you discover more repositories with similar signals, prepare founder outreach, save opportunities, and analyze without trial limits.</p>
+                {% elif result.score >= 50 %}
+                    <h2>This repository scored {{ result.score }}.</h2>
+                    <p>This opportunity needs manual review. Pro helps you discover stronger repositories, prepare outreach, save opportunities, and analyze without trial limits.</p>
+                {% else %}
+                    <h2>This repository may not be worth your time.</h2>
+                    <p>This repository scored {{ result.score }}. Pro helps you discover stronger opportunities before spending time on weak targets.</p>
+                {% endif %}
+                <div class="upgrade-actions">
+                    <a href="/billing/upgrade" class="nav-cta compact">Unlock BashOps Pro</a>
+                    <a href="/pipeline" class="nav-outline compact">View Pipeline</a>
+                </div>
+            </div>
+            {% elif has_pro_access %}
+            <div class="success-card">Pro founder outreach workflows are active in your pipeline. Additional paid sprint strategy tools are coming soon.</div>
+            {% endif %}
 
             {% if not has_pro_access %}
             <div class="locked-preview-grid">
@@ -301,9 +317,9 @@
             <span class="section-label">Today&apos;s Focus</span>
             <h2>Move this toward proof-of-work</h2>
             <div class="briefing-list">
-                <div><strong>Priority</strong><span>Analyze 3 repositories with a score above 85.</span></div>
-                <div><strong>Next Action</strong><span>Submit your highest probability pull request.</span></div>
-                <div><strong>Goal</strong><span>Move one repository to Founder Contacted.</span></div>
+                <div><strong>Priority</strong><span>Compare this repository with your strongest saved opportunity.</span></div>
+                <div><strong>Next Action</strong><span>Verify the ranked issue scope and current maintainer activity.</span></div>
+                <div><strong>Goal</strong><span>Advance one verified opportunity through your pipeline.</span></div>
             </div>
             <div class="quick-actions">
                 {% if from_discover %}

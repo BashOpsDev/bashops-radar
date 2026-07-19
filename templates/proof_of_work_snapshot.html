@@ -62,7 +62,6 @@
                     <span>Opportunity Score</span>
                     <strong>{{ target.score|round(1) }}<small>/100</small></strong>
                 </div>
-                <div><span>Recommendation</span><strong>{% if target.score >= 85 %}Contribute now{% elif target.score >= 60 %}Inspect manually{% else %}Skip for now{% endif %}</strong></div>
                 <div><span>Estimated Difficulty</span><strong>{{ target.difficulty }}</strong></div>
                 <div><span>Estimated Time</span><strong>{{ target.estimated_time }}</strong></div>
                 <div><span>Estimated Merge Probability</span><strong>{{ target.merge_probability }}</strong></div>

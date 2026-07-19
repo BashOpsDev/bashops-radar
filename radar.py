@@ -13,6 +13,28 @@ console = Console()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 
+# Repository opportunity scoring is composed from independent, capped evidence
+# groups. The methodology page reads this same data so documentation cannot
+# drift from the implementation.
+OPPORTUNITY_SCORE_COMPONENTS = (
+    {"key": "activity", "label": "Repository activity", "weight": 25, "source": "Repository pushed_at", "positive": "Recent pushes increase the component.", "negative": "Missing or stale activity reduces it."},
+    {"key": "issue_quality", "label": "Issue quality", "weight": 25, "source": "Up to 30 open GitHub issues", "positive": "Recent, discussed, and contributor-labeled issues increase it.", "negative": "No usable issue sample scores zero."},
+    {"key": "contributor_readiness", "label": "Contributor readiness", "weight": 15, "source": "Issue labels and activity", "positive": "Ranked issues and contributor labels increase it.", "negative": "Missing ranked issues or contributor signals reduce it."},
+    {"key": "visibility", "label": "Repository visibility", "weight": 10, "source": "GitHub stars", "positive": "Established visibility increases it with diminishing returns.", "negative": "Stars alone cannot produce a strong score."},
+    {"key": "community", "label": "Community evidence", "weight": 10, "source": "Forks and sampled issue authors", "positive": "Forks and distinct issue authors increase it.", "negative": "Little observable participation reduces it."},
+    {"key": "language", "label": "Language profile", "weight": 5, "source": "GitHub language bytes", "positive": "Available language data and common contribution languages increase it.", "negative": "Missing language data scores zero."},
+    {"key": "commercial", "label": "Commercial context", "weight": 5, "source": "Owner type, homepage, and Sponsors metadata", "positive": "Organization and project metadata add limited evidence.", "negative": "These signals never prove paid-work intent."},
+    {"key": "completeness", "label": "Evidence completeness", "weight": 5, "source": "Availability of repository, issue, and language metadata", "positive": "More complete public evidence increases confidence in the score.", "negative": "Missing evidence reduces the score and confidence."},
+)
+
+RECOMMENDATION_RULES = (
+    "Contribute Now requires a score of at least 90, a ranked issue, and High confidence.",
+    "Inspect Repository is used when no ranked issue is available.",
+    "Inspect Carefully is used for scores from 70 to 89, or when confidence is below High.",
+    "Skip is used for scores below 70 when a ranked issue exists.",
+)
+
+
 def parse_github_url(url: str):
     parts = url.rstrip("/").split("/")
     if "github.com" not in url or len(parts) < 5:
@@ -108,125 +130,141 @@ def _days_label(days: int) -> str:
 
 
 def score_repo_signal_report(repo, issues, languages):
-    score = 0
+    issues = list(issues or [])
+    languages = languages or {}
     reasons = []
     warnings = []
-    open_issues = repo.get("open_issues_count", 0)
-    stars = repo.get("stargazers_count", 0)
-    forks = repo.get("forks_count", 0)
+    components = []
+    stars = int(repo.get("stargazers_count") or 0)
+    forks = int(repo.get("forks_count") or 0)
     last_push_days = days_since(repo.get("pushed_at"))
+    issue_scores = [score_issue(issue)[0] for issue in issues]
+    average_issue_score = sum(issue_scores) / len(issue_scores) if issue_scores else 0
+    recent_issue_count = sum(days_since(issue.get("updated_at")) <= 30 for issue in issues)
+    discussed_issue_count = sum(int(issue.get("comments") or 0) > 0 for issue in issues)
+    contributor_label_count = sum(
+        any(
+            str(label.get("name") or "").casefold() in {"good first issue", "help wanted"}
+            for label in issue.get("labels", [])
+        )
+        for issue in issues
+    )
+    distinct_issue_authors = len(
+        {
+            str((issue.get("user") or {}).get("login") or "").casefold()
+            for issue in issues
+            if (issue.get("user") or {}).get("login")
+        }
+    )
 
-    def add_signal(points: int, label: str, detail: str):
-        nonlocal score
-        score += points
-        reasons.append(_quality_label(label, detail))
+    def add_component(key: str, earned: int, detail: str):
+        definition = next(item for item in OPPORTUNITY_SCORE_COMPONENTS if item["key"] == key)
+        components.append({**definition, "earned": max(0, min(int(earned), definition["weight"])), "detail": detail})
 
-    if 5 <= open_issues <= 80:
-        add_signal(25, "Healthy issue backlog", f"{open_issues} open issues")
-    elif open_issues > 80:
-        add_signal(10, "Large issue backlog", f"{open_issues} open issues")
-        warnings.append(_quality_label("Issue volume may require filtering", "Large backlogs can contain stale or noisy work"))
-    elif open_issues > 0:
-        add_signal(12, "Some issue activity", f"{open_issues} open issues")
+    activity_points = 25 if last_push_days <= 3 else 22 if last_push_days <= 14 else 18 if last_push_days <= 30 else 10 if last_push_days <= 90 else 4 if last_push_days <= 180 else 0
+    add_component("activity", activity_points, f"Last push: {_days_label(last_push_days)}")
+    if activity_points >= 18:
+        reasons.append(_quality_label("Recently maintained", f"Last push: {_days_label(last_push_days)}"))
     else:
-        warnings.append(_quality_label("No open issue signal", "GitHub reports no open issues"))
+        warnings.append(_quality_label("Maintenance evidence is limited", f"Last push: {_days_label(last_push_days)}"))
 
-    if last_push_days <= 3:
-        add_signal(25, "Recently maintained", f"Last push: {_days_label(last_push_days)}")
-    elif last_push_days <= 14:
-        add_signal(18, "Active maintenance", f"Last push: {_days_label(last_push_days)}")
-    elif last_push_days <= 30:
-        add_signal(10, "Maintenance signal available", f"Last push: {_days_label(last_push_days)}")
+    issue_quality_points = 0
+    if issue_scores:
+        issue_quality_points += 14 if average_issue_score >= 90 else 12 if average_issue_score >= 80 else 9 if average_issue_score >= 70 else 6 if average_issue_score >= 60 else 3
+        issue_quality_points += 6 if recent_issue_count >= 5 else 4 if recent_issue_count >= 2 else 2 if recent_issue_count else 0
+        issue_quality_points += 5 if discussed_issue_count >= 5 else 3 if discussed_issue_count >= 2 else 1 if discussed_issue_count else 0
+        reasons.append(_quality_label("Issue evidence available", f"{len(issue_scores)} open issues ranked; average issue score {round(average_issue_score)}"))
     else:
-        warnings.append(_quality_label("Maintenance recency is limited", f"Last push: {_days_label(last_push_days)}"))
+        warnings.append(_quality_label("No ranked issues found", "No usable open issue was available, so issue quality could not be scored"))
+    add_component("issue_quality", issue_quality_points, f"{len(issue_scores)} ranked issues, {recent_issue_count} recently updated, {discussed_issue_count} with discussion")
 
-    if 20 <= stars <= 5000:
-        add_signal(20, "Healthy repository visibility", f"{stars} stars")
-    elif stars > 5000:
-        add_signal(10, "Strong ecosystem visibility", f"{stars} stars")
-        warnings.append(_quality_label("Popular repository", "Higher visibility can mean more contributor competition"))
-    elif stars > 0:
-        add_signal(8, "Early visibility signal", f"{stars} stars")
+    readiness_points = (4 if issue_scores else 0) + (7 if contributor_label_count >= 3 else 5 if contributor_label_count else 0) + (2 if recent_issue_count else 0) + (2 if discussed_issue_count else 0)
+    add_component("contributor_readiness", readiness_points, f"{contributor_label_count} contributor-labeled issues in the sample")
+    if contributor_label_count:
+        reasons.append(_quality_label("Contributor-ready labels detected", f"{contributor_label_count} sampled issues use good-first-issue or help-wanted labels"))
 
-    if 2 <= forks <= 500:
-        add_signal(10, "Community activity present", f"{forks} forks")
-    elif forks > 500:
-        add_signal(5, "Broad ecosystem activity", f"{forks} forks")
-        warnings.append(_quality_label("Large contributor surface", "Many forks can indicate a crowded project"))
+    visibility_points = 0 if stars <= 0 else 2 if stars < 20 else 4 if stars < 100 else 7 if stars < 1000 else 9 if stars < 5000 else 10
+    add_component("visibility", visibility_points, f"{stars} stars, scored with diminishing returns")
+    if stars:
+        reasons.append(_quality_label("Repository visibility", f"{stars} stars; popularity is only one capped signal"))
+    if stars >= 5000:
+        warnings.append(_quality_label("High contributor competition", "Large public visibility can increase competition for maintainer attention"))
 
+    fork_points = 0 if forks <= 0 else 2 if forks == 1 else 4 if forks < 10 else 6 if forks < 100 else 8
+    author_points = 2 if distinct_issue_authors >= 5 else 1 if distinct_issue_authors >= 2 else 0
+    add_component("community", fork_points + author_points, f"{forks} forks and {distinct_issue_authors} distinct authors in the issue sample")
+
+    target_languages = [lang for lang in ("Python", "TypeScript", "JavaScript") if lang in languages]
+    language_points = (3 if languages else 0) + (2 if target_languages else 0)
+    add_component("language", language_points, ", ".join(list(languages.keys())[:3]) if languages else "Language data unavailable")
     if languages:
-        add_signal(10, "Language profile available", ", ".join(list(languages.keys())[:3]))
+        reasons.append(_quality_label("Language profile available", ", ".join(list(languages.keys())[:3])))
     else:
         warnings.append(_quality_label("Language signal unavailable", "GitHub did not return language data"))
 
-    target_languages = [lang for lang in ("Python", "TypeScript", "JavaScript") if lang in languages]
-    if target_languages:
-        add_signal(10, "Good contributor fit", ", ".join(target_languages) + " detected")
+    owner_type = str((repo.get("owner") or {}).get("type") or "").casefold()
+    commercial_points = (3 if owner_type == "organization" else 0) + (1 if repo.get("homepage") else 0) + (1 if repo.get("has_sponsors") else 0)
+    add_component("commercial", commercial_points, "Organization, homepage, and Sponsors metadata only; paid intent is not inferred")
 
-    issue_scores = [score_issue(issue)[0] for issue in issues]
-    average_issue_score = 0
-    if issue_scores:
-        average_issue_score = sum(issue_scores) / len(issue_scores)
-        if average_issue_score >= 75:
-            add_signal(15, "Strong issue quality", "Recent, active issues found")
-        elif average_issue_score >= 60:
-            add_signal(8, "Usable issue quality", "Some issues look suitable for focused work")
-        else:
-            warnings.append(_quality_label("Issue quality needs review", "Inspect the top issues before committing time"))
-    else:
-        warnings.append(_quality_label("No ranked issues found", "Manual inspection is required"))
+    core_fields = ("pushed_at", "open_issues_count", "stargazers_count", "forks_count")
+    completeness_points = (2 if all(repo.get(field) is not None for field in core_fields) else 1) + (1 if issues else 0) + (1 if languages else 0) + (1 if repo.get("description") or repo.get("license") or repo.get("homepage") else 0)
+    add_component("completeness", completeness_points, "Public repository, issue, and language evidence available")
 
-    recent_issue_count = sum(1 for issue in issues if days_since(issue.get("updated_at")) <= 30)
-    discussed_issue_count = sum(1 for issue in issues if int(issue.get("comments") or 0) > 0)
-    if discussed_issue_count:
-        reasons.append(_quality_label("Active issue discussion", f"{discussed_issue_count} ranked issues have comments"))
-
-    warnings.append(_quality_label("Review speed could not be verified", "GitHub issue data does not confirm review speed"))
-
+    warnings.append(_quality_label("Review speed unavailable", "Issue metadata does not include first-response timelines, so maintainer response speed was not scored"))
     signals_used = [
-        _quality_label(
-            "Repository Activity",
-            "Excellent" if last_push_days <= 3 else "Strong" if last_push_days <= 14 else "Moderate" if last_push_days <= 30 else "Limited",
-        ),
-        _quality_label(
-            "Issue Quality",
-            "Excellent" if average_issue_score >= 80 else "Strong" if average_issue_score >= 70 else "Moderate" if average_issue_score >= 60 else "Limited",
-        ),
-        _quality_label(
-            "Community Health",
-            "Strong" if forks >= 2 and open_issues > 0 else "Moderate" if stars > 0 or open_issues > 0 else "Limited",
-        ),
-        _quality_label(
-            "Competition",
-            "High" if stars > 5000 or forks > 500 else "Medium" if stars >= 1000 or forks >= 100 else "Low",
-        ),
-        _quality_label(
-            "Maintenance Activity",
-            "High" if last_push_days <= 14 and (recent_issue_count or discussed_issue_count) else "Medium" if last_push_days <= 30 else "Low",
-        ),
+        _quality_label("Repository Activity", "Excellent" if activity_points >= 25 else "Strong" if activity_points >= 18 else "Moderate" if activity_points >= 10 else "Limited"),
+        _quality_label("Issue Quality", "Excellent" if issue_quality_points >= 23 else "Strong" if issue_quality_points >= 18 else "Moderate" if issue_quality_points >= 10 else "Limited"),
+        _quality_label("Contributor Readiness", "Strong" if readiness_points >= 12 else "Moderate" if readiness_points >= 7 else "Limited"),
+        _quality_label("Community Evidence", "Strong" if fork_points + author_points >= 8 else "Moderate" if fork_points + author_points >= 4 else "Limited"),
+        _quality_label("Competition", "High" if stars >= 5000 or forks >= 500 else "Medium" if stars >= 1000 or forks >= 100 else "Low"),
     ]
 
     confidence_reasons = []
-    if repo.get("pushed_at") and repo.get("open_issues_count") is not None:
-        confidence_reasons.append("Repository metadata available")
+    confidence_unknowns = ["Maintainer response speed was not measured from issue timelines"]
+    evidence_points = 0
+    if all(repo.get(field) is not None for field in core_fields):
+        evidence_points += 1
+        confidence_reasons.append("Core repository metadata is available")
+    if last_push_days < 999:
+        evidence_points += 1
+        confidence_reasons.append("Repository activity date is available")
+    else:
+        confidence_unknowns.append("Repository push recency is unavailable")
     if last_push_days <= 30:
-        confidence_reasons.append("Recent repository activity")
-    if languages:
-        confidence_reasons.append("Language profile detected")
+        evidence_points += 1
+        confidence_reasons.append("Recent repository activity was observed")
+    elif last_push_days > 90:
+        confidence_unknowns.append("Current maintenance cadence is uncertain")
     if issue_scores:
-        confidence_reasons.append("Ranked issue candidates found")
-    if recent_issue_count:
-        confidence_reasons.append("Recent issue updates")
+        evidence_points += 2
+        confidence_reasons.append("Ranked issue candidates are available")
+        if average_issue_score >= 60:
+            evidence_points += 1
+            confidence_reasons.append("The sampled issue queue contains usable candidates")
+    else:
+        confidence_unknowns.append("No ranked issue was available")
+    if contributor_label_count:
+        evidence_points += 1
+        confidence_reasons.append("Contributor-friendly issue labels were observed")
+    if languages:
+        evidence_points += 1
+        confidence_reasons.append("Language profile is available")
+    else:
+        confidence_unknowns.append("Language profile is unavailable")
+    if commercial_points:
+        evidence_points += 1
+        confidence_reasons.append("Limited organization or project metadata is available")
 
-    confidence = "High" if len(confidence_reasons) >= 4 else "Medium" if len(confidence_reasons) >= 2 else "Low"
-
+    confidence = "High" if evidence_points >= 7 and len(confidence_unknowns) <= 1 else "Medium" if evidence_points >= 4 and len(confidence_unknowns) <= 3 else "Low"
     return {
-        "score": min(score, 100),
+        "score": min(sum(component["earned"] for component in components), 100),
+        "components": components,
         "reasons": reasons[:7],
-        "warnings": warnings[:3],
+        "warnings": warnings[:5],
         "signals_used": signals_used,
         "confidence": confidence,
-        "confidence_reasons": confidence_reasons[:5],
+        "confidence_reasons": confidence_reasons[:6],
+        "confidence_unknowns": confidence_unknowns[:5],
     }
 
 
@@ -234,12 +272,39 @@ def score_repo(repo, issues, languages):
     return score_repo_signal_report(repo, issues, languages)["score"]
 
 
-def decision(score):
-    if score >= 80:
-        return "YES — strong Proof-of-Work target"
-    if score >= 60:
-        return "MAYBE — inspect manually before committing time"
-    return "NO — low probability target for now"
+def recommendation(score, best_issue=None, confidence="Medium"):
+    """Return the single recommendation used by every Radar surface."""
+    if not best_issue:
+        return {
+            "label": "INSPECT REPOSITORY",
+            "decision": "Inspect Repository",
+            "explanation": "No ranked open issue was available, so inspect the issue queue before committing time.",
+        }
+    if score >= 90 and confidence == "High":
+        return {
+            "label": "CONTRIBUTE NOW",
+            "decision": "Contribute Now",
+            "explanation": "The repository has strong public evidence, a ranked issue, and High analysis confidence.",
+        }
+    if score >= 70:
+        return {
+            "label": "INSPECT CAREFULLY",
+            "decision": "Inspect Carefully",
+            "explanation": "Useful signals are present, but scope or evidence should be verified before starting work.",
+        }
+    return {
+        "label": "SKIP",
+        "decision": "Skip",
+        "explanation": "The available public evidence is not strong enough to justify prioritizing this repository now.",
+    }
+
+
+def decision(score, best_issue=True, confidence=None):
+    confidence = confidence or ("High" if score >= 90 else "Medium")
+    result = recommendation(score, best_issue=best_issue, confidence=confidence)
+    return f"{result['decision']} - {result['explanation']}"
+
+
 def primary_language(languages):
     if not languages:
         return "Unknown"

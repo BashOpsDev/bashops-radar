@@ -28,6 +28,11 @@ def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
         "number": 7,
         "title": "Improve setup docs",
         "html_url": "https://github.com/example/repo/issues/7",
+        "labels": [{"name": "good first issue"}],
+        "comments": 2,
+        "updated_at": pushed_at,
+        "created_at": pushed_at,
+        "user": {"login": "contributor"},
     }
 
     def fake_get_analysis(repo_url):
@@ -35,13 +40,15 @@ def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
             "example",
             "repo",
             {
-                "homepage": "",
+                "homepage": "https://example.com",
                 "html_url": "https://github.com/example/repo",
                 "description": "Example repo",
-                "stargazers_count": 10,
-                "forks_count": 2,
+                "stargazers_count": 2000,
+                "forks_count": 200,
                 "open_issues_count": 4,
                 "pushed_at": pushed_at,
+                "has_sponsors": True,
+                "owner": {"type": "Organization"},
             },
             {"Python": 100},
             [(92, "Docs", issue)],
@@ -65,6 +72,112 @@ def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
     assert payload["difficulty"] == result["difficulty"]
     assert payload["estimated_time"] == result["estimated_time"]
     assert payload["merge_probability"] == result["merge_probability"]
+
+
+def test_analysis_without_ranked_issue_is_consistent_and_lowers_confidence(monkeypatch):
+    import analysis_service
+
+    pushed_at = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    monkeypatch.setattr(
+        analysis_service,
+        "get_analysis",
+        lambda _repo_url: (
+            "example",
+            "empty-issues",
+            {
+                "html_url": "https://github.com/example/empty-issues",
+                "description": "An active repository without a usable issue sample",
+                "stargazers_count": 50_000,
+                "forks_count": 2_000,
+                "open_issues_count": 200,
+                "pushed_at": pushed_at,
+                "owner": {"type": "Organization"},
+                "homepage": "https://example.com",
+            },
+            {"Python": 100},
+            [],
+            99,
+            "Python",
+        ),
+    )
+
+    result = analysis_service.build_analysis_result("https://github.com/example/empty-issues")
+
+    assert result["score"] < 90
+    assert result["score_action"] == "INSPECT REPOSITORY"
+    assert result["best_issue"] is None
+    assert result["difficulty"] == "Unavailable"
+    assert result["merge_probability"] == "Unavailable"
+    assert result["recommended_outcome"] == "Find a current, scoped issue before deciding whether to contribute."
+    assert result["score_transparency"]["confidence"] != "High"
+    assert "No ranked issue was available" in result["score_transparency"]["confidence_unknowns"]
+
+
+def test_methodology_documents_score_confidence_limits_and_is_in_sitemap(client):
+    response = client.get("/methodology")
+
+    assert response.status_code == 200
+    assert "Opportunity Score Methodology" in response.text
+    assert "Repository activity" in response.text
+    assert "25 points maximum" in response.text
+    assert "AI interpretation" in response.text
+    assert "not a prediction of employment" in response.text
+    assert '<link rel="canonical" href="http://testserver/methodology">' in response.text
+    assert "/methodology" in client.get("/sitemap.xml").text
+
+
+def test_ai_summary_prompt_uses_project_specific_evidence(monkeypatch):
+    import app as app_module
+
+    captured = {}
+
+    class FakeModel:
+        def generate_content(self, prompt):
+            captured["prompt"] = prompt
+            return type("Response", (), {"text": "Project-specific interpretation."})()
+
+    class FakeGenAI:
+        @staticmethod
+        def GenerativeModel(_name):
+            return FakeModel()
+
+    monkeypatch.setattr(app_module, "GEMINI_API_KEY", "configured")
+    monkeypatch.setattr(app_module, "genai", FakeGenAI())
+    response = app_module.generate_ai_summary(
+        "example/api-platform",
+        {"description": "API integration platform", "stargazers_count": 400, "forks_count": 30, "open_issues_count": 12, "pushed_at": "2026-07-17T00:00:00Z"},
+        {"number": 7, "title": "Fix webhook retries", "type": "Bug Fix", "score": 91},
+        88,
+        "Backend reliability",
+        languages={"Python": 1000},
+        repository_intelligence=[
+            {"key": "commercial", "value": "Signals present", "detail": "organization-owned; does not prove commercial intent"},
+            {"key": "friendliness", "value": "Moderate", "detail": "Open issues are available"},
+        ],
+        confidence="High",
+        recommendation_label="INSPECT CAREFULLY",
+    )
+
+    assert response["status"] == "available"
+    assert "API integration platform" in captured["prompt"]
+    assert "Fix webhook retries" in captured["prompt"]
+    assert "Python" in captured["prompt"]
+    assert "Never promise attention, merge, employment, a contract" in captured["prompt"]
+
+
+def test_ai_summary_sanitizer_removes_unsupported_outcome_promises():
+    import app as app_module
+
+    cleaned = app_module.clean_ai_summary_text(
+        "This issue matches the repository's Python API work. "
+        "It will definitely get maintainer attention and a paid contract. "
+        "Verify the reproduction steps before preparing a focused change."
+    )
+
+    assert "Python API work" in cleaned
+    assert "definitely" not in cleaned
+    assert "paid contract" not in cleaned
+    assert "Verify the reproduction steps" in cleaned
 
 
 def test_homepage_links_to_free_developer_tools(client):
@@ -139,6 +252,8 @@ def _fake_analysis_result(score=88):
         "score": score,
         "score_label": "Strong",
         "score_action": "CONTRIBUTE NOW",
+        "recommendation_explanation": "Strong evidence and a ranked issue are available.",
+        "contract_potential": "High",
         "merge_probability": "High",
         "estimated_time": "3-6 hours",
         "difficulty": "Medium",
@@ -176,6 +291,7 @@ def _fake_analysis_result(score=88):
             "signals_used": [{"label": "Repository Activity", "detail": "Excellent"}],
             "confidence": "High",
             "confidence_reasons": ["Repository metadata available", "Ranked issue candidates found"],
+            "confidence_unknowns": ["Maintainer response speed was not measured"],
         },
         "repository_intelligence": [
             {
@@ -527,6 +643,10 @@ def test_free_analysis_shows_core_result_and_safe_pro_preview(client, monkeypatc
     assert "Estimated Implementation Time" in r.text
     assert "Estimated Difficulty" in r.text
     assert "Estimated Contract Potential" in r.text
+    assert "Secondary Estimates" in r.text
+    assert "Public Repository Facts" in r.text
+    assert r.text.index("Secondary Estimates") < r.text.index("Public Repository Facts")
+    assert "Analyze 3 repositories with a score above 85" not in r.text
     assert ">Merge Probability<" not in r.text
     assert ">Estimated Time<" not in r.text
     assert "This repository scored 88." in r.text
@@ -734,6 +854,7 @@ def test_pro_user_can_view_multiple_and_later_stage_snapshots(client, monkeypatc
     assert "example/second" in r.text
     assert "PR Merged" in r.text
     assert "The contribution has been accepted and merged." in r.text
+    assert "<span>Recommendation</span>" not in r.text
     assert "Proof-of-Work Snapshot is available for your first researched repository" not in r.text
 
 def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
@@ -744,6 +865,7 @@ def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
 
     assert r.status_code == 200
     assert "opportunity_score" in payload
+    assert payload["chance_of_getting_noticed"] == "Unavailable - maintainer attention is not measured"
     assert "score_transparency" not in payload
     assert "repository_intelligence" not in payload
 

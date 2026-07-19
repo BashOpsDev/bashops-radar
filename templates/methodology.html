@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}BashOps Radar Scoring Methodology{% endblock %}
+{% block meta_description %}Technical documentation for the BashOps Radar Opportunity Score, confidence levels, recommendations, estimates, and data limitations.{% endblock %}
+{% block extra_head %}
+<link rel="canonical" href="{{ site_url }}/methodology">
+<meta property="og:title" content="BashOps Radar Scoring Methodology">
+<meta property="og:description" content="How BashOps Radar evaluates public repository and issue evidence.">
+<meta property="og:url" content="{{ site_url }}/methodology">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="BashOps Radar Scoring Methodology">
+<meta name="twitter:description" content="How BashOps Radar evaluates public repository and issue evidence.">
+{% endblock %}
+{% block content %}
+<main class="page-shell legal-page">
+    <span class="section-label">Technical Documentation</span>
+    <h1>Opportunity Score Methodology</h1>
+    <p class="lead">The Opportunity Score is a deterministic assessment of public GitHub evidence. It is not a prediction of employment, payment, maintainer response, or pull-request acceptance.</p>
+
+    <section>
+        <h2>Score formula</h2>
+        <p>Eight independent components are capped and added to produce a score from 0 to 100. Diminishing returns prevent a large backlog or star count from dominating the result.</p>
+        <div class="intelligence-grid">
+            {% for component in score_components %}
+            <article class="intelligence-card">
+                <span>{{ component.weight }} points maximum</span>
+                <strong>{{ component.label }}</strong>
+                <p><b>Source:</b> {{ component.source }}</p>
+                <p>{{ component.positive }} {{ component.negative }}</p>
+            </article>
+            {% endfor %}
+        </div>
+        <p>A score of 90-97 requires strong evidence across several independent components. Scores of 98-100 are reserved for unusually complete, recent, contributor-ready evidence; no single metric can produce them.</p>
+        <p>Display bands are Weak (0-59), Moderate (60-79), Strong (80-89), Excellent (90-97), and Exceptional (98-100).</p>
+    </section>
+
+    <section>
+        <h2>Recommendation rules</h2>
+        <ul>
+            {% for rule in recommendation_rules %}<li>{{ rule }}</li>{% endfor %}
+        </ul>
+        <p>A missing ranked issue always prevents a Contribute Now recommendation, regardless of the repository score.</p>
+    </section>
+
+    <section>
+        <h2>Confidence</h2>
+        <p>Confidence describes evidence completeness, not opportunity quality. High confidence requires current repository metadata, a ranked issue sample, useful issue evidence, and few unknowns. Medium indicates usable evidence with meaningful gaps. Low indicates sparse, stale, or incomplete evidence.</p>
+        <p>Known unknowns, such as unmeasured maintainer response time, missing language data, stale activity, or the absence of ranked issues, reduce confidence and are shown in the report.</p>
+    </section>
+
+    <section>
+        <h2>Deterministic signals, interpretation, and estimates</h2>
+        <p><b>Deterministic signals</b> come directly from the repository and sampled public issues: activity dates, issue metadata, labels, stars, forks, languages, and organization metadata.</p>
+        <p><b>AI interpretation</b> summarizes those supplied facts. It does not alter the score or recommendation and is clearly marked unavailable when it cannot be generated.</p>
+        <p><b>Secondary estimates</b> include difficulty, implementation time, merge probability, and contract potential. They are heuristic bands, not measured outcomes or guarantees.</p>
+        <p><b>Unknowns</b> are facts the bounded analysis did not request or cannot verify, including maintainer response speed, complete pull-request history, private business intent, hiring intent, and future review decisions.</p>
+    </section>
+
+    <section>
+        <h2>Known limitations</h2>
+        <ul>
+            <li>GitHub repository open-item counts can include pull requests; issue quality uses the filtered issue sample.</li>
+            <li>Only a bounded set of open issues is ranked, so the report is not a complete repository audit.</li>
+            <li>Stars and forks indicate visibility and participation, not contributor acceptance.</li>
+            <li>Organization ownership, a homepage, or Sponsors metadata does not prove commercial intent.</li>
+            <li>Issue labels and titles can be incomplete or maintained inconsistently.</li>
+            <li>Repository conditions can change after the analysis is generated.</li>
+        </ul>
+    </section>
+</main>
+{% endblock %}
