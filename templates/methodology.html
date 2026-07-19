@@ -56,6 +56,28 @@
     </section>
 
     <section>
+        <h2>Evidence Engine</h2>
+        <p>The Evidence Engine is a separate, informational historical layer. It does not change the Opportunity Score or recommendation in Phase 1.</p>
+        <p>On a cold cache, it makes exactly three additional GitHub requests: up to {{ evidence_config.open_pull_sample }} open pull requests, up to {{ evidence_config.closed_pull_sample }} closed pull requests, and up to {{ evidence_config.release_sample }} releases. It does not follow pagination beyond those bounded samples.</p>
+        <p>Every metric identifies its source, sample size, observation window, collection freshness, and limitation. “Sampled contributor acceptance” is not presented as the repository's complete lifetime acceptance rate.</p>
+        <h3>Historical calculations</h3>
+        <p>Sampled contributor acceptance is merged outside-contributor pull requests divided by determinable merged plus closed-unmerged outside-contributor pull requests. At least {{ evidence_config.minimum_closed_pull_sample }} determinable records are required before a percentage is shown. Maintainer-authored PRs, bot-authored PRs, and records with missing or unknown author association are excluded.</p>
+        <p>Median merge time uses valid <code>created_at</code> to <code>merged_at</code> durations. Median closure time uses valid <code>created_at</code> to <code>closed_at</code> durations only for closed-unmerged PRs. At least three valid durations are required; missing or impossible negative durations are discarded and reported.</p>
+        <p>First-time contributor outcomes use only GitHub's <code>FIRST_TIMER</code> and <code>FIRST_TIME_CONTRIBUTOR</code> author-association values. Missing associations are never treated as unsuccessful contributions.</p>
+        <p>Label history is matched case-insensitively. A label must appear on at least three sampled outside-contributor PRs before it is displayed.</p>
+        <p>Contributor competition is Low for 0-7 sampled open PRs, Medium for 8-24, and High for 25 or more. Distinct non-bot authors are deduplicated across the bounded open and closed samples and shown only as supporting context. Open PR count is not described as an exact review backlog.</p>
+        <p>Momentum compares sampled PRs created in the latest 30 days with the prior 30 days, alongside release and push activity. Growing requires at least four recent sampled PRs and more than 1.25 times the prior period. Slowing requires no recent sampled PRs or releases and a last push more than 90 days ago. An empty release list does not by itself indicate inactivity.</p>
+        <h3>Evidence completeness</h3>
+        <p>Evidence Completeness gives equal weight to six families: usable closed-PR history, the open-PR queue, label outcomes, release history, contributor outcomes, and formal review/response history. Formal review/response history is intentionally unmeasured in Phase 1. The percentage measures data availability, not repository quality or success probability.</p>
+        <p>Historical Support is Limited below 50% completeness. Otherwise it is Supports the recommendation when at least two positive observations are present without a negative observation, Mixed when a negative observation is present, and Inconclusive otherwise. Positive observations are sampled acceptance of at least 60% and median merge time of at most 14 days. Negative observations are sampled acceptance below 35%, median merge time above 45 days, or High observed competition.</p>
+        <h3>Caching and freshness</h3>
+        <p>Complete historical evidence is cached for {{ evidence_config.cache_ttl_hours }} hours in a bounded process-local cache. Partial collections are cached for no more than {{ evidence_config.partial_cache_ttl_hours }} hour. When a complete entry expires, it may be shown for up to {{ evidence_config.stale_hours }} additional hours only if a three-request refresh fails; the original collection timestamp and a stale warning remain visible.</p>
+        <p>A deployment restart or another application process may collect the evidence again. The cache does not contain user data, authorization headers, access tokens, issue bodies, pull-request bodies, AI text, or raw GitHub responses.</p>
+        <h3>Phase 1 exclusions</h3>
+        <p>Maintainer response time, formal review difficulty, pull-request size, and maintainer diversity are not measured in Phase 1 because they require per-item history or additional GraphQL enrichment. The report explains these gaps instead of estimating them.</p>
+    </section>
+
+    <section>
         <h2>Known limitations</h2>
         <ul>
             <li>GitHub repository open-item counts can include pull requests; issue quality uses the filtered issue sample.</li>

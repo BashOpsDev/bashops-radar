@@ -1,3 +1,6 @@
+import radar
+
+from evidence_service import build_evidence_engine, unavailable_evidence
 from radar import (
     decision,
     estimate_difficulty as estimate_issue_difficulty,
@@ -73,6 +76,22 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
         repo,
         [issue for _score, _issue_type, issue in issue_rankings],
     )
+    repository_full_name = f"{owner}/{repo_name}"
+    selected_issue_data = selected_issue[2] if selected_issue else None
+    selected_issue_type = selected_issue[1] if selected_issue else None
+    try:
+        evidence = build_evidence_engine(
+            repository_full_name,
+            repo,
+            selected_issue_data,
+            selected_issue_type,
+            fetcher=radar.github_get,
+        )
+    except Exception:
+        evidence = unavailable_evidence(
+            repository_full_name,
+            "Historical GitHub evidence could not be calculated for this report.",
+        )
     recommendation_result = recommendation(
         repo_score,
         best_issue=best_issue,
@@ -139,6 +158,7 @@ def build_analysis_result(repo_url: str, issue_number=None) -> dict:
         "languages": languages,
         "score_transparency": score_transparency,
         "repository_intelligence": repository_intelligence,
+        "evidence": evidence,
     }
 
 
@@ -148,6 +168,11 @@ def to_public_api_payload(result: dict, site_url: str) -> dict:
     if best_issue:
         best_issue_text = f"#{best_issue.get('number')} - {best_issue.get('title')}"
 
+    score_transparency = result.get("score_transparency") or {}
+    evidence = result.get("evidence") or unavailable_evidence(
+        result.get("repo", ""),
+        "Historical GitHub evidence was not included in this analysis.",
+    )
     return {
         "repository": result.get("repo", ""),
         "opportunity_score": result.get("score", 0),
@@ -162,4 +187,14 @@ def to_public_api_payload(result: dict, site_url: str) -> dict:
         "proof_of_work_angle": result.get("angle", ""),
         "recommended_next_action": result.get("recommended_action", ""),
         "upgrade_url": f"{site_url.rstrip('/')}/pricing",
+        "confidence": {
+            "level": score_transparency.get("confidence", "Unknown"),
+            "reasons": score_transparency.get("confidence_reasons", []),
+            "unknowns": score_transparency.get("confidence_unknowns", []),
+        },
+        "evidence": evidence,
+        "ai_interpretation": {
+            "status": "not_included",
+            "detail": "The public API response contains deterministic evidence only.",
+        },
     }

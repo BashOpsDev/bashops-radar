@@ -170,7 +170,7 @@ def build_repository_intelligence(repo, issues, pull_sample=None, reference_time
         _signal("momentum", "Repository Momentum", momentum_value, momentum_detail, momentum_available),
         _signal("documentation", "Documentation Quality", docs_value, docs_detail),
         _signal("commercial", "Commercial Signals", commercial_value, commercial_detail),
-        _signal("acceptance", "Contributor Acceptance Rate", acceptance_value, acceptance_detail, acceptance_available),
+        _signal("acceptance", "Sampled Contributor Acceptance", acceptance_value, acceptance_detail, acceptance_available),
         _signal("risk", "Repository Risk", risk_value, risk_detail),
         _signal("friendliness", "Repository Friendliness", friendliness_value, friendliness_detail),
     ]

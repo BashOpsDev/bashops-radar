@@ -888,6 +888,15 @@ def methodology_page(request: Request):
         context={
             "score_components": OPPORTUNITY_SCORE_COMPONENTS,
             "recommendation_rules": RECOMMENDATION_RULES,
+            "evidence_config": {
+                "open_pull_sample": config.EVIDENCE_OPEN_PR_SAMPLE,
+                "closed_pull_sample": config.EVIDENCE_CLOSED_PR_SAMPLE,
+                "release_sample": config.EVIDENCE_RELEASE_SAMPLE,
+                "minimum_closed_pull_sample": config.EVIDENCE_MIN_CLOSED_PR_SAMPLE,
+                "cache_ttl_hours": config.EVIDENCE_CACHE_TTL_HOURS,
+                "partial_cache_ttl_hours": min(config.EVIDENCE_CACHE_TTL_HOURS, 1),
+                "stale_hours": config.EVIDENCE_CACHE_STALE_HOURS,
+            },
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
         },

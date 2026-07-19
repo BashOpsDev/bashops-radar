@@ -57,6 +57,11 @@ def test_analysis_result_uses_issue_derived_difficulty(monkeypatch):
         )
 
     monkeypatch.setattr(analysis_service, "get_analysis", fake_get_analysis)
+    monkeypatch.setattr(
+        analysis_service,
+        "build_evidence_engine",
+        lambda *args, **kwargs: analysis_service.unavailable_evidence("example/repo", "Test evidence omitted."),
+    )
 
     result = analysis_service.build_analysis_result("https://github.com/example/repo")
 
@@ -100,6 +105,11 @@ def test_analysis_without_ranked_issue_is_consistent_and_lowers_confidence(monke
             "Python",
         ),
     )
+    monkeypatch.setattr(
+        analysis_service,
+        "build_evidence_engine",
+        lambda *args, **kwargs: analysis_service.unavailable_evidence("example/empty-issues", "Test evidence omitted."),
+    )
 
     result = analysis_service.build_analysis_result("https://github.com/example/empty-issues")
 
@@ -121,6 +131,14 @@ def test_methodology_documents_score_confidence_limits_and_is_in_sitemap(client)
     assert "Repository activity" in response.text
     assert "25 points maximum" in response.text
     assert "AI interpretation" in response.text
+    assert "Evidence Engine" in response.text
+    assert "Evidence Completeness" in response.text
+    assert "does not change the Opportunity Score" in response.text
+    assert "exactly three additional GitHub requests" in response.text
+    assert "At least 5 determinable records" in response.text
+    assert "matched case-insensitively" in response.text
+    assert "Partial collections are cached for no more than 1 hour" in response.text
+    assert "original collection timestamp" in response.text
     assert "not a prediction of employment" in response.text
     assert '<link rel="canonical" href="http://testserver/methodology">' in response.text
     assert "/methodology" in client.get("/sitemap.xml").text
@@ -239,6 +257,56 @@ def test_vscode_validation_section_is_honest_and_anonymous_cta_registers(client)
     assert "marketplace" not in response.text.lower()
 
 
+def _fake_evidence():
+    return {
+        "version": "1.0",
+        "repository": "example/repo",
+        "collected_at": "2026-07-19T12:00:00+00:00",
+        "freshness": "Less than 1 hour ago",
+        "cache_status": "miss",
+        "score_impact": "Informational only; historical evidence does not alter the Opportunity Score.",
+        "completeness": {
+            "percent": 67,
+            "confidence": "High",
+            "detail": "Completeness measures availability, not opportunity quality.",
+            "checks": [
+                {"label": "Closed pull-request history", "available": True},
+                {"label": "Formal review and response history", "available": False},
+            ],
+        },
+        "historical_support": {
+            "status": "Supports the recommendation",
+            "reasons": ["Sampled contributor acceptance: 75%."],
+        },
+        "metrics": [
+            {
+                "key": "contributor_acceptance",
+                "label": "Sampled Contributor Acceptance",
+                "value": "75%",
+                "detail": "3 merged; 1 closed without merge.",
+                "available": True,
+                "source": "Most recently updated closed pull requests from GitHub",
+                "sample": "4 outside-contributor pull requests",
+                "window": "2026-06-01 to 2026-07-19",
+                "limitation": "This is a bounded sample.",
+                "items": [],
+            }
+        ],
+        "best_issue": {
+            "available": True,
+            "issue_number": 7,
+            "reasons": ["Contributor-oriented label: good first issue."],
+            "detail": "Maintainer response was not measured.",
+        },
+        "gaps": [
+            {
+                "label": "Maintainer responsiveness",
+                "reason": "Not measured in Phase 1 because comment history was not requested.",
+            }
+        ],
+    }
+
+
 def _fake_analysis_result(score=88):
     return {
         "repo": "example/repo",
@@ -309,6 +377,7 @@ def _fake_analysis_result(score=88):
                 "available": False,
             },
         ],
+        "evidence": _fake_evidence(),
     }
 
 
@@ -339,6 +408,32 @@ def test_radar_result_renders_repository_intelligence_without_changing_api(clien
     assert "Repository Health" in response.text
     assert "Maintainer Responsiveness" in response.text
     assert "Comment timelines were not requested." in response.text
+    assert "Observed repository history" in response.text
+    assert "Sampled Contributor Acceptance" in response.text
+    assert "4 outside-contributor pull requests" in response.text
+    assert "This is a bounded sample." in response.text
+    assert "Evidence not measured in Phase 1" in response.text
+
+
+def test_radar_result_displays_stale_evidence_warning(client, monkeypatch):
+    import app as app_module
+
+    result = _fake_analysis_result()
+    result["evidence"]["cache_status"] = "stale"
+    result["evidence"]["freshness"] = "2 days ago"
+    result["evidence"]["stale_warning"] = (
+        "Historical evidence is 2 days old. GitHub was temporarily unavailable during refresh."
+    )
+    result["evidence"]["collection_warnings"] = ["GitHub rate limiting prevented this evidence request."]
+    monkeypatch.setattr(app_module, "build_analysis_result", lambda *args, **kwargs: result)
+    monkeypatch.setattr(app_module, "generate_ai_summary", lambda *args, **kwargs: {"text": "Basic AI summary.", "status": "available"})
+
+    response = _post_analysis(client)
+
+    assert response.status_code == 200
+    assert "Stale evidence:" in response.text
+    assert "Historical evidence is 2 days old" in response.text
+    assert "GitHub was temporarily unavailable during refresh" in response.text
 
 
 def _register_verified_and_login(client, email="user@example.com", password="StrongPass1", name="Test User"):
@@ -857,7 +952,7 @@ def test_pro_user_can_view_multiple_and_later_stage_snapshots(client, monkeypatc
     assert "<span>Recommendation</span>" not in r.text
     assert "Proof-of-Work Snapshot is available for your first researched repository" not in r.text
 
-def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
+def test_api_contract_adds_separate_evidence_without_exposing_internal_score_details(client, monkeypatch):
     _stub_analysis(monkeypatch)
 
     r = client.post("/api/v1/analyze", json={"repo_url": "https://github.com/example/repo"})
@@ -868,6 +963,30 @@ def test_api_contract_does_not_expose_score_transparency(client, monkeypatch):
     assert payload["chance_of_getting_noticed"] == "Unavailable - maintainer attention is not measured"
     assert "score_transparency" not in payload
     assert "repository_intelligence" not in payload
+    assert payload["confidence"]["level"] == "High"
+    assert payload["evidence"]["version"] == "1.0"
+    assert payload["evidence"]["score_impact"].startswith("Informational only")
+    assert payload["ai_interpretation"]["status"] == "not_included"
+
+    legacy_types = {
+        "repository": str,
+        "opportunity_score": int,
+        "decision": str,
+        "chance_of_getting_noticed": str,
+        "contract_potential": str,
+        "merge_probability": str,
+        "estimated_time": str,
+        "difficulty": str,
+        "best_issue": str,
+        "best_issue_url": str,
+        "proof_of_work_angle": str,
+        "recommended_next_action": str,
+        "upgrade_url": str,
+    }
+    for field, expected_type in legacy_types.items():
+        assert field in payload
+        assert isinstance(payload[field], expected_type)
+    assert json.loads(json.dumps(payload)) == payload
 
 
 def test_public_api_keeps_existing_anonymous_quota_behavior(client, monkeypatch):

@@ -177,6 +177,101 @@
                 <p class="analysis-retry-note"><a href="/methodology">Read the scoring methodology and known limitations.</a></p>
             </section>
 
+            {% if result.evidence %}
+            <section class="evidence-engine">
+                <div class="score-explainer-header evidence-engine-header">
+                    <div>
+                        <span class="section-label">Evidence Engine</span>
+                        <h2>Observed repository history</h2>
+                        <p>Bounded GitHub history that supports, challenges, or leaves gaps in the recommendation.</p>
+                    </div>
+                    <div class="evidence-freshness">
+                        <span>Evidence updated</span>
+                        <strong>{{ result.evidence.freshness }}</strong>
+                    </div>
+                </div>
+
+                {% if result.evidence.stale_warning %}
+                <div class="evidence-warning"><strong>Stale evidence:</strong> {{ result.evidence.stale_warning }}</div>
+                {% elif result.evidence.collection_warnings %}
+                <div class="evidence-warning"><strong>Partial evidence:</strong> {{ result.evidence.collection_warnings | join(" ") }}</div>
+                {% endif %}
+
+                <div class="evidence-summary-grid">
+                    <div class="evidence-summary">
+                        <span>Evidence Completeness</span>
+                        <strong>{{ result.evidence.completeness.percent }}%</strong>
+                        <p>{{ result.evidence.completeness.detail }}</p>
+                        <div class="evidence-checks">
+                            {% for check in result.evidence.completeness.checks %}
+                            <span class="{% if check.available %}available{% else %}unavailable{% endif %}">
+                                {{ check.label }}: {% if check.available %}available{% else %}not measured{% endif %}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="evidence-summary">
+                        <span>Historical Evidence</span>
+                        <strong>{{ result.evidence.historical_support.status }}</strong>
+                        <ul>
+                            {% for reason in result.evidence.historical_support.reasons %}
+                            <li>{{ reason }}</li>
+                            {% endfor %}
+                        </ul>
+                        <p>{{ result.evidence.score_impact }}</p>
+                    </div>
+                </div>
+
+                {% if result.evidence.metrics %}
+                <div class="evidence-metric-grid">
+                    {% for metric in result.evidence.metrics %}
+                    <article class="evidence-metric{% if not metric.available %} unavailable{% endif %}">
+                        <span>{{ metric.label }}</span>
+                        <strong>{{ metric.value }}</strong>
+                        <p>{{ metric.detail }}</p>
+                        {% if metric["items"] %}
+                        <div class="evidence-label-list">
+                            {% for item in metric["items"] %}
+                            <div>
+                                <b>{{ item.label }}</b>
+                                <span>{{ item.merged }}/{{ item.sample }} merged · {{ item.acceptance_rate }}% sampled acceptance{% if item.median_merge_days is not none %} · {{ item.median_merge_days }} day median{% endif %}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <dl class="evidence-provenance">
+                            <div><dt>Source</dt><dd>{{ metric.source }}</dd></div>
+                            <div><dt>Sample</dt><dd>{{ metric.sample }}</dd></div>
+                            <div><dt>Window</dt><dd>{{ metric.window }}</dd></div>
+                            <div><dt>Freshness</dt><dd>{{ result.evidence.freshness }}</dd></div>
+                            <div><dt>Limitation</dt><dd>{{ metric.limitation }}</dd></div>
+                        </dl>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if result.evidence.best_issue.available %}
+                <div class="best-issue-evidence">
+                    <h3>Why issue #{{ result.evidence.best_issue.issue_number }} ranked highly</h3>
+                    <ul>
+                        {% for reason in result.evidence.best_issue.reasons %}<li>{{ reason }}</li>{% endfor %}
+                    </ul>
+                    <p>{{ result.evidence.best_issue.detail }}</p>
+                </div>
+                {% endif %}
+
+                {% if result.evidence.gaps %}
+                <div class="evidence-gaps">
+                    <h3>Evidence not measured in Phase 1</h3>
+                    {% for gap in result.evidence.gaps %}
+                    <p><strong>{{ gap.label }}:</strong> {{ gap.reason }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </section>
+            {% endif %}
+
             {% if result.repository_intelligence %}
             <section class="repository-intelligence">
                 <div class="score-explainer-header">
