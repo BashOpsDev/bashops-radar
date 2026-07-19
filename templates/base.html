@@ -50,18 +50,27 @@
 
 {% block content %}{% endblock %}
 
-<footer>
-    <strong>BashOps Radar</strong>
-    <p>AI Opportunity Intelligence for Developers. Built by BashOps.</p>
-    <p>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
-        <a href="/refund">Refund Policy</a>
-        <a href="/contact">Contact</a>
-        <a href="/methodology">Methodology</a>
-    </p>
-    <p>To unsubscribe from product updates, contact support.</p>
-    <span>Copyright 2026 BashOps Radar</span>
+<footer class="site-footer">
+    <div class="site-footer-inner">
+        <div class="site-footer-statement">
+            <strong>BashOps Radar</strong>
+            <p>Built using deterministic repository analysis and evidence-based opportunity signals.</p>
+        </div>
+        <nav class="site-footer-links" aria-label="Product information">
+            <a href="/methodology#evidence-engine">Evidence Engine V1</a>
+            <a href="/methodology">Methodology</a>
+            <a href="/docs">API</a>
+            <a href="https://github.com/BashOpsDev/bashops-radar" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="/privacy">Privacy</a>
+        </nav>
+        <nav class="site-footer-legal" aria-label="Legal and support">
+            <a href="/terms">Terms</a>
+            <a href="/refund">Refund Policy</a>
+            <a href="/contact">Contact</a>
+        </nav>
+        <p class="site-footer-note">Opportunity recommendations are signals, not guarantees. To unsubscribe from product updates, contact support.</p>
+        <span>Copyright 2026 BashOps Radar</span>
+    </div>
 </footer>
 
 <script>

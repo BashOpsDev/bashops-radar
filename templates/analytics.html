@@ -21,6 +21,43 @@
     </section>
 
     <section class="card-flat">
+        <span class="section-label">OSS Jobs</span>
+        <h2>Category engagement</h2>
+        <p class="angle">Views, repository clicks, issue opens, and analysis starts from the public category experience.</p>
+        <div class="analytics-table-wrap">
+            <table class="admin-table">
+                <thead><tr><th>Category</th><th>Views</th><th>Selected</th><th>Repo clicks</th><th>CTR</th><th>Issue opens</th><th>Analyses</th></tr></thead>
+                <tbody>
+                    {% for item in jobs_categories %}
+                    <tr><td>{{ item.category }}</td><td>{{ item.views }}</td><td>{{ item.selections }}</td><td>{{ item.clicks }}</td><td>{{ item.click_through_rate }}%</td><td>{{ item.issues }}</td><td>{{ item.analyses }}</td></tr>
+                    {% else %}
+                    <tr><td colspan="7">No category engagement has been recorded yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="analytics-grid">
+        <div class="card-flat">
+            <h2>Clicked positions</h2>
+            <table class="admin-table">
+                <tbody>
+                    {% for item in jobs_positions %}<tr><td>Position {{ item.position }}</td><td>{{ item.clicks }}</td></tr>{% else %}<tr><td>No position clicks yet.</td><td>0</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-flat">
+            <h2>Cross-category overlap</h2>
+            <table class="admin-table">
+                <tbody>
+                    {% for item in jobs_overlap %}<tr><td>{{ item.repository }}</td><td>{{ item.categories }} categories</td></tr>{% else %}<tr><td>No repeated qualified repositories.</td><td>0</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="card-flat">
         <span class="section-label">Funnel</span>
         <h2>Conversion Funnel</h2>
         <div class="analytics-table-wrap">

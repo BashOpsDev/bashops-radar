@@ -29,27 +29,49 @@
 
     <p class="jobs-disclaimer">These are contribution and opportunity signals, not confirmed jobs, contracts, payments, merge outcomes, or maintainer intent.</p>
 
+    {% if feed_error %}<p class="error" role="status">{{ feed_error }}</p>{% endif %}
+
     {% if sections %}
     <nav class="jobs-category-nav" aria-label="Opportunity categories">
         {% for section in sections %}
-        <a href="#{{ section.key }}" data-public-event="jobs_category" data-event-detail="{{ section.key }}">{{ section.title }}</a>
+        <a href="#{{ section.key }}" data-public-event="jobs_category_selected" data-event-category="{{ section.key }}">{{ section.title }}</a>
         {% endfor %}
     </nav>
 
     {% for section in sections %}
-    <section class="jobs-section" id="{{ section.key }}" aria-labelledby="{{ section.key }}-title">
+    <section class="jobs-section" id="{{ section.key }}" aria-labelledby="{{ section.key }}-title" data-jobs-section="{{ section.key }}">
         <div class="section-heading-row">
-            <div><span class="section-label">Open Source Opportunities</span><h2 id="{{ section.key }}-title">{{ section.title }}</h2></div>
+            <div>
+                <span class="section-label">Open Source Opportunities</span>
+                <h2 id="{{ section.key }}-title">{{ section.title }}</h2>
+                <p class="jobs-section-description">{{ section.description }}</p>
+            </div>
             <span>{{ section["items"] | length }} {% if section["items"] | length == 1 %}repository{% else %}repositories{% endif %}</span>
         </div>
+        {% if section["items"] %}
         <div class="jobs-grid">
             {% for item in section["items"] %}
-            <article class="jobs-card">
+            <article class="jobs-card" data-jobs-card data-event-category="{{ section.key }}" data-event-repository="{{ item.repository }}" data-event-position="{{ item.position }}">
                 <div class="jobs-card-heading">
                     <div><span>{{ item.language }}</span><h3>{{ item.repository }}</h3></div>
                     <strong>{{ item.radar_score }}/100</strong>
                 </div>
-                <p>{{ item.reason }}</p>
+                <div class="jobs-ranking-summary">
+                    <span>Why ranked here</span>
+                    <p>{{ item.ranking_reason }}</p>
+                    <div class="jobs-ranking-meta">
+                        <small>Category fit {{ item.category_relevance }}/100</small>
+                        <small>{{ item.confidence }} confidence</small>
+                    </div>
+                    <details data-public-event="jobs_why_ranked_expanded" data-event-category="{{ section.key }}" data-event-repository="{{ item.repository }}" data-event-position="{{ item.position }}">
+                        <summary>Evidence used</summary>
+                        <ul>{% for signal in item.evidence_signals %}<li>{{ signal }}</li>{% endfor %}</ul>
+                        {% if item.missing_evidence %}
+                        <p><strong>Not established:</strong> {{ item.missing_evidence | join(" ") }}</p>
+                        {% endif %}
+                    </details>
+                </div>
+                <p class="jobs-radar-context"><strong>Radar context:</strong> {{ item.reason }}</p>
                 <dl class="jobs-metrics">
                     <div><dt>Difficulty</dt><dd>{{ item.difficulty }}</dd></div>
                     <div><dt>Merge probability</dt><dd>{{ item.merge_probability }}</dd></div>
@@ -57,19 +79,24 @@
                     <div><dt>Updated</dt><dd>{{ item.analyzed_at[:10] if item.analyzed_at else "Unavailable" }}</dd></div>
                 </dl>
                 {% if item.best_issue %}
-                <div class="jobs-issue"><span>Best first issue</span><a href="{{ item.best_issue.url }}" target="_blank" rel="noopener noreferrer" data-public-event="jobs_repository" data-event-detail="{{ item.repository }}">#{{ item.best_issue.number }} {{ item.best_issue.title }}</a></div>
+                <div class="jobs-issue"><span>Best first issue</span><a href="{{ item.best_issue.url }}" target="_blank" rel="noopener noreferrer" data-public-event="jobs_issue_opened" data-event-category="{{ section.key }}" data-event-repository="{{ item.repository }}" data-event-position="{{ item.position }}">#{{ item.best_issue.number }} {{ item.best_issue.title }}</a></div>
                 {% endif %}
                 <div class="jobs-actions">
-                    <form method="post" action="/analyze" data-public-event="jobs_analyze" data-event-detail="{{ item.repository }}">
+                    <form method="post" action="/analyze" data-public-event="jobs_analysis_started" data-event-category="{{ section.key }}" data-event-repository="{{ item.repository }}" data-event-position="{{ item.position }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <input type="hidden" name="repo_url" value="{{ item.repository_url }}">
                         <button type="submit" class="nav-cta compact">View Opportunity Analysis</button>
                     </form>
-                    <a href="{{ item.repository_url }}" target="_blank" rel="noopener noreferrer" data-public-event="jobs_repository" data-event-detail="{{ item.repository }}">Open repository</a>
+                    <a href="{{ item.repository_url }}" target="_blank" rel="noopener noreferrer" data-public-event="jobs_repository_clicked" data-event-category="{{ section.key }}" data-event-repository="{{ item.repository }}" data-event-position="{{ item.position }}">Open repository</a>
                 </div>
             </article>
             {% endfor %}
         </div>
+        {% else %}
+        <div class="jobs-category-empty">
+            <p>No repositories currently meet this category's evidence threshold. We show fewer results instead of unrelated fallback repositories.</p>
+        </div>
+        {% endif %}
     </section>
     {% endfor %}
     {% else %}
@@ -91,24 +118,54 @@
 <script>
 (function () {
     const csrf = document.getElementById("jobsEventCsrf");
-    document.querySelectorAll("[data-public-event]").forEach(function (element) {
-        element.addEventListener("click", function () {
-            if (!csrf) return;
-            const body = new URLSearchParams({
-                action: element.dataset.publicEvent,
-                surface: "jobs",
-                detail: element.dataset.eventDetail || "",
-                csrf_token: csrf.value
-            });
-            fetch("/public/event", {
-                method: "POST",
-                headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                body: body.toString(),
-                credentials: "same-origin",
-                keepalive: true
-            }).catch(function () {});
+    const emitted = new Set();
+    function emit(action, element, onceKey) {
+        if (!csrf || (onceKey && emitted.has(onceKey))) return;
+        if (onceKey) emitted.add(onceKey);
+        const body = new URLSearchParams({
+            action: action,
+            surface: "jobs",
+            detail: element.dataset.eventDetail || "",
+            category: element.dataset.eventCategory || "",
+            repository: element.dataset.eventRepository || "",
+            position: element.dataset.eventPosition || "0",
+            csrf_token: csrf.value
         });
+        fetch("/public/event", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: body.toString(),
+            credentials: "same-origin",
+            keepalive: true
+        }).catch(function () {});
+    }
+
+    document.querySelectorAll("[data-public-event]").forEach(function (element) {
+        if (element.tagName === "DETAILS") {
+            element.addEventListener("toggle", function () {
+                if (element.open) emit(element.dataset.publicEvent, element, "why:" + element.dataset.eventCategory + ":" + element.dataset.eventRepository);
+            });
+        } else {
+            element.addEventListener("click", function () { emit(element.dataset.publicEvent, element); });
+        }
     });
+
+    if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                const element = entry.target;
+                if (element.dataset.jobsSection) {
+                    element.dataset.eventCategory = element.dataset.jobsSection;
+                    emit("jobs_category_viewed", element, "section:" + element.dataset.jobsSection);
+                } else {
+                    emit("jobs_repository_card_viewed", element, "card:" + element.dataset.eventCategory + ":" + element.dataset.eventRepository);
+                }
+                observer.unobserve(element);
+            });
+        }, {threshold: 0.35});
+        document.querySelectorAll("[data-jobs-section], [data-jobs-card]").forEach(function (element) { observer.observe(element); });
+    }
 })();
 </script>
 {% endblock %}

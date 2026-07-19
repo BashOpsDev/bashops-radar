@@ -4001,6 +4001,17 @@ footer,
   margin-top: 34px;
 }
 
+.jobs-section .section-heading-row > div:first-child {
+  max-width: 760px;
+}
+
+.jobs-section-description {
+  max-width: 720px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .jobs-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4039,6 +4050,73 @@ footer,
   padding: 7px 9px;
   border: 1px solid var(--primary);
   border-radius: 6px;
+}
+
+.jobs-ranking-summary {
+  margin-top: 14px;
+  padding: 12px;
+  border-left: 3px solid var(--primary);
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.jobs-ranking-summary > span {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.jobs-ranking-summary > p {
+  margin: 5px 0 8px;
+  color: var(--text);
+}
+
+.jobs-ranking-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.jobs-ranking-meta small {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.jobs-ranking-summary details {
+  margin-top: 9px;
+}
+
+.jobs-ranking-summary summary {
+  width: fit-content;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.jobs-ranking-summary ul {
+  margin: 9px 0 0;
+  padding-left: 20px;
+}
+
+.jobs-ranking-summary details p,
+.jobs-radar-context {
+  margin: 9px 0 0;
+  font-size: 0.86rem;
+}
+
+.jobs-category-empty {
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.jobs-category-empty p {
+  margin: 0;
 }
 
 .jobs-metrics {
@@ -4094,6 +4172,53 @@ footer,
   margin-top: 40px;
 }
 
+.site-footer {
+  margin-top: 40px;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: #090f15;
+  text-align: left;
+}
+
+.site-footer-inner {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+}
+
+.site-footer-statement p {
+  max-width: 620px;
+  margin: 5px 0 0;
+}
+
+.site-footer-links,
+.site-footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 14px;
+}
+
+.site-footer-links a,
+.site-footer-legal a {
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.site-footer-links a:hover,
+.site-footer-links a:focus-visible,
+.site-footer-legal a:hover,
+.site-footer-legal a:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.site-footer-note {
+  margin: 14px 0 7px;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 760px) {
   .jobs-page {
     width: min(100% - 20px, 1180px);
@@ -4118,6 +4243,15 @@ footer,
 
   .jobs-grid {
     grid-template-columns: 1fr;
+  }
+
+  .site-footer {
+    padding: 20px 16px;
+  }
+
+  .site-footer-links,
+  .site-footer-legal {
+    gap: 8px 14px;
   }
 }
 

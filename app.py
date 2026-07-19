@@ -1947,21 +1947,44 @@ def public_oss_opportunities(request: Request):
     current_user = get_current_user(request)
     refresh_status = _opportunity_refresh_status()
     db: Session = SessionLocal()
+    feed_error = ""
     try:
-        items = load_feed_items(db)
-        sections = [
-            {
-                "key": section["key"],
-                "title": section["title"],
-                "items": [public_opportunity_payload(item) for item in section["items"]],
-            }
-            for section in curated_opportunity_sections(items)
-        ]
+        try:
+            items = load_feed_items(db)
+        except SQLAlchemyError:
+            db.rollback()
+            items = []
+            feed_error = "The public opportunity feed is temporarily unavailable. You can still analyze a repository directly."
+        sections = []
+        for section in curated_opportunity_sections(items):
+            section_items = []
+            for position, item in enumerate(section["items"], start=1):
+                payload = public_opportunity_payload(item)
+                ranking = section["ranking_details"].get(item.repository_full_name.casefold(), {})
+                payload.update({**ranking, "position": position})
+                section_items.append(payload)
+            sections.append(
+                {
+                    "key": section["key"],
+                    "title": section["title"],
+                    "description": section["description"],
+                    "items": section_items,
+                }
+            )
         freshness = feed_freshness(items)
     finally:
         db.close()
     result_count = len({item["repository"] for section in sections for item in section["items"]})
-    track_event(request, "jobs_view", user=current_user, metadata={"result_count": result_count})
+    track_event(
+        request,
+        "jobs_page_viewed",
+        user=current_user,
+        metadata={"result_count": result_count, "authenticated": bool(current_user)},
+    )
+    unique_items = {}
+    for section in sections:
+        for item in section["items"]:
+            unique_items.setdefault(item["repository"].casefold(), item)
     jobs_json_ld = {
         "@context": "https://schema.org",
         "@type": "ItemList",
@@ -1976,7 +1999,7 @@ def public_oss_opportunities(request: Request):
                 "url": item["repository_url"],
             }
             for index, item in enumerate(
-                next((section["items"] for section in sections if section["key"] == "trending"), []),
+                unique_items.values(),
                 start=1,
             )
         ],
@@ -1989,6 +2012,7 @@ def public_oss_opportunities(request: Request):
             "freshness": freshness,
             "refresh_status": refresh_status["status"],
             "result_count": result_count,
+            "feed_error": feed_error,
             "jobs_json_ld": jobs_json_ld,
             "site_url": config.SITE_URL,
             **user_context(request, current_user),
@@ -2003,10 +2027,14 @@ def public_distribution_event(
     action: str = Form(...),
     surface: str = Form(""),
     detail: str = Form(""),
+    category: str = Form(""),
+    repository: str = Form(""),
+    position: int = Form(0),
     csrf_token: str = Form(""),
 ):
     if not check_csrf(request, csrf_token):
         return JSONResponse({"error": "invalid session"}, status_code=403)
+    current_user = get_current_user(request)
     allowed_events = {
         "share_linkedin": "share_linkedin",
         "share_x": "share_x",
@@ -2015,16 +2043,36 @@ def public_distribution_event(
         "jobs_repository": "jobs_repository",
         "jobs_analyze": "jobs_analyze",
         "jobs_profile": "jobs_profile",
+        "jobs_category_viewed": "jobs_category_viewed",
+        "jobs_category_selected": "jobs_category_selected",
+        "jobs_repository_card_viewed": "jobs_repository_card_viewed",
+        "jobs_repository_clicked": "jobs_repository_clicked",
+        "jobs_why_ranked_expanded": "jobs_why_ranked_expanded",
+        "jobs_analysis_started": "jobs_analysis_started",
+        "jobs_issue_opened": "jobs_issue_opened",
     }
     event_name = allowed_events.get(action)
     if not event_name or surface not in {"profile", "today", "jobs"}:
         return JSONResponse({"error": "invalid action"}, status_code=400)
     safe_detail = detail[:100] if re.fullmatch(r"[A-Za-z0-9_. /-]{0,100}", detail or "") else ""
+    safe_category = category[:64] if re.fullmatch(r"[a-z0-9-]{0,64}", category or "") else ""
+    try:
+        safe_repository = normalize_repository_full_name(repository) if repository else ""
+    except OpportunityFeedError:
+        safe_repository = ""
+    safe_position = max(0, min(int(position or 0), 100))
     track_event(
         request,
         event_name,
-        user=get_current_user(request),
-        metadata={"surface": surface, "detail": safe_detail},
+        user=current_user,
+        metadata={
+            "surface": surface,
+            "detail": safe_detail,
+            "category": safe_category,
+            "repository": safe_repository,
+            "position": safe_position,
+            "authenticated": bool(current_user),
+        },
     )
     return JSONResponse({"ok": True})
 
@@ -2901,6 +2949,9 @@ def admin_event_summary() -> dict:
             "top_referrers": [],
             "top_repositories": [],
             "funnel": [{"name": name, "count": 0} for name in funnel_names],
+            "jobs_categories": [],
+            "jobs_positions": [],
+            "jobs_overlap": [],
         }
 
     db: Session = SessionLocal()
@@ -2908,6 +2959,13 @@ def admin_event_summary() -> dict:
         try:
             events_today = db.query(Event).filter(Event.created_at >= today).all()
             all_events = db.query(Event).order_by(Event.created_at.desc()).limit(50).all()
+            jobs_events = (
+                db.query(Event)
+                .filter(Event.event_name.like("jobs_%"))
+                .order_by(Event.created_at.desc())
+                .limit(5000)
+                .all()
+            )
         except SQLAlchemyError as e:
             db.rollback()
             print(f"[/admin/analytics event query unavailable] {e.__class__.__name__}")
@@ -2939,6 +2997,59 @@ def admin_event_summary() -> dict:
             .limit(10)
             .all()
         )
+
+        category_totals = {}
+        position_clicks = {}
+        for event in jobs_events:
+            try:
+                metadata = json.loads(event.metadata_json or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                metadata = {}
+            category = str(metadata.get("category") or "").strip()
+            if not re.fullmatch(r"[a-z0-9-]{1,64}", category):
+                continue
+            totals = category_totals.setdefault(
+                category,
+                {"category": category, "views": 0, "selections": 0, "clicks": 0, "analyses": 0, "issues": 0},
+            )
+            if event.event_name == "jobs_category_viewed":
+                totals["views"] += 1
+            elif event.event_name == "jobs_category_selected":
+                totals["selections"] += 1
+            elif event.event_name == "jobs_repository_clicked":
+                totals["clicks"] += 1
+                try:
+                    position = max(0, min(int(metadata.get("position") or 0), 100))
+                except (TypeError, ValueError):
+                    position = 0
+                if position:
+                    position_clicks[position] = position_clicks.get(position, 0) + 1
+            elif event.event_name == "jobs_analysis_started":
+                totals["analyses"] += 1
+            elif event.event_name == "jobs_issue_opened":
+                totals["issues"] += 1
+        jobs_categories = []
+        for totals in category_totals.values():
+            totals["click_through_rate"] = round((totals["clicks"] / totals["views"]) * 100, 1) if totals["views"] else 0
+            jobs_categories.append(totals)
+        jobs_categories.sort(key=lambda value: (-value["analyses"], -value["clicks"], value["category"]))
+
+        overlap_counts = {}
+        try:
+            overlap_sections = curated_opportunity_sections(load_feed_items(db))
+        except SQLAlchemyError:
+            db.rollback()
+            overlap_sections = []
+        for section in overlap_sections:
+            if section["key"] == "trending":
+                continue
+            for item in section["items"]:
+                overlap_counts[item.repository_full_name] = overlap_counts.get(item.repository_full_name, 0) + 1
+        jobs_overlap = [
+            {"repository": repository, "categories": count}
+            for repository, count in sorted(overlap_counts.items(), key=lambda value: (-value[1], value[0].casefold()))
+            if count > 1
+        ][:10]
 
         return {
             "cards": [
@@ -2973,6 +3084,12 @@ def admin_event_summary() -> dict:
             "top_referrers": [{"referrer": referrer, "count": count} for referrer, count in top_referrer_rows],
             "top_repositories": [{"repo": repo, "count": count} for repo, count in top_repo_rows],
             "funnel": [{"name": name, "count": db.query(Event).filter(Event.event_name == name).count()} for name in funnel_names],
+            "jobs_categories": jobs_categories[:12],
+            "jobs_positions": [
+                {"position": position, "clicks": clicks}
+                for position, clicks in sorted(position_clicks.items(), key=lambda value: (-value[1], value[0]))[:10]
+            ],
+            "jobs_overlap": jobs_overlap,
         }
     finally:
         db.close()

@@ -27,6 +27,64 @@ REFRESH_CATEGORY_VALUES = [
     "apis-integrations",
 ]
 
+JOB_CATEGORY_DEFINITIONS = [
+    {
+        "key": "trending",
+        "title": "Today's Best Opportunities",
+        "description": "The strongest current Radar analyses across the bounded public opportunity feed.",
+    },
+    {
+        "key": "paid-sprint",
+        "title": "Highest Paid Sprint Potential",
+        "description": "Commercial open-source projects showing stronger business, maintenance, and technical-work signals. These are opportunity indicators, not guarantees.",
+    },
+    {
+        "key": "fast-merge",
+        "title": "Fast Merge Opportunities",
+        "description": "Repositories where recent public evidence suggests active maintenance and a more manageable contribution path. Merge timing is never guaranteed.",
+    },
+    {
+        "key": "founder-friendly",
+        "title": "Founder Friendly",
+        "description": "Actively maintained projects where visible commercial and contributor signals may make a genuine conversation easier to evaluate. Founder identity is not inferred.",
+    },
+    {
+        "key": "great-first-contribution",
+        "title": "Great First Contribution",
+        "description": "Clearer, more approachable opportunities with public evidence that an outside contributor can get started.",
+    },
+    {
+        "key": "backend",
+        "title": "Backend",
+        "description": "Opportunities centred on APIs, databases, authentication, services, workers, and server-side systems.",
+    },
+    {
+        "key": "frontend",
+        "title": "Frontend",
+        "description": "Opportunities involving interfaces, accessibility, design systems, browser behaviour, and frontend frameworks.",
+    },
+    {
+        "key": "ai",
+        "title": "AI",
+        "description": "Repositories working on models, agents, evaluation, inference, retrieval, and AI development infrastructure.",
+    },
+    {
+        "key": "devops",
+        "title": "DevOps",
+        "description": "Opportunities involving CI/CD, containers, deployment, automation, reliability, and developer operations.",
+    },
+    {
+        "key": "infrastructure",
+        "title": "Infrastructure",
+        "description": "Lower-level systems involving databases, cloud platforms, networking, distributed systems, and developer infrastructure.",
+    },
+    {
+        "key": "python",
+        "title": "Python",
+        "description": "Current opportunities in repositories where Python is the primary detected language.",
+    },
+]
+
 _REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,155}$")
 _refresh_lock = threading.Lock()
 _last_refresh_attempt_at = None
@@ -150,6 +208,17 @@ def _best_issue_source(result: dict) -> dict:
     return {}
 
 
+def _public_evidence_metric(result: dict, key: str) -> dict:
+    for metric in (result.get("evidence") or {}).get("metrics") or []:
+        if metric.get("key") == key:
+            return {
+                "available": bool(metric.get("available")),
+                "value": str(metric.get("value") or "Unavailable")[:100],
+                "sample": str(metric.get("sample") or "Sample unavailable")[:160],
+            }
+    return {"available": False, "value": "Unavailable", "sample": "Sample unavailable"}
+
+
 def _days_since(value: str, reference_time: datetime) -> int | None:
     if not value:
         return None
@@ -223,6 +292,21 @@ def apply_analysis_to_feed_item(item: OpportunityFeedItem, result: dict, analyze
         "best_issue_updated_at": issue_source.get("updated_at") or "",
         "friendliness": friendliness.get("value") or "Unavailable",
         "momentum": momentum.get("value") or "Unavailable",
+        "score_confidence": (result.get("score_transparency") or {}).get("confidence") or "Unavailable",
+        "best_issue_labels": [
+            str(label.get("name") or "")[:100]
+            for label in (issue_source.get("labels") or [])
+            if isinstance(label, dict) and label.get("name")
+        ][:10],
+        "evidence_metrics": {
+            key: _public_evidence_metric(result, key)
+            for key in (
+                "contributor_acceptance",
+                "median_merge_time",
+                "contributor_competition",
+                "repository_momentum",
+            )
+        },
     }
     current_snapshot["changes"] = _snapshot_changes(item.source_snapshot or {}, current_snapshot)
 
@@ -394,94 +478,207 @@ def public_opportunity_payload(item: OpportunityFeedItem, reference_time=None) -
     }
 
 
-def curated_opportunity_sections(items, limit=5) -> list[dict]:
-    """Group cached results with category-specific, deterministic ranking."""
-    limit = max(1, min(int(limit or 5), 5))
-
-    def searchable(item):
-        values = [item.primary_language, *(item.categories or []), *(item.topics or [])]
-        return " ".join(str(value or "") for value in values).casefold()
-
-    def matches(item, *terms):
-        text = searchable(item)
-        return any(
-            re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", text)
-            for term in terms
-        )
-
-    def selected(predicate, ranker):
-        matching = [item for item in items if predicate(item)]
-        return sorted(matching, key=ranker, reverse=True)[:limit]
-
-    def score(item):
-        return float(item.radar_score or 0)
-
-    def commercial_present(item):
-        value = (item.commercial_signal or "").casefold()
-        return bool(value) and not any(
-            marker in value
-            for marker in ("unavailable", "not detected", "does not show a commercial signal")
-        )
-
-    def paid_sprint_rank(item):
-        commercial = commercial_present(item)
-        explicit = (item.paid_sprint_signal or "").startswith("Potential")
-        return (int(explicit), int(commercial), score(item))
-
-    def founder_rank(item):
-        activity = (item.maintainer_activity_signal or "").casefold()
-        commercial = commercial_present(item)
-        return (int("high" in activity), int(commercial), score(item))
-
-    def fast_merge_rank(item):
-        probability = (item.merge_probability or "").casefold()
-        difficulty = (item.difficulty or "").casefold()
-        return (int(probability == "high"), int(difficulty in {"low", "easy"}), int(bool(item.best_issue_url)), score(item))
-
-    def first_contribution_rank(item):
-        difficulty = (item.difficulty or "").casefold()
-        return (int(matches(item, "good first issue")), int(difficulty in {"low", "easy"}), int(bool(item.best_issue_url)), score(item))
-
-    definitions = [
-        ("trending", "Today's Best Opportunities", lambda item: True, score),
-        (
-            "paid-sprint",
-            "Highest Paid Sprint Potential",
-            lambda item: (item.paid_sprint_signal or "").startswith("Potential"),
-            paid_sprint_rank,
-        ),
-        (
-            "founder-friendly",
-            "Founder Friendly",
-            lambda item: "high" in (item.maintainer_activity_signal or "").casefold()
-            and commercial_present(item),
-            founder_rank,
-        ),
-        (
-            "fast-merge",
-            "Fast Merge Opportunities",
-            lambda item: (item.merge_probability or "").casefold() == "high",
-            fast_merge_rank,
-        ),
-        (
-            "great-first-contribution",
-            "Great First Contribution",
-            lambda item: (item.difficulty or "").casefold() in {"easy", "low"}
-            or matches(item, "good first issue"),
-            first_contribution_rank,
-        ),
-        ("ai", "AI", lambda item: matches(item, "ai", "machine learning"), score),
-        ("backend", "Backend", lambda item: matches(item, "backend", "api", "fastapi"), score),
-        ("devops", "DevOps", lambda item: matches(item, "devops", "ci/cd", "ci", "deployment"), score),
-        ("infrastructure", "Infrastructure", lambda item: matches(item, "infrastructure", "cloud", "kubernetes", "docker"), score),
-        ("python", "Python", lambda item: (item.primary_language or "").casefold() == "python", score),
-        ("frontend", "Frontend", lambda item: matches(item, "frontend", "react", "typescript", "javascript"), score),
+def _structured_category_text(item) -> str:
+    values = [
+        item.primary_language,
+        *(item.categories or []),
+        *(item.topics or []),
+        item.best_issue_title,
     ]
+    return " ".join(str(value or "") for value in values).casefold()
+
+
+def _matches_category_terms(item, *terms: str) -> bool:
+    text = _structured_category_text(item)
+    return any(
+        re.search(rf"(?<![a-z0-9]){re.escape(term.casefold())}(?![a-z0-9])", text)
+        for term in terms
+    )
+
+
+def _commercial_present(item) -> bool:
+    value = (item.commercial_signal or "").casefold()
+    return bool(value) and not any(
+        marker in value
+        for marker in ("unavailable", "not detected", "does not show a commercial signal")
+    )
+
+
+def _source_snapshot(item) -> dict:
+    value = item.source_snapshot or {}
+    return value if isinstance(value, dict) else {}
+
+
+def _snapshot_metric(item, key: str) -> dict:
+    metrics = _source_snapshot(item).get("evidence_metrics") or {}
+    if not isinstance(metrics, dict):
+        return {}
+    return metrics.get(key) or {}
+
+
+def _metric_number(metric: dict) -> float | None:
+    if not metric.get("available"):
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", str(metric.get("value") or ""))
+    return float(match.group()) if match else None
+
+
+def _recent_maintenance(item) -> bool:
+    activity = (item.maintainer_activity_signal or "").casefold()
+    momentum = str(_source_snapshot(item).get("momentum") or "").casefold()
+    if "high" in activity or momentum in {"growing", "stable"}:
+        return True
+    match = re.search(r"pushed\s+(\d+)\s+days?\s+ago", (item.recent_activity_signal or "").casefold())
+    return bool(match and int(match.group(1)) <= 30)
+
+
+def _category_ranking_detail(item, category_key: str) -> dict:
+    radar_score = max(0, min(float(item.radar_score or 0), 100))
+    relevance = 0
+    signals = []
+    missing = []
+
+    def add(points: int, condition: bool, reason: str) -> None:
+        nonlocal relevance
+        if condition:
+            relevance += points
+            signals.append(reason)
+
+    active = _recent_maintenance(item)
+    commercial = _commercial_present(item)
+    has_issue = bool(item.best_issue_url and item.best_issue_title)
+    difficulty = (item.difficulty or "").casefold()
+    merge_estimate = (item.merge_probability or "").casefold()
+    acceptance = _metric_number(_snapshot_metric(item, "contributor_acceptance"))
+    merge_days = _metric_number(_snapshot_metric(item, "median_merge_time"))
+    competition = str(_snapshot_metric(item, "contributor_competition").get("value") or "").casefold()
+    issue_labels = [str(value).casefold() for value in _source_snapshot(item).get("best_issue_labels") or []]
+
+    eligible = True
+    minimum_relevance = 45
+    if category_key == "trending":
+        relevance = round(radar_score)
+        signals.append(item.public_reason or "The cached Radar analysis contains current public opportunity signals")
+        minimum_relevance = 0
+    elif category_key == "paid-sprint":
+        technical_scope = _matches_category_terms(
+            item, "api", "integration", "infrastructure", "reliability", "performance", "security", "database", "backend"
+        )
+        add(30, commercial, "Visible organization, homepage, or sponsor metadata provides commercial context")
+        add(20, technical_scope, "The ranked work matches meaningful operational or product-maintenance scope")
+        add(15, active, "Recent public activity indicates ongoing maintenance")
+        add(15, (item.paid_sprint_signal or "").startswith("Potential"), "The canonical Radar analysis found adjacent-work signals")
+        add(10, has_issue, "A concrete ranked issue is available for proof-of-work")
+        add(10, radar_score >= 80, "The independent Radar opportunity score is strong")
+        eligible = commercial and relevance >= 55
+        if not commercial:
+            missing.append("No explicit commercial context was detected")
+    elif category_key == "fast-merge":
+        if merge_days is not None:
+            add(30, merge_days <= 14, f"Sampled median merge time is {merge_days:g} days")
+            add(15, 14 < merge_days <= 30, f"Sampled median merge time is {merge_days:g} days")
+        if acceptance is not None:
+            add(15, acceptance >= 60, f"Sampled contributor acceptance is {acceptance:g}%")
+        add(15, merge_estimate == "high", "The issue-level merge estimate is High")
+        add(15, difficulty in {"low", "easy"}, "The ranked issue has a Low difficulty estimate")
+        add(8, difficulty == "medium", "The ranked issue has a Medium difficulty estimate")
+        add(10, competition == "low", "The observed open-PR competition signal is Low")
+        add(5, competition == "medium", "The observed open-PR competition signal is Medium")
+        add(15, has_issue, "A bounded ranked issue is available")
+        add(10, active, "Recent public activity indicates active maintenance")
+        eligible = has_issue and relevance >= 45
+        if merge_days is None:
+            missing.append("Observed merge timing is unavailable; the issue-level value remains an estimate")
+    elif category_key == "founder-friendly":
+        add(30, active, "Recent public activity indicates current project maintenance")
+        add(25, commercial, "Visible organization, homepage, or sponsor metadata provides commercial context")
+        add(15, acceptance is not None and acceptance >= 50, "Sampled outside-contributor outcomes are constructive")
+        add(10, competition in {"low", "medium"}, "Observed contributor competition is manageable")
+        add(10, has_issue, "A concrete public issue provides a specific conversation starting point")
+        eligible = active and commercial and relevance >= 55
+        missing.append("Founder identity and direct founder engagement are not inferred from repository metadata")
+    elif category_key == "great-first-contribution":
+        beginner_signal = _matches_category_terms(item, "good first issue", "help wanted", "documentation", "tests", "examples", "setup") or any(
+            any(term in label for term in ("good first", "help wanted", "beginner"))
+            for label in issue_labels
+        )
+        add(35, beginner_signal, "The ranked issue has a contributor-oriented type or label")
+        add(20, difficulty in {"low", "easy"}, "The ranked issue has a Low difficulty estimate")
+        add(10, difficulty == "medium", "The ranked issue has a Medium difficulty estimate")
+        add(20, has_issue, "A concrete bounded issue is available")
+        add(10, acceptance is not None and acceptance >= 50, "Sampled outside-contributor outcomes are constructive")
+        add(10, active, "Recent public activity reduces stale-issue risk")
+        eligible = has_issue and relevance >= 45
+    else:
+        category_terms = {
+            "backend": ("backend", "api", "fastapi", "django", "flask", "database", "authentication", "queue", "worker", "server"),
+            "frontend": ("frontend", "react", "vue", "svelte", "angular", "accessibility", "design system", "browser", "component"),
+            "ai": ("machine learning", "llm", "ai agent", "agents", "inference", "evaluation", "embeddings", "retrieval", "model serving"),
+            "devops": ("devops", "ci/cd", "github actions", "docker", "deployment", "release automation", "build system", "observability"),
+            "infrastructure": ("infrastructure", "distributed system", "storage", "networking", "cloud platform", "runtime", "compiler", "orchestration", "platform engineering", "kubernetes"),
+        }
+        if category_key == "python":
+            primary_match = (item.primary_language or "").casefold() == "python"
+            add(70, primary_match, "Python is the repository's primary detected language")
+            eligible = primary_match
+        else:
+            relevant = _matches_category_terms(item, *category_terms[category_key])
+            add(65, relevant, f"Repository topics, issue type, or ranked issue match {category_key} work")
+            eligible = relevant
+        add(15, has_issue, "A concrete ranked issue is available")
+        add(10, active, "The repository has recent public maintenance activity")
+        add(10, radar_score >= 80, "The independent Radar opportunity score is strong")
+        eligible = eligible and relevance >= minimum_relevance
+
+    relevance = max(0, min(int(relevance), 100))
+    category_score = round((relevance * 0.8) + (radar_score * 0.2)) if category_key != "trending" else round(radar_score)
+    confidence = "High" if relevance >= 75 and len(signals) >= 3 else "Medium" if relevance >= 50 and len(signals) >= 2 else "Low"
+    if not signals:
+        signals.append("No category-specific evidence was available")
+    reason = ". ".join(signal.rstrip(".") for signal in signals[:2]) + "."
+    return {
+        "eligible": eligible,
+        "category_score": category_score,
+        "category_relevance": relevance,
+        "confidence": confidence,
+        "ranking_reason": reason,
+        "evidence_signals": signals[:4],
+        "missing_evidence": missing[:3],
+    }
+
+
+def curated_opportunity_sections(items, limit=5) -> list[dict]:
+    """Build strict category candidate pools from one cached repository dataset."""
+    items = list(items or [])
+    if not items:
+        return []
+    limit = max(1, min(int(limit or 5), 5))
     sections = []
-    for key, title, predicate, ranker in definitions:
-        section_items = selected(predicate, ranker)
-        if section_items:
-            sections.append({"key": key, "title": title, "items": section_items})
+    for definition in JOB_CATEGORY_DEFINITIONS:
+        ranked = []
+        for item in items:
+            detail = _category_ranking_detail(item, definition["key"])
+            if detail["eligible"]:
+                ranked.append((item, detail))
+        ranked.sort(
+            key=lambda value: (
+                -value[1]["category_score"],
+                -value[1]["category_relevance"],
+                -float(value[0].radar_score or 0),
+                value[0].repository_full_name.casefold(),
+            )
+        )
+        ranked = ranked[:limit]
+        sections.append(
+            {
+                **definition,
+                "items": [item for item, _detail in ranked],
+                "ranking_details": {
+                    item.repository_full_name.casefold(): detail
+                    for item, detail in ranked
+                },
+            }
+        )
     return sections
 
 

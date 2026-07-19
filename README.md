@@ -241,6 +241,24 @@ The daily opportunity cache can later be refreshed from a Railway Cron service w
 python -m scripts.refresh_opportunity_feed
 ```
 
+### Public OSS Jobs ranking
+
+`/jobs` uses the cached public opportunity feed; rendering the page does not call GitHub or an AI provider. Each section applies its own deterministic relevance profile to the same cached repository facts:
+
+- Paid Sprint requires explicit commercial context plus current maintenance and meaningful technical-work signals.
+- Fast Merge prefers observed contributor outcomes and merge timing when available, then clearly labeled issue-level estimates.
+- Founder Friendly requires active maintenance and visible commercial context but never infers founder identity.
+- Great First Contribution prioritizes a concrete ranked issue, contributor-oriented labels/types, and manageable difficulty.
+- Backend, Frontend, AI, DevOps, Infrastructure, and Python require structured language, topic, issue-type, or ranked-issue evidence.
+
+Category relevance supplies most of the category rank; the general Radar score is supporting context. Weak matches are omitted instead of backfilled, ordering is deterministic, and justified overlap is allowed. Ranking reasons expose the signals used and any important missing evidence. Rankings remain indicators rather than guarantees.
+
+The public page records allowlisted, CSRF-protected `jobs_*` events for category views/selections, card views, repository and issue clicks, ranking-detail expansion, and analysis starts. Metadata is limited to category slug, public repository identifier, ranking position, surface, and authenticated/anonymous state. No email address, token, private repository data, or generated pitch is recorded.
+
+Complete feed rows are reused for 24 hours. Stale rows remain visibly labeled during a safe refresh failure; missing category evidence produces fewer results rather than unrelated fallback repositories.
+
+Manual QA: open `/jobs` anonymously and authenticated, compare category ordering and reasons, expand evidence, test repository/issue/analysis links, verify empty and stale states, inspect `/admin/analytics`, and repeat at approximately 390px width without horizontal overflow.
+
 Use Railway environment variables for all secrets. Do not commit `.env`.
 
 ## GitHub Repository Metadata

@@ -181,12 +181,20 @@ def test_jobs_page_is_cache_backed_indexable_and_in_sitemap(client, monkeypatch)
     assert "Highest Paid Sprint Potential" in response.text
     assert "Fast Merge Opportunities" in response.text
     assert "Great First Contribution" in response.text
+    assert "Commercial open-source projects showing stronger business" in response.text
+    assert "Why ranked here" in response.text
+    assert "Category fit" in response.text
+    assert "Evidence used" in response.text
     assert "View Opportunity Analysis" in response.text
     assert "Last refreshed" in response.text
     assert "example/repo" in response.text
     assert "not confirmed jobs" in response.text
     assert '<link rel="canonical" href="http://testserver/jobs">' in response.text
     assert 'type="application/ld+json"' in response.text
+    assert 'data-public-event="jobs_category_selected"' in response.text
+    assert 'data-jobs-card' in response.text
+    assert "const emitted = new Set()" in response.text
+    assert "observer.unobserve(element)" in response.text
     assert "/jobs" in client.get("/sitemap.xml").text
 
 
@@ -198,7 +206,7 @@ def test_category_matching_does_not_treat_maintainer_as_ai(client):
     db = SessionLocal()
     sections = {section["key"]: section for section in curated_opportunity_sections(load_feed_items(db))}
     db.close()
-    assert "ai" not in sections
+    assert sections["ai"]["items"] == []
 
 
 def test_curated_categories_use_distinct_ranking_signals():
@@ -250,11 +258,100 @@ def test_public_distribution_events_are_csrf_protected_and_allowlisted(client, m
     assert client.post("/public/event", data={"action": "unknown", "surface": "jobs", "csrf_token": token}).status_code == 400
     tracked = client.post(
         "/public/event",
-        data={"action": "jobs_category", "surface": "jobs", "detail": "python", "csrf_token": token},
+        data={
+            "action": "jobs_repository_clicked",
+            "surface": "jobs",
+            "category": "python",
+            "repository": "example/repo",
+            "position": "2",
+            "csrf_token": token,
+        },
     )
     assert tracked.status_code == 200
     db = SessionLocal()
-    assert db.query(Event).filter(Event.event_name == "jobs_category").count() == 1
+    event = db.query(Event).filter(Event.event_name == "jobs_repository_clicked").one()
+    metadata = json.loads(event.metadata_json)
+    assert metadata == {
+        "surface": "jobs",
+        "detail": "",
+        "category": "python",
+        "repository": "example/repo",
+        "position": 2,
+        "authenticated": False,
+    }
+    db.close()
+
+
+def test_jobs_footer_uses_existing_trust_and_documentation_destinations(client):
+    response = client.get("/jobs")
+    assert response.status_code == 200
+    assert "Built using deterministic repository analysis" in response.text
+    assert 'href="/methodology#evidence-engine"' in response.text
+    assert 'href="/methodology"' in response.text
+    assert 'href="/docs"' in response.text
+    assert 'href="https://github.com/BashOpsDev/bashops-radar"' in response.text
+    assert 'href="/privacy"' in response.text
+    assert client.get("/methodology").status_code == 200
+    assert client.get("/privacy").status_code == 200
+    assert client.get("/docs").status_code == 200
+
+
+def test_jobs_empty_and_database_failure_states_are_safe(client, monkeypatch):
+    import app as app_module
+    from sqlalchemy.exc import SQLAlchemyError
+
+    empty = client.get("/jobs")
+    assert empty.status_code == 200
+    assert "opportunity cache is being refreshed" in empty.text
+
+    monkeypatch.setattr(
+        app_module,
+        "load_feed_items",
+        lambda _db: (_ for _ in ()).throw(SQLAlchemyError("private database detail")),
+    )
+    failed = client.get("/jobs")
+    assert failed.status_code == 200
+    assert "public opportunity feed is temporarily unavailable" in failed.text
+    assert "private database detail" not in failed.text
+
+
+def test_jobs_category_engagement_is_available_to_existing_admin_summary(client):
+    import app as app_module
+    from database import SessionLocal
+    from models import Event
+
+    page = client.get("/jobs")
+    token = _csrf(page.text)
+    for action in ("jobs_category_viewed", "jobs_category_selected", "jobs_repository_clicked", "jobs_issue_opened", "jobs_analysis_started"):
+        response = client.post(
+            "/public/event",
+            data={
+                "action": action,
+                "surface": "jobs",
+                "category": "backend",
+                "repository": "example/repo",
+                "position": "1",
+                "csrf_token": token,
+            },
+        )
+        assert response.status_code == 200
+
+    summary = app_module.admin_event_summary()
+    backend = next(item for item in summary["jobs_categories"] if item["category"] == "backend")
+    assert backend == {
+        "category": "backend",
+        "views": 1,
+        "selections": 1,
+        "clicks": 1,
+        "analyses": 1,
+        "issues": 1,
+        "click_through_rate": 100.0,
+    }
+    assert summary["jobs_positions"][0] == {"position": 1, "clicks": 1}
+
+    db = SessionLocal()
+    assert db.query(Event).filter(Event.event_name == "jobs_page_viewed").count() == 1
+    assert all("user@example.com" not in (event.metadata_json or "") for event in db.query(Event).all())
     db.close()
 
 

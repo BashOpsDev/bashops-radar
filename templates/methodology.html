@@ -55,9 +55,10 @@
         <p><b>Unknowns</b> are facts the bounded analysis did not request or cannot verify, including maintainer response speed, complete pull-request history, private business intent, hiring intent, and future review decisions.</p>
     </section>
 
-    <section>
+    <section id="evidence-engine">
         <h2>Evidence Engine</h2>
         <p>The Evidence Engine is a separate, informational historical layer. It does not change the Opportunity Score or recommendation in Phase 1.</p>
+        <p>Opportunity recommendations use observable public repository activity. AI may interpret supplied evidence, but it does not create repository facts, and no recommendation guarantees attention, acceptance, payment, or future work. Results can change as public repository activity changes.</p>
         <p>On a cold cache, it makes exactly three additional GitHub requests: up to {{ evidence_config.open_pull_sample }} open pull requests, up to {{ evidence_config.closed_pull_sample }} closed pull requests, and up to {{ evidence_config.release_sample }} releases. It does not follow pagination beyond those bounded samples.</p>
         <p>Every metric identifies its source, sample size, observation window, collection freshness, and limitation. “Sampled contributor acceptance” is not presented as the repository's complete lifetime acceptance rate.</p>
         <h3>Historical calculations</h3>
@@ -75,6 +76,13 @@
         <p>A deployment restart or another application process may collect the evidence again. The cache does not contain user data, authorization headers, access tokens, issue bodies, pull-request bodies, AI text, or raw GitHub responses.</p>
         <h3>Phase 1 exclusions</h3>
         <p>Maintainer response time, formal review difficulty, pull-request size, and maintainer diversity are not measured in Phase 1 because they require per-item history or additional GraphQL enrichment. The report explains these gaps instead of estimating them.</p>
+    </section>
+
+    <section id="opportunity-categories">
+        <h2>Opportunity category rankings</h2>
+        <p>The public OSS Jobs page evaluates one cached repository dataset through separate category profiles. Each profile uses relevant public signals, such as commercial context, recent maintenance, sampled contributor outcomes, issue scope, language, and repository topics. The general Opportunity Score is supporting context rather than the sole category rank.</p>
+        <p>Categories use minimum relevance thresholds and show fewer results when evidence is weak. A repository may appear in more than one category when different observable signals support each placement; its ranking explanation changes with the category.</p>
+        <p>Rankings are deterministic for a given cached dataset and may change after the daily feed refresh, repository activity, issue selection, or historical evidence changes. Public GitHub metadata cannot prove hiring intent, founder identity, merge timing, payment, or contract availability.</p>
     </section>
 
     <section>
